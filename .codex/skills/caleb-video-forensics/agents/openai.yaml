@@ -1,0 +1,4 @@
+interface:
+  display_name: "Caleb Video Forensics"
+  short_description: "Measure technical explainer production patterns"
+  default_prompt: "Use $caleb-video-forensics to analyze these reference videos into evidence-backed ATME production rules."

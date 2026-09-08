@@ -1,0 +1,26 @@
+{
+  "contract_version": "1",
+  "analysis_id": "ref-example-explainer",
+  "video": {
+    "url": "https://example.com/reference-video",
+    "title": "Reference technical explainer",
+    "duration_ms": 120000,
+    "accessed_at": "2026-08-28T12:00:00Z",
+    "format": "digital_whiteboard"
+  },
+  "evidence": {
+    "transcript_source": "authorized_local_transcription",
+    "visual_method": "Frame samples at five-second intervals plus transition boundaries"
+  },
+  "narrative_beats": [
+    {"beat_id": "beat-1", "kind": "hook", "start_ms": 0, "end_ms": 12000, "summary": "Introduces a technical contradiction."},
+    {"beat_id": "beat-2", "kind": "mechanism", "start_ms": 12000, "end_ms": 90000, "summary": "Builds the causal system explanation."},
+    {"beat_id": "beat-3", "kind": "resolution", "start_ms": 90000, "end_ms": 120000, "summary": "Returns to the contradiction with a practical consequence."}
+  ],
+  "visual_events": [
+    {"event_id": "visual-1", "at_ms": 1500, "action": "draw", "description": "Draws the first system boundary.", "trigger_phrase": "the real constraint", "major": true, "persistent": true}
+  ],
+  "metrics": {"spoken_word_count": 290, "words_per_minute": 145, "camera_event_count": 3, "visual_event_count": 1, "persistent_object_ratio": 1},
+  "observations": [{"observation_id": "obs-1", "statement": "The first diagram remains visible through the mechanism section.", "evidence_ms": [1500, 60000]}],
+  "interpretations": [{"statement": "Persistent objects support cumulative explanation.", "observation_ids": ["obs-1"], "confidence": "medium"}]
+}

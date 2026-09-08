@@ -1,0 +1,48 @@
+{
+  "contract_version": "1",
+  "seed": 7,
+  "grid": 50,
+  "canvas": {"width": 1200, "height": 800},
+  "board_timeline": {
+    "version": "1",
+    "boards": [{"board_id": "queue"}, {"board_id": "measurement"}],
+    "activations": [
+      {"activation_id": "queue-introduced", "board_id": "queue", "start_ms": 0, "end_ms": 4000},
+      {"activation_id": "measurement-shown", "board_id": "measurement", "start_ms": 4000, "end_ms": 7000},
+      {"activation_id": "queue-returned", "board_id": "queue", "start_ms": 7000, "end_ms": 10000}
+    ]
+  },
+  "camera_plan": [
+    {"cue_ms": 0, "action": "hold", "focus": {"x": 0, "y": 0, "width": 1200, "height": 800}},
+    {"cue_ms": 4000, "action": "cut", "focus": {"x": 0, "y": 0, "width": 1200, "height": 800}},
+    {"cue_ms": 7000, "action": "cut", "focus": {"x": 0, "y": 0, "width": 1200, "height": 800}}
+  ],
+  "elements": [
+    {"id": "el-question", "board_id": "queue", "scene_id": 1, "appear_at_ms": 0,
+     "type": "text", "x": 100, "y": 50, "size": "l", "text": "Why does the queue grow?"},
+    {"id": "el-arrivals", "board_id": "queue", "scene_id": 1, "appear_at_ms": 300,
+     "type": "rectangle", "x": 100, "y": 250, "width": 350, "height": 150,
+     "label": "Arrivals: 12 / second", "fillStyle": "none"},
+    {"id": "el-service", "board_id": "queue", "scene_id": 1, "appear_at_ms": 900,
+     "type": "rectangle", "x": 750, "y": 250, "width": 350, "height": 150,
+     "label": "Service: 8 / second", "fillStyle": "none"},
+    {"id": "el-flow", "board_id": "queue", "scene_id": 1, "appear_at_ms": 1500,
+     "type": "arrow", "start": {"x": 450, "y": 300}, "end": {"x": 750, "y": 300},
+     "startBinding": "el-arrivals", "endBinding": "el-service"},
+    {"id": "el-attention", "board_id": "queue", "scene_id": 1, "appear_at_ms": 2300,
+     "visibility_intervals": [{"start_ms": 2300, "end_ms": 3600}],
+     "type": "arrow", "start": {"x": 1000, "y": 550}, "end": {"x": 950, "y": 400}},
+    {"id": "el-measure-title", "board_id": "measurement", "scene_id": 2, "appear_at_ms": 4000,
+     "type": "text", "x": 100, "y": 50, "size": "l", "text": "An illustrative ten-second count"},
+    {"id": "el-measure-arrivals", "board_id": "measurement", "scene_id": 2, "appear_at_ms": 4300,
+     "type": "rectangle", "x": 100, "y": 250, "width": 1000, "height": 100,
+     "label": "120 arrived", "fillStyle": "hachure"},
+    {"id": "el-measure-service", "board_id": "measurement", "scene_id": 2, "appear_at_ms": 4800,
+     "type": "rectangle", "x": 100, "y": 450, "width": 650, "height": 100,
+     "label": "80 served", "fillStyle": "hachure"},
+    {"id": "el-measure-note", "board_id": "measurement", "scene_id": 2, "appear_at_ms": 5500,
+     "type": "text", "x": 100, "y": 650, "size": "m", "text": "Original illustrative numbers, not a sourced benchmark."},
+    {"id": "el-resolution", "board_id": "queue", "scene_id": 3, "appear_at_ms": 7500,
+     "type": "text", "x": 100, "y": 550, "size": "l", "text": "Backlog grows by 4 each second."}
+  ]
+}

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ATME</title>
+  <link rel="stylesheet" href="/src/tokens.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="titlestrip">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="title">ATME</span>
+      <span class="pill" id="job-status">idle</span>
+      <span class="spacer"></span>
+      <nav class="nav">
+        <button data-view="compose" class="navlink active">Compose</button>
+        <button data-view="library" class="navlink">Library</button>
+        <button data-view="settings" class="navlink">Settings</button>
+      </nav>
+    </header>
+
+    <main class="surface">
+      <section id="compose" class="pane">
+        <h1>What are we explaining?</h1>
+        <textarea id="topic" rows="3"
+          placeholder="Type the topic — e.g. Why inference is hard"></textarea>
+        <div class="chiprow">
+          <label class="chip">Voice
+            <select id="voice">
+              <option value="upload">My uploaded voice</option>
+              <option value="sapi">Windows draft voice</option>
+            </select>
+          </label>
+          <label class="chip">Quality
+            <select id="quality">
+              <option value="720p30">720p30</option>
+              <option value="720p24">720p24 (faster)</option>
+              <option value="1080p30">1080p30 (overnight)</option>
+            </select>
+          </label>
+          <label class="chip">Provider
+            <span id="provider-state">not configured</span>
+          </label>
+        </div>
+        <details class="fine-tuning">
+          <summary>Fine-tuning</summary>
+          <div class="fine-grid">
+            <label>Target duration (minutes)
+              <input id="duration-minutes" type="number" min="1" max="60" value="8" />
+            </label>
+            <label class="check"><input id="review-gate" type="checkbox" checked /> Review script before voice and rendering</label>
+          </div>
+        </details>
+        <div id="compose-feedback" class="mono feedback"></div>
+        <button id="start" class="primary">Start run</button>
+      </section>
+
+      <section id="voice-upload" class="pane hidden">
+        <h1>Record the approved script</h1>
+        <p class="hint">Upload one continuous WAV, MP3, M4A, AAC, or FLAC recording. Your delivery becomes the master timeline for every drawing and camera move.</p>
+        <label class="filebox" for="voice-file">
+          <span id="voice-file-name">Choose your voiceover</span>
+          <input id="voice-file" type="file" accept="audio/wav,audio/mpeg,audio/mp4,audio/aac,audio/flac,.wav,.mp3,.m4a,.aac,.flac" />
+        </label>
+        <div id="voice-feedback" class="mono feedback"></div>
+        <div class="rowgap">
+          <button id="upload-voice" class="primary">Upload &amp; render</button>
+          <button id="back-to-review" class="ghost">Back to script</button>
+        </div>
+      </section>
+
+      <section id="run" class="pane hidden">
+        <svg id="runline" viewBox="0 0 1000 24" preserveAspectRatio="none">
+          <path id="runline-path" d="" />
+        </svg>
+        <div id="run-meta" class="mono">—</div>
+        <pre id="log" class="mono"></pre>
+        <details>
+          <summary>Narration timing report</summary>
+          <p class="hint">Last saved alignment report. Refresh after alignment; this does not approve or modify timing.</p>
+          <button class="ghost" data-timing-refresh>Load timing report</button>
+          <div data-timing-report role="status" aria-live="polite"></div>
+        </details>
+        <div class="rowgap run-controls">
+          <button id="pause-run" class="ghost">Pause at checkpoint</button>
+          <button id="resume-run" class="ghost">Resume</button>
+          <button id="cancel-run" class="ghost danger">Cancel run</button>
+        </div>
+      </section>
+
+      <section id="review" class="pane hidden">
+        <h1>Script review</h1>
+        <p class="hint mono">Edit any narration below, then approve. Voice synthesis starts on approval.</p>
+        <div id="scenes"></div>
+        <details>
+          <summary>Board timeline and object assignments</summary>
+          <p class="hint">Requires a saved layout and final polished audio. Saving preserves a backup and requires realignment and rendering.</p>
+          <div id="board-editor"></div>
+        </details>
+        <details>
+          <summary>Narration timing report</summary>
+          <p class="hint">Available after voice alignment. Script edits may make the last saved report outdated.</p>
+          <button class="ghost" data-timing-refresh>Load timing report</button>
+          <div data-timing-report role="status" aria-live="polite"></div>
+        </details>
+        <div class="rowgap">
+          <button id="approve" class="primary">Approve &amp; continue</button>
+          <button id="cancel-job" class="ghost">Cancel job</button>
+        </div>
+      </section>
+
+      <section id="library" class="pane hidden">
+        <h1>Library</h1>
+        <div id="lib-rows"></div>
+      </section>
+
+      <section id="settings" class="pane hidden">
+        <h1>AI providers</h1>
+        <p class="hint">Map each production role to a LiteLLM model. API keys are encrypted for your Windows account and never returned to the interface.</p>
+        <p class="hint">OpenRouter defaults are filled in as real values. Paste the same OpenRouter API key into all four key fields, then save.</p>
+        <p class="hint mono">Alignment model: <span id="alignment-model-state">not ready</span></p>
+        <div id="provider-roles" class="provider-roles">
+          <fieldset data-role="researcher">
+            <legend>Researcher <span class="required">web grounded</span></legend>
+            <input data-field="model" placeholder="Model identifier" autocomplete="off" />
+            <input data-field="api_base" placeholder="API base URL (optional)" autocomplete="off" />
+            <input data-field="api_key" type="password" placeholder="API key" autocomplete="new-password" />
+            <label class="check"><input data-field="web_grounded" type="checkbox" checked /> Endpoint performs live web search</label>
+          </fieldset>
+          <fieldset data-role="reasoner">
+            <legend>Verifier / reasoner</legend>
+            <input data-field="model" placeholder="Model identifier" autocomplete="off" />
+            <input data-field="api_base" placeholder="API base URL (optional)" autocomplete="off" />
+            <input data-field="api_key" type="password" placeholder="API key" autocomplete="new-password" />
+          </fieldset>
+          <fieldset data-role="writer">
+            <legend>Scriptwriter</legend>
+            <input data-field="model" placeholder="Model identifier" autocomplete="off" />
+            <input data-field="api_base" placeholder="API base URL (optional)" autocomplete="off" />
+            <input data-field="api_key" type="password" placeholder="API key" autocomplete="new-password" />
+          </fieldset>
+          <fieldset data-role="layouter">
+            <legend>Spatial director</legend>
+            <input data-field="model" placeholder="Model identifier" autocomplete="off" />
+            <input data-field="api_base" placeholder="API base URL (optional)" autocomplete="off" />
+            <input data-field="api_key" type="password" placeholder="API key" autocomplete="new-password" />
+          </fieldset>
+        </div>
+        <div id="settings-feedback" class="mono feedback" role="status" aria-live="polite"></div>
+        <div class="rowgap">
+          <button id="save-settings" class="primary">Save provider settings</button>
+          <button id="prepare-model" class="ghost">Prepare alignment model</button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

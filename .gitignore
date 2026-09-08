@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+sidecar/.venv/
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Node / Rust / Tauri
+node_modules/
+app/src-tauri/target/
+
+# Local runtime data (jobs, artifacts, models) never enters the repo
+data/
+*.local.json
+
+# OS
+Thumbs.db
+.DS_Store
+# Packaging/test scratch outputs
+smoke-out.txt
+pytest-out.txt
+packaged-smoke.txt
+netstat-smoke.txt
+stacks.txt
+cargo-check.log
+sidecar-dist/
+sidecar-build/
+app/src-tauri/binaries/

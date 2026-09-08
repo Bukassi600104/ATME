@@ -1,0 +1,60 @@
+{
+  "topic": "Why inference is hard",
+  "generated_at": "2026-07-12T09:00:00Z",
+  "research_model": "researcher/sonar-pro",
+  "verification_rounds_used": 3,
+  "sources": [
+    {
+      "source_id": "src-arxiv-2601-00421",
+      "url": "https://arxiv.org/abs/2601.00421",
+      "title": "Serving LLMs at Scale: KV-Cache Management",
+      "publisher": "arXiv",
+      "published_at": "2026-01-05",
+      "retrieved_at": "2026-07-12T08:41:00Z",
+      "excerpt": "PagedAttention reduces memory fragmentation ... measured 2.4x throughput ..."
+    },
+    {
+      "source_id": "src-docs-vllm",
+      "url": "https://docs.vllm.ai/en/latest/design/paged_attention.html",
+      "title": "PagedAttention design notes",
+      "publisher": "vLLM project",
+      "retrieved_at": "2026-07-12T08:44:10Z",
+      "excerpt": "Continuous batching over paged KV blocks yields up to 2.4x higher throughput."
+    },
+    {
+      "source_id": "src-blog-memorywall",
+      "url": "https://example.com/hbm-bandwidth-analysis",
+      "title": "The memory wall in modern GPU serving",
+      "publisher": "Example Engineering Blog",
+      "retrieved_at": "2026-07-12T08:52:00Z"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "clm-paged-attn-throughput",
+      "text": "vLLM's PagedAttention delivers roughly 2.4x higher serving throughput versus naive KV-cache management.",
+      "kind": "figure",
+      "source_ids": ["src-arxiv-2601-00421", "src-docs-vllm"],
+      "status": "verified",
+      "verification_rounds": 2
+    },
+    {
+      "claim_id": "clm-memory-wall",
+      "text": "Data movement between HBM and compute units, not raw FLOPs, dominates token latency at high batch sizes.",
+      "kind": "fact",
+      "source_ids": ["src-blog-memorywall"],
+      "status": "verified",
+      "verification_rounds": 1,
+      "notes": "Qualitative claim; single authoritative source accepted after cross-read."
+    },
+    {
+      "claim_id": "clm-dropped-latency-number",
+      "text": "P99 latency drops by exactly 87 percent with speculative decoding.",
+      "kind": "figure",
+      "source_ids": ["src-blog-memorywall"],
+      "status": "dropped",
+      "verification_rounds": 5,
+      "notes": "Only one weak source; numerals unverifiable. Cite-or-cut rule applied."
+    }
+  ]
+}

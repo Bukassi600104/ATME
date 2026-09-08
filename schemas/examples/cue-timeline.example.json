@@ -1,0 +1,27 @@
+{
+  "contract_version": "1",
+  "duration_ms": 75250,
+  "audio": {
+    "path": "data/jobs/job-0007/audio/final.wav",
+    "sha256": "3b5d2fa41c9e8f0176bc4de5a9087f23ba61cd94e05872ab34cf10d97e6851ac",
+    "sample_rate": 24000,
+    "lufs": -16.2
+  },
+  "words": [
+    { "word": "Scaling",   "start_ms": 500,   "end_ms": 820,   "scene_id": 1, "confidence": 0.98, "flagged": false },
+    { "word": "trilemma:", "start_ms": 3100,  "end_ms": 3720,  "scene_id": 1, "confidence": 0.91, "flagged": false },
+    { "word": "GPU",       "start_ms": 42300, "end_ms": 42580, "scene_id": 2, "confidence": 0.55, "flagged": true },
+    { "word": "bandwidth", "start_ms": 48410, "end_ms": 48960, "scene_id": 2, "confidence": 0.97, "flagged": false }
+  ],
+  "directives": [
+    { "at_ms": 500,   "scene_id": 1, "action": "draw",     "target_id": "el-title" },
+    { "at_ms": 42000, "scene_id": 2, "action": "camera",   "target_id": "camera_plan[1]" },
+    { "at_ms": 42300, "scene_id": 2, "action": "draw",     "target_id": "el-gpu" },
+    { "at_ms": 45500, "scene_id": 2, "action": "draw",     "target_id": "el-hbm" },
+    { "at_ms": 48250, "scene_id": 2, "action": "draw",     "target_id": "el-bw-arrow" }
+  ],
+  "edl_original_to_final_ms": [
+    { "orig_start_ms": 0,     "orig_end_ms": 480,    "final_start_ms": 0 },
+    { "orig_start_ms": 12400, "orig_end_ms": 12650,  "final_start_ms": 480 }
+  ]
+}

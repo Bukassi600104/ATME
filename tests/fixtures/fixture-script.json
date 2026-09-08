@@ -1,0 +1,31 @@
+{
+  "topic": "Why inference is hard",
+  "title": "Fixture: Why Inference Is Hard",
+  "target_seconds": 75,
+  "scenes": [
+    {
+      "scene_id": 1,
+      "phase": "hook",
+      "spoken_text": "Serving large models is a fight against three walls at once: throughput, latency, and cost.",
+      "visual_directive": "Draw a triangle labeled Throughput, Latency, Cost.",
+      "est_seconds": 9,
+      "claim_ids": []
+    },
+    {
+      "scene_id": 2,
+      "phase": "context",
+      "spoken_text": "The real wall is memory. Every token drags the KV cache across a bandwidth ceiling that FLOPs cannot fix.",
+      "visual_directive": "Draw GPU box left, HBM box right, arrow between labeled bandwidth.",
+      "est_seconds": 13,
+      "claim_ids": ["clm-memory-wall"]
+    },
+    {
+      "scene_id": 3,
+      "phase": "architecture",
+      "spoken_text": "vLLM pages the KV cache like virtual memory and batches continuously, roughly doubling serving throughput.",
+      "visual_directive": "Draw stacked page rectangles inside KV Cache box; arrow labeled continuous batching.",
+      "est_seconds": 14,
+      "claim_ids": ["clm-paged-attn-throughput"]
+    }
+  ]
+}

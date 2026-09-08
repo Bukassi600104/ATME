@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atme.local/schemas/v1/fact-sheet.schema.json",
+  "title": "FactSheet",
+  "description": "Claim-level research output; quantitative claims must be dual-sourced.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["topic", "generated_at", "sources", "claims"],
+  "properties": {
+    "topic": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string" },
+    "research_model": { "type": "string" },
+    "verification_rounds_used": { "type": "integer", "minimum": 0, "maximum": 5 },
+    "sources": { "type": "array", "items": { "$ref": "#/$defs/source" } },
+    "claims": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/claim" } }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "url", "title", "retrieved_at"],
+      "properties": {
+        "source_id": { "type": "string", "pattern": "^src-[a-zA-Z0-9_-]+$" },
+        "url": { "type": "string" },
+        "title": { "type": "string", "minLength": 1 },
+        "publisher": { "type": "string" },
+        "published_at": { "type": "string" },
+        "retrieved_at": { "type": "string" },
+        "excerpt": { "type": "string" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_id", "text", "kind", "source_ids", "status"],
+      "properties": {
+        "claim_id": { "type": "string", "pattern": "^clm-[a-zA-Z0-9_-]+$" },
+        "text": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["fact", "figure", "quote", "opinion"] },
+        "source_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "status": { "enum": ["verified", "dropped", "unresolved"] },
+        "verification_rounds": { "type": "integer", "minimum": 0 },
+        "notes": { "type": "string" }
+      },
+      "if": {
+        "properties": {
+          "kind": { "const": "figure" },
+          "status": { "not": { "const": "dropped" } }
+        }
+      },
+      "then": { "properties": { "source_ids": { "minItems": 2 } } }
+    }
+  }
+}

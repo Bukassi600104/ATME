@@ -1,0 +1,8 @@
+{
+  "contract_version": "1",
+  "topic": "Why inference is hard",
+  "beats": [
+    {"beat_id": "beat-001", "scene_id": 1, "narration": "Serving models creates a three-way conflict.", "trigger_phrase": "Serving models creates", "purpose": "conflict", "assets": ["draw a triangle labeled throughput latency cost"], "actions": ["draw"], "layout": "center", "camera": {"action": "hold", "subject": "beat-001"}, "continuity": {"keep": [], "remove": []}, "emphasis": "three-way conflict", "fallback": "draw three connected labels"},
+    {"beat_id": "beat-002", "scene_id": 2, "narration": "Memory movement becomes the bottleneck.", "trigger_phrase": "Memory movement becomes", "purpose": "causality", "assets": ["draw a memory path"], "actions": ["draw"], "layout": "below the first beat", "camera": {"action": "reframe", "subject": "beat-002"}, "continuity": {"keep": ["el-scene-1"], "remove": []}, "emphasis": "bottleneck", "fallback": "draw two boxes connected by a narrow arrow"}
+  ]
+}

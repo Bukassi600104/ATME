@@ -1,0 +1,34 @@
+{
+  "contract_version": "1",
+  "seed": 42,
+  "canvas": { "width": 1920, "height": 1080 },
+  "grid": 50,
+  "roughness": 1,
+  "elements": [
+    {
+      "id": "el-gpu", "scene_id": 2, "appear_at_ms": 42000,
+      "type": "rectangle", "x": 300, "y": 450, "width": 450, "height": 200,
+      "label": "GPU", "stroke": "ink", "fillStyle": "hachure"
+    },
+    {
+      "id": "el-hbm", "scene_id": 2, "appear_at_ms": 45500,
+      "type": "rectangle", "x": 1250, "y": 450, "width": 400, "height": 200,
+      "label": "HBM", "stroke": "ink", "fillStyle": "hachure"
+    },
+    {
+      "id": "el-bw-arrow", "scene_id": 2, "appear_at_ms": 48250,
+      "type": "arrow",
+      "start": { "x": 750, "y": 550 }, "end": { "x": 1250, "y": 550 },
+      "label": "bandwidth", "startBinding": "el-gpu", "endBinding": "el-hbm"
+    },
+    {
+      "id": "el-title", "scene_id": 1, "appear_at_ms": 500,
+      "type": "text", "x": 700, "y": 100,
+      "text": "The Memory Wall", "size": "l"
+    }
+  ],
+  "camera_plan": [
+    { "cue_ms": 0,     "focus": { "x": 0, "y": 0, "width": 1920, "height": 1080 }, "easing": "easeInOut" },
+    { "cue_ms": 42000, "focus": { "x": 250, "y": 400, "width": 1450, "height": 350 }, "easing": "easeInOut" }
+  ]
+}

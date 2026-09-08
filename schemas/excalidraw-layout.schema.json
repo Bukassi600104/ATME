@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atme.local/schemas/v1/excalidraw-layout.schema.json",
+  "title": "LayoutDoc",
+  "description": "Spatial agent output: grid-snapped diagram elements + camera plan. Coordinates are multiples of the grid size.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "seed", "canvas", "grid", "elements"],
+  "properties": {
+    "contract_version": { "const": "1" },
+    "seed": { "type": "integer", "minimum": 0 },
+    "canvas": {
+      "type": "object", "additionalProperties": false,
+      "required": ["width", "height"],
+      "description": "Output raster size in pixels (e.g. 1280x720 / 1920x1080); NOT grid-snapped.",
+      "properties": {
+        "width": { "type": "integer", "minimum": 320 },
+        "height": { "type": "integer", "minimum": 180 }
+      }
+    },
+    "grid": { "const": 50 },
+    "roughness": { "type": "integer", "minimum": 0, "maximum": 2 },
+    "elements": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/element" } },
+    "camera_plan": { "type": "array", "items": { "$ref": "#/$defs/cameraCue" } },
+    "board_timeline": { "$ref": "#/$defs/boardTimeline" }
+  },
+  "$defs": {
+    "narrationTrigger": {
+      "type": "object", "additionalProperties": false, "required": ["phrase"],
+      "properties": {
+        "phrase": {"type": "string", "minLength": 1},
+        "occurrence": {"type": "integer", "minimum": 1},
+        "offset_ms": {"type": "integer"},
+        "min_confidence": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "visibilityInterval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["start_ms", "end_ms"],
+      "properties": {
+        "start_ms": {"type": "integer", "minimum": 0},
+        "end_ms": {"type": "integer", "minimum": 1}
+      }
+    },
+    "visibilityIntervals": {
+      "type": "array", "minItems": 1,
+      "items": {"$ref": "#/$defs/visibilityInterval"}
+    },
+    "boardTimeline": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "boards", "activations"],
+      "properties": {
+        "version": {"const": "1"},
+        "boards": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["board_id"],
+            "properties": {"board_id": {"type": "string", "minLength": 1}}
+          }
+        },
+        "activations": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["activation_id", "board_id", "start_ms", "end_ms"],
+            "properties": {
+              "activation_id": {"type": "string", "minLength": 1},
+              "board_id": {"type": "string", "minLength": 1},
+              "start_ms": {"type": "integer", "minimum": 0},
+              "end_ms": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    "point": {
+      "type": "object", "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "integer", "multipleOf": 50, "minimum": 0 },
+        "y": { "type": "integer", "multipleOf": 50, "minimum": 0 }
+      }
+    },
+    "element": {
+      "oneOf": [
+        { "$ref": "#/$defs/box" },
+        { "$ref": "#/$defs/textEl" },
+        { "$ref": "#/$defs/arrow" },
+        { "$ref": "#/$defs/evidenceImage" }
+      ]
+    },
+    "baseEl": {
+      "type": "object",
+      "required": ["id", "scene_id", "appear_at_ms"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^el-[a-zA-Z0-9_-]+$" },
+        "scene_id": { "type": "integer", "minimum": 1 },
+        "appear_at_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "box": {
+      "allOf": [ { "$ref": "#/$defs/baseEl" } ],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "x", "y", "width", "height", "label"],
+      "properties": {
+        "id": true, "scene_id": true, "appear_at_ms": true,
+        "board_id": {"type": "string", "minLength": 1},
+        "visibility_intervals": {"$ref": "#/$defs/visibilityIntervals"},
+        "type": { "const": "rectangle" },
+        "narration_trigger": {"$ref": "#/$defs/narrationTrigger"},
+        "enter_action": {"enum": ["draw", "reveal"]},
+        "x": { "type": "integer", "multipleOf": 50, "minimum": 0 },
+        "y": { "type": "integer", "multipleOf": 50, "minimum": 0 },
+        "width": { "type": "integer", "multipleOf": 50, "minimum": 50 },
+        "height": { "type": "integer", "multipleOf": 50, "minimum": 50 },
+        "label": { "type": "string" },
+        "stroke": { "enum": ["ink", "accent", "muted"] },
+        "fillStyle": { "enum": ["hachure", "solid", "none"] }
+      }
+    },
+    "textEl": {
+      "allOf": [ { "$ref": "#/$defs/baseEl" } ],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "x", "y", "text"],
+      "properties": {
+        "id": true, "scene_id": true, "appear_at_ms": true,
+        "board_id": {"type": "string", "minLength": 1},
+        "visibility_intervals": {"$ref": "#/$defs/visibilityIntervals"},
+        "type": { "const": "text" },
+        "narration_trigger": {"$ref": "#/$defs/narrationTrigger"},
+        "enter_action": {"enum": ["draw", "reveal"]},
+        "x": { "type": "integer", "multipleOf": 50, "minimum": 0 },
+        "y": { "type": "integer", "multipleOf": 50, "minimum": 0 },
+        "text": { "type": "string", "minLength": 1 },
+        "size": { "enum": ["s", "m", "l"] }
+      }
+    },
+    "arrow": {
+      "allOf": [ { "$ref": "#/$defs/baseEl" } ],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "start", "end"],
+      "properties": {
+        "id": true, "scene_id": true, "appear_at_ms": true,
+        "board_id": {"type": "string", "minLength": 1},
+        "visibility_intervals": {"$ref": "#/$defs/visibilityIntervals"},
+        "type": { "const": "arrow" },
+        "narration_trigger": {"$ref": "#/$defs/narrationTrigger"},
+        "enter_action": {"enum": ["draw", "reveal"]},
+        "start": { "$ref": "#/$defs/point" },
+        "end": { "$ref": "#/$defs/point" },
+        "label": { "type": "string" },
+        "startBinding": { "type": "string" },
+        "endBinding": { "type": "string" }
+      }
+    },
+    "evidenceImage": {
+      "allOf": [{"$ref": "#/$defs/baseEl"}],
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "x", "y", "width", "height", "enter_action", "png_base64", "sha256", "provenance"],
+      "properties": {
+        "id": true, "scene_id": true, "appear_at_ms": true,
+        "board_id": {"type": "string", "minLength": 1},
+        "visibility_intervals": {"$ref": "#/$defs/visibilityIntervals"},
+        "type": {"const": "evidence_image"},
+        "narration_trigger": {"$ref": "#/$defs/narrationTrigger"},
+        "enter_action": {"const": "reveal"},
+        "x": {"type": "integer", "minimum": 0, "multipleOf": 50},
+        "y": {"type": "integer", "minimum": 0, "multipleOf": 50},
+        "width": {"type": "integer", "minimum": 50, "multipleOf": 50},
+        "height": {"type": "integer", "minimum": 50, "multipleOf": 50},
+        "png_base64": {"type": "string", "minLength": 1, "maxLength": 11184812},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "provenance": {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "description"],
+          "properties": {
+            "kind": {"enum": ["original_illustration", "external_evidence"]},
+            "description": {"type": "string", "minLength": 1},
+            "source_url": {"type": "string", "pattern": "^https?://[^\\s]+$"}
+          },
+          "allOf": [{"if": {"properties": {"kind": {"const": "external_evidence"}}},
+                     "then": {"required": ["source_url"]}}]
+        }
+      }
+    },
+    "cameraCue": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cue_ms", "focus"],
+      "properties": {
+        "cue_ms": { "type": "integer", "minimum": 0 },
+        "focus": {
+          "type": "object", "additionalProperties": false,
+          "description": "Derived zoom region in canvas pixels; may exceed canvas bounds when zooming out.",
+          "required": ["x", "y", "width", "height"],
+          "properties": {
+            "x": { "type": "integer" },
+            "y": { "type": "integer" },
+            "width": { "type": "integer", "minimum": 50 },
+            "height": { "type": "integer", "minimum": 50 }
+          }
+        },
+        "easing": { "enum": ["linear", "easeInOut"], "default": "easeInOut" },
+        "action": {"enum": ["hold", "cut", "pan", "zoom", "reframe"]},
+        "transition_ms": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

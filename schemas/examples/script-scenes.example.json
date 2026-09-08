@@ -1,0 +1,32 @@
+{
+  "topic": "Why inference is hard",
+  "title": "Why Inference Is Hard",
+  "target_seconds": 480,
+  "fact_sheet_digest": "sha256:9f2c...",
+  "scenes": [
+    {
+      "scene_id": 1,
+      "phase": "hook",
+      "spoken_text": "Scaling large language models pushes infrastructure into a corner. You are fighting a trilemma: more throughput spikes latency, clamping latency inflates cost, and cutting cost wrecks performance.",
+      "visual_directive": "Draw a large triangle labeled Throughput, Latency, Cost. Place a red circle at its center labeled The Memory Wall.",
+      "est_seconds": 18,
+      "claim_ids": []
+    },
+    {
+      "scene_id": 2,
+      "phase": "context",
+      "spoken_text": "The bottleneck is not compute. It is data movement: every generated token drags the KV cache across the memory wall.",
+      "visual_directive": "Draw a GPU box on the left and an HBM box on the right. Connect them with an arrow labeled bandwidth.",
+      "est_seconds": 22,
+      "claim_ids": ["clm-memory-wall"]
+    },
+    {
+      "scene_id": 3,
+      "phase": "architecture",
+      "spoken_text": "vLLM attacks fragmentation with PagedAttention, paging the KV cache like virtual memory and batching continuously for about 2.4 times the throughput.",
+      "visual_directive": "Draw three stacked rectangles labeled pages inside a box titled KV Cache. Add an arrow into them labeled continuous batching.",
+      "est_seconds": 35,
+      "claim_ids": ["clm-paged-attn-throughput"]
+    }
+  ]
+}

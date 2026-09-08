@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atme"
+version = "0.1.0"
+description = "ATME Python sidecar: agents, LLM gateway, audio, alignment, rendering, assembly"
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic>=2.7",
+  "fastapi>=0.111",
+  "uvicorn>=0.30",
+  "jsonschema>=4.22",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2", "ruff>=0.4", "mypy>=1.10"]
+gateway = ["litellm>=1.40"]
+audio = ["numpy>=1.26", "soundfile>=0.12", "noisereduce>=3.0", "pedalboard>=0.9", "pyloudnorm>=0.1.1"]
+# resvg-py bundles its own native rasterizer (no GTK/cairo DLL hunt on Windows);
+# cairosvg kept as documented fallback only.
+render = ["resvg-py>=0.0.8", "pillow>=10.3", "numpy>=1.26"]
+align = ["faster-whisper>=1.0"]
+tts = ["kokoro-onnx>=0.3", "onnxruntime>=1.17"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+  "integration: end-to-end pipeline runs (slower, needs fixture VO)",
+]

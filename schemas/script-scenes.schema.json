@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atme.local/schemas/v1/script-scenes.schema.json",
+  "title": "ScriptScenes",
+  "description": "Scriptwriter output: narration split into scenes with constrained visual directives.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["topic", "scenes"],
+  "properties": {
+    "topic": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
+    "target_seconds": { "type": "number", "exclusiveMinimum": 0 },
+    "fact_sheet_digest": { "type": "string" },
+    "scenes": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/scene" } }
+  },
+  "$defs": {
+    "scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scene_id", "phase", "spoken_text", "visual_directive"],
+      "properties": {
+        "scene_id": { "type": "integer", "minimum": 1 },
+        "phase": { "enum": ["hook", "context", "architecture", "conclusion"] },
+        "spoken_text": { "type": "string", "minLength": 1 },
+        "visual_directive": { "type": "string", "minLength": 1 },
+        "est_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "claim_ids": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
