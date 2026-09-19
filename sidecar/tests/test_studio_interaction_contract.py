@@ -48,6 +48,11 @@ def test_studio_has_production_viewer_timeline_and_navigation_contracts():
     assert "watchMcpConnection" in script
     assert "MCP connected live" in script
     assert 'id="enable-jev"' in html and 'id="jev-key"' in html
+    assert 'id="copy-ai-status"' in html and "✓ Copied" in script
+    assert "ATME CONNECTION RULE" not in script
+    assert "Paste this into the client configuration location shown above, not into a normal chat." in html
+    assert 'class="app-menu"' in html and 'data-menu-action="render"' in html
+    assert "runMenuAction" in script
 
 
 def test_user_mcp_surface_cannot_edit_or_diagnose_the_application_source():
