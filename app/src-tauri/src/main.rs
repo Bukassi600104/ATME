@@ -60,7 +60,7 @@ fn import_dropped_source(path: String, project_id: i64, expected_revision: i64,
 
 #[tauri::command]
 fn mcp_connection_info(state: tauri::State<SidecarState>) -> Result<serde_json::Value, String> {
-    let command = state.sidecar_path.canonicalize().map_err(|e| e.to_string())?;
+    let command = display_windows_path(&state.sidecar_path.canonicalize().map_err(|e| e.to_string())?);
     Ok(serde_json::json!({
         "command": command,
         "args": ["mcp"],
@@ -68,6 +68,83 @@ fn mcp_connection_info(state: tauri::State<SidecarState>) -> Result<serde_json::
         "api_keys_required": false,
         "project_store": "resolved_from_windows_atme_configuration",
     }))
+}
+
+fn display_windows_path(path: &std::path::Path) -> String {
+    let value = path.to_string_lossy().to_string();
+    value.strip_prefix(r"\\?\").unwrap_or(&value).to_string()
+}
+
+fn client_config_path(client: &str) -> Result<PathBuf, String> {
+    match client {
+        "chatgpt" | "codex" => std::env::var_os("USERPROFILE").map(PathBuf::from)
+            .map(|p| p.join(".codex").join("config.toml"))
+            .ok_or_else(|| "Windows user profile could not be located".to_string()),
+        "claude" => std::env::var_os("APPDATA").map(PathBuf::from)
+            .map(|p| p.join("Claude").join("claude_desktop_config.json"))
+            .ok_or_else(|| "Windows application-data folder could not be located".to_string()),
+        _ => Err("Unsupported AI client".to_string()),
+    }
+}
+
+fn write_config_safely(path: &std::path::Path, content: &[u8]) -> Result<Option<PathBuf>, String> {
+    let parent = path.parent().ok_or_else(|| "Configuration location is invalid".to_string())?;
+    std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let backup = path.with_extension(format!("{}.atme-backup", path.extension().and_then(|v| v.to_str()).unwrap_or("config")));
+    let backup_created = if path.exists() {
+        std::fs::copy(path, &backup).map_err(|e| format!("Could not back up existing configuration: {e}"))?;
+        Some(backup)
+    } else { None };
+    let temporary = path.with_extension(format!("{}.atme-new", path.extension().and_then(|v| v.to_str()).unwrap_or("config")));
+    std::fs::write(&temporary, content).map_err(|e| e.to_string())?;
+    if path.exists() { std::fs::remove_file(path).map_err(|e| e.to_string())?; }
+    std::fs::rename(&temporary, path).map_err(|e| e.to_string())?;
+    Ok(backup_created)
+}
+
+#[tauri::command]
+fn install_mcp_client(client: String, jev_key: Option<String>, state: tauri::State<SidecarState>) -> Result<serde_json::Value, String> {
+    let executable = state.sidecar_path.canonicalize().map_err(|_| "ATME's MCP executable is missing. Reinstall ATME before configuring a client.".to_string())?;
+    let command = display_windows_path(&executable);
+    let path = client_config_path(&client)?;
+    let existing = if path.exists() { std::fs::read_to_string(&path).map_err(|e| e.to_string())? } else { String::new() };
+    let backup = if client == "claude" {
+        let mut root: serde_json::Value = if existing.trim().is_empty() { serde_json::json!({}) } else { serde_json::from_str(&existing).map_err(|e| format!("Claude configuration is not valid JSON: {e}"))? };
+        let object = root.as_object_mut().ok_or_else(|| "Claude configuration must be a JSON object".to_string())?;
+        let servers = object.entry("mcpServers").or_insert_with(|| serde_json::json!({})).as_object_mut().ok_or_else(|| "Claude mcpServers must be a JSON object".to_string())?;
+        let mut server = serde_json::json!({"command": command, "args": ["mcp"]});
+        if let Some(key) = jev_key.filter(|v| !v.trim().is_empty()) { server["env"] = serde_json::json!({"TYPESAFE_API_KEY": key}); }
+        servers.insert("atme".to_string(), server);
+        write_config_safely(&path, serde_json::to_string_pretty(&root).map_err(|e| e.to_string())?.as_bytes())?
+    } else {
+        use toml_edit::{value, Array, DocumentMut, Item, Table};
+        let mut document = if existing.trim().is_empty() { DocumentMut::new() } else { existing.parse::<DocumentMut>().map_err(|e| format!("Codex configuration is not valid TOML: {e}"))? };
+        if !document.as_table().contains_key("mcp_servers") { document["mcp_servers"] = Item::Table(Table::new()); }
+        let servers = document["mcp_servers"].as_table_mut().ok_or_else(|| "mcp_servers must be a TOML table".to_string())?;
+        let mut server = Table::new(); server["command"] = value(command); let mut args = Array::new(); args.push("mcp"); server["args"] = value(args); server["startup_timeout_sec"] = value(20); server["tool_timeout_sec"] = value(120);
+        if let Some(key) = jev_key.filter(|v| !v.trim().is_empty()) { let mut env = Table::new(); env["TYPESAFE_API_KEY"] = value(key); server["env"] = Item::Table(env); }
+        servers.insert("atme", Item::Table(server));
+        write_config_safely(&path, document.to_string().as_bytes())?
+    };
+    Ok(serde_json::json!({"installed": true, "client": client, "path": path, "backup": backup, "restart_required": true}))
+}
+
+#[tauri::command]
+fn remove_mcp_client(client: String) -> Result<serde_json::Value, String> {
+    let path = client_config_path(&client)?;
+    if !path.exists() { return Ok(serde_json::json!({"removed": false, "path": path})); }
+    let existing = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    if client == "claude" {
+        let mut root: serde_json::Value = serde_json::from_str(&existing).map_err(|e| format!("Claude configuration is not valid JSON: {e}"))?;
+        if let Some(servers) = root.get_mut("mcpServers").and_then(|v| v.as_object_mut()) { servers.remove("atme"); }
+        write_config_safely(&path, serde_json::to_string_pretty(&root).map_err(|e| e.to_string())?.as_bytes())?;
+    } else {
+        use toml_edit::DocumentMut;
+        let mut document = existing.parse::<DocumentMut>().map_err(|e| format!("Codex configuration is not valid TOML: {e}"))?;
+        if let Some(servers) = document.get_mut("mcp_servers").and_then(|v| v.as_table_mut()) { servers.remove("atme"); }
+        write_config_safely(&path, document.to_string().as_bytes())?;
+    }
+    Ok(serde_json::json!({"removed": true, "path": path, "restart_required": true}))
 }
 
 #[tauri::command]
@@ -253,7 +330,7 @@ fn main() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![sidecar_info, set_studio_open, import_dropped_source, mcp_connection_info, open_artifact])
+        .invoke_handler(tauri::generate_handler![sidecar_info, set_studio_open, import_dropped_source, mcp_connection_info, install_mcp_client, remove_mcp_client, open_artifact])
         .run(tauri::generate_context!())
         .expect("error while running ATME");
 }

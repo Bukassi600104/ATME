@@ -957,7 +957,18 @@ async function connectionSetup(client:string,jevKey=""):Promise<{config:string;s
   return {config,steps};
 }
 async function connectionInstruction(client:string,jevKey=""):Promise<string>{return (await connectionSetup(client,jevKey)).config;}
-async function showAiSetup():Promise<void>{const dialog=$<HTMLDialogElement>("ai-setup-dialog"),select=$<HTMLSelectElement>("ai-client"),output=$<HTMLTextAreaElement>("ai-setup-command"),steps=$("ai-setup-steps"),enable=$<HTMLInputElement>("enable-jev"),key=$<HTMLInputElement>("jev-key"),row=$("jev-key-row"),status=$("copy-ai-status"),button=$<HTMLButtonElement>("copy-ai-setup");const refresh=async()=>{row.classList.toggle("hidden",!enable.checked);const setup=await connectionSetup(select.value,enable.checked?key.value.trim():"");output.value=setup.config;steps.replaceChildren();const title=document.createElement("strong");title.textContent="Where to paste it";const copy=document.createElement("span");copy.textContent=setup.steps;steps.append(title,copy);status.textContent="";button.textContent="Copy configuration";button.classList.remove("copied");};select.onchange=()=>void refresh();enable.onchange=()=>void refresh();key.oninput=()=>void refresh();await refresh();dialog.showModal();}
+async function showAiSetup():Promise<void>{const dialog=$<HTMLDialogElement>("ai-setup-dialog"),select=$<HTMLSelectElement>("ai-client"),output=$<HTMLTextAreaElement>("ai-setup-command"),steps=$("ai-setup-steps"),enable=$<HTMLInputElement>("enable-jev"),key=$<HTMLInputElement>("jev-key"),row=$("jev-key-row"),status=$("copy-ai-status"),button=$<HTMLButtonElement>("copy-ai-setup");const refresh=async()=>{row.classList.toggle("hidden",!enable.checked);const setup=await connectionSetup(select.value,enable.checked?key.value.trim():"");output.value=setup.config;steps.replaceChildren();const title=document.createElement("strong");title.textContent="What ATME will update";const copy=document.createElement("span");copy.textContent=setup.steps;steps.append(title,copy);status.textContent="";button.textContent="Copy configuration";button.classList.remove("copied");};select.onchange=()=>void refresh();enable.onchange=()=>void refresh();key.oninput=()=>void refresh();await refresh();dialog.showModal();}
+
+async function installAiConnection(remove=false):Promise<void>{
+  const client=$<HTMLSelectElement>("ai-client").value,enable=$<HTMLInputElement>("enable-jev"),key=$<HTMLInputElement>("jev-key").value.trim(),status=$("copy-ai-status"),button=$<HTMLButtonElement>(remove?"remove-ai-setup":"install-ai-setup");
+  if(enable.checked&&!key){status.textContent="Enter the TypeSafe Jev key or turn off Jev.";return;}
+  button.disabled=true;status.textContent=remove?"Removing ATME connection…":"Installing ATME connection…";
+  try{
+    const result=await invoke<{path:string;restart_required:boolean}>(remove?"remove_mcp_client":"install_mcp_client",remove?{client}:{client,jevKey:enable.checked?key:null});
+    status.textContent=remove?"ATME was removed. Restart the AI client.":`Installed in ${result.path}. Restart the AI client, then ATME will verify the live handshake.`;
+    toast(remove?"ATME connection removed.":"ATME connection installed. Restart the selected AI client.");
+  }catch(error){status.textContent=typeof error==="string"?error:"ATME could not update the client configuration.";}finally{button.disabled=false;}
+}
 
 function showScript(): void {
   const card = document.createElement("div"); card.className = "workspace-card";
@@ -1146,6 +1157,7 @@ window.addEventListener("DOMContentLoaded", () => {
   $("return-projects").onclick = () => showProjectBrowser(true); $("project-picker").onclick = () => showProjectBrowser(true);
   $("launcher-new-project").onclick = openNewProject; $("empty-new-project").onclick = openNewProject;
   $("launcher-connect-ai").onclick=()=>void showAiSetup();$("close-ai-setup").onclick=()=> $<HTMLDialogElement>("ai-setup-dialog").close();$("copy-ai-setup").onclick=async()=>{const button=$<HTMLButtonElement>("copy-ai-setup"),status=$("copy-ai-status");try{await navigator.clipboard.writeText($<HTMLTextAreaElement>("ai-setup-command").value);button.textContent="✓ Copied";button.classList.add("copied");status.textContent="Configuration copied to clipboard.";window.setTimeout(()=>{button.textContent="Copy configuration";button.classList.remove("copied");status.textContent="";},2500);}catch{status.textContent="Clipboard access failed. Select the configuration and press Ctrl+C.";}};
+  $("install-ai-setup").onclick=()=>void installAiConnection();$("remove-ai-setup").onclick=()=>void installAiConnection(true);
   document.querySelector(".app-menu")?.addEventListener("click",event=>{const button=(event.target as HTMLElement).closest<HTMLButtonElement>("[data-menu-action]");if(!button)return;document.querySelectorAll<HTMLDetailsElement>(".app-menu details[open]").forEach(item=>item.removeAttribute("open"));runMenuAction(button.dataset.menuAction||"");});
   document.addEventListener("pointerdown",event=>{if(!(event.target as HTMLElement).closest(".app-menu"))document.querySelectorAll<HTMLDetailsElement>(".app-menu details[open]").forEach(item=>item.removeAttribute("open"));});
   $("cancel-new-project").onclick = closeNewProject; $("close-new-project").onclick = closeNewProject;
