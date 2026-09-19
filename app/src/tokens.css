@@ -163,6 +163,25 @@ button.ghost {
 .filebox:hover { border-color: var(--accent); }
 .filebox input { display: none; }
 .feedback { min-height: 24px; color: var(--muted-ink); }
+.project-intake { display: grid; gap: 14px; margin: 20px 0; padding: 18px;
+  border: 1px solid var(--hairline); border-radius: var(--radius); }
+.project-intake legend { padding: 0 6px; font-weight: 600; }
+.project-intake label { display: grid; gap: 5px; color: var(--muted-ink); }
+.project-intake input, .project-intake select { width: 100%; min-width: 0; padding: 9px;
+  color: var(--ink); background: var(--paper); border: 1px solid var(--hairline);
+  border-radius: var(--radius); font: inherit; }
+.project-intake textarea { width: 100%; min-width: 0; resize: vertical; padding: 10px;
+  color: var(--ink); background: var(--paper); border: 1px solid var(--hairline);
+  border-radius: var(--radius); }
+.project-intake input:focus-visible, .project-intake select:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px; }
+.input-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+#project-feedback { min-height: 20px; margin: 0; color: var(--muted-ink); }
+#project-result { margin: 0; padding: 12px; border-left: 2px solid var(--done);
+  white-space: pre-wrap; overflow-wrap: anywhere; }
+.legacy-import { margin-top: 26px; color: var(--muted-ink); }
+.legacy-import summary { cursor: pointer; }
+@media (max-width: 640px) { .input-pair { grid-template-columns: 1fr; } }
 .fine-tuning { margin: 20px 0; border-top: 1px solid var(--hairline); padding-top: 12px; }
 .fine-tuning summary { cursor: pointer; color: var(--muted-ink); }
 .fine-grid { display: grid; gap: 12px; margin-top: 14px; max-width: 520px; }

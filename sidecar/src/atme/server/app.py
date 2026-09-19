@@ -79,6 +79,10 @@ def create_app(token: str = "dev-token", orchestrator=None) -> FastAPI:
 
     app = FastAPI(title="ATME sidecar", version=__version__,
                   docs_url=None, redoc_url=None, lifespan=lifespan)
+    from atme.mcp_activity import LiveMcpSessions
+    app.state.live_mcp = LiveMcpSessions()
+    from atme.server.projects import register_projects
+    app.state.projects = register_projects(app, store, auth)
     from atme.server.board_proposals import register_board_proposals
     register_board_proposals(app, orchestrator, store, auth, lock, running)
     app.add_middleware(
@@ -99,24 +103,26 @@ def create_app(token: str = "dev-token", orchestrator=None) -> FastAPI:
             server_obj.should_exit = True
         return {"accepted": True}
 
+    @app.post("/mcp/live", dependencies=[Depends(auth)])
+    async def mcp_live(request: Request) -> dict:
+        raw = await request.body()
+        if len(raw) > 16 * 1024:
+            raise HTTPException(413, "MCP event is too large")
+        try:
+            payload = json.loads(raw)
+            if not isinstance(payload, dict):
+                raise ValueError()
+            return app.state.live_mcp.update(payload)
+        except (ValueError, UnicodeError):
+            raise HTTPException(400, "Invalid MCP event")
+
     @app.get("/settings/providers", dependencies=[Depends(auth)])
     def provider_settings() -> dict:
-        settings_store = getattr(orch, "settings_store", None)
-        if settings_store is None:
-            return {"configured": False, "roles": {}}
-        return settings_store.public()
+        return {"configured": False, "roles": {}, "mode": "external", "api_keys_required": False}
 
     @app.put("/settings/providers", dependencies=[Depends(auth)])
     def save_provider_settings(body: dict) -> dict:
-        settings_store = getattr(orch, "settings_store", None)
-        if settings_store is None:
-            raise HTTPException(503, "secure settings store is unavailable")
-        from atme.settings import SettingsError
-
-        try:
-            return settings_store.save(body)
-        except SettingsError as exc:
-            raise HTTPException(400, str(exc)) from exc
+        raise HTTPException(410, "Provider setup retired. Import external script and layout; no API keys required.")
 
     @app.get("/models/alignment", dependencies=[Depends(auth)])
     def alignment_model_status() -> dict:
@@ -172,34 +178,47 @@ def create_app(token: str = "dev-token", orchestrator=None) -> FastAPI:
             jobs.append(item)
         return {"jobs": jobs}
 
+    @app.post("/jobs/external", dependencies=[Depends(auth)])
+    async def import_external(request: Request) -> dict:
+        from atme.external_inputs import validate_external_inputs
+        from jsonschema import ValidationError
+        if orch is None:
+            raise HTTPException(503, "orchestrator not wired")
+        raw = bytearray()
+        async for chunk in request.stream():
+            raw.extend(chunk)
+            if len(raw) > 12 * 1024 * 1024:
+                raise HTTPException(413, "external input exceeds 12 MiB")
+        try:
+            body = json.loads(raw)
+            if not isinstance(body, dict) or set(body) != {"script", "layout"}:
+                raise ValueError("provide script and layout only")
+            script, layout = validate_external_inputs(body["script"], body["layout"])
+        except (ValueError, TypeError, KeyError, ValidationError):
+            raise HTTPException(400, "invalid external script/layout; check schemas, scene IDs and board timing")
+        job_id = store.create_job(topic=script["topic"], settings={
+            "provider": "external", "voice": "upload", "review_gate": True,
+            "width": 1280, "height": 720, "fps": 30})
+        directory = orch._job_dir(job_id)
+        directory.mkdir(parents=True, exist_ok=True)
+        try:
+            for name, value in (("script", script), ("layout", layout)):
+                (directory / f"{name}.json").write_text(json.dumps(value, indent=2), encoding="utf-8")
+            (directory / "external-inputs.original.json").write_bytes(raw)
+            for stage in STAGE_ORDER:
+                store.ensure_stage(job_id, stage)
+            for stage in ("created", "scripted", "laid_out"):
+                store.start_stage(job_id, stage)
+                store.finish_stage(job_id, stage, ok=True)
+            store.set_job_status(job_id, "paused")
+        except Exception:
+            store.set_job_status(job_id, "failed")
+            raise HTTPException(500, "external import could not be saved; job remains recoverable")
+        return {"job_id": job_id, "status": "paused", "requires_review": True, "provider": "external"}
+
     @app.post("/jobs", dependencies=[Depends(auth)])
     def submit_job(body: dict) -> dict:
-        topic = (body.get("topic") or "").strip()
-        if not topic:
-            raise HTTPException(400, "topic required")
-        voice = body.get("voice", "upload")
-        if voice not in ("upload", "sapi"):
-            raise HTTPException(400, "voice must be upload or sapi")
-        width, height, fps = int(body.get("width", 1280)), int(body.get("height", 720)), int(body.get("fps", 30))
-        if (width, height, fps) not in ((1280, 720, 24), (1280, 720, 30), (1920, 1080, 30)):
-            raise HTTPException(400, "unsupported quality preset")
-        provider = body.get("provider", "litellm")
-        if provider not in ("litellm", "fake"):
-            raise HTTPException(400, "unsupported AI provider mode")
-        settings_store = getattr(orch, "settings_store", None)
-        if provider == "litellm" and (settings_store is None or not settings_store.configured()):
-            raise HTTPException(409, "configure AI providers in Settings before starting")
-        settings = {
-            "provider": provider,
-            "width": width, "height": height, "fps": fps, "voice": voice,
-            "review_gate": bool(body.get("review_gate", True)),
-            "target_seconds": max(30, min(3600, int(body.get("target_seconds", 480))))}
-        if body.get("providers_json"):
-            settings["providers_json"] = body["providers_json"]
-        job_id = store.create_job(topic=topic, settings=settings)
-        for name in STAGE_ORDER:
-            store.ensure_stage(job_id, name)
-        return {"job_id": job_id}
+        raise HTTPException(410, "Internal topic generation retired. Use /jobs/external to import a script and layout.")
 
     def spawn_worker(job_id: int) -> bool:
         with lock:
@@ -299,6 +318,8 @@ def create_app(token: str = "dev-token", orchestrator=None) -> FastAPI:
             sp = jdir / "script.json"
             if sp.exists():
                 doc = json.loads(sp.read_text(encoding="utf-8"))
+                if store.get_job(job_id)["settings"].get("provider") == "external" and scenes != doc["scenes"]:
+                    raise HTTPException(409, "external script changed; import a revised script and matching layout as a new project")
                 doc["scenes"] = scenes
                 from jsonschema import Draft202012Validator
                 from atme.resources import resource_path

@@ -9,11 +9,11 @@ import soundfile as sf
 
 from atme.audio.voice_upload import (
     VoiceScriptMismatch,
+    load_uploaded_voice,
     normalize_filename,
     prepare_voice_upload,
     reconcile_words,
 )
-
 
 SCENES = [
     {"scene_id": 1, "spoken_text": "Serving models creates a fight between latency and cost."},
@@ -42,6 +42,8 @@ def test_reconcile_assigns_words_to_scenes():
     assert report["similarity"] == 1.0
     assert starts[0] == 0 and starts[1] > starts[0]
     assert {word["scene_id"] for word in assigned} == {1, 2}
+    assert all(word["semantic_source"] == "approved_external_script" for word in assigned)
+    assert report["semantic_authority"] == "approved_external_script"
 
 
 def test_reconcile_rejects_unrelated_recording():
@@ -62,3 +64,13 @@ def test_prepare_voice_upload_decodes_and_reports_quality(tmp_path: Path):
     assert (tmp_path / "job" / "audio" / "upload.wav").exists()
     saved = json.loads((tmp_path / "job" / "audio" / "upload_quality.json").read_text())
     assert saved["duration_ms"] == report["duration_ms"]
+
+
+def test_uploaded_stereo_preserves_timebase_when_mixed_to_mono(tmp_path: Path):
+    audio = tmp_path / "audio"
+    audio.mkdir()
+    stereo = np.column_stack((np.ones(8000, dtype=np.float32) * .1,
+                              np.ones(8000, dtype=np.float32) * -.1))
+    sf.write(audio / "upload.wav", stereo, 8000, subtype="PCM_16")
+    samples, rate = load_uploaded_voice(tmp_path)
+    assert rate == 8000 and len(samples) == 8000

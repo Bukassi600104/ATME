@@ -37,13 +37,11 @@ def main() -> int:
     warmup.warm_heavy_imports()
 
     from atme.orchestrator import Orchestrator
-    from atme.settings import SettingsStore
 
     data_root = Path(os.environ.get("ATME_DATA_DIR", "data")).resolve()
     data_root.mkdir(parents=True, exist_ok=True)
-    settings_store = SettingsStore(data_root / "settings.json")
-    orchestrator = Orchestrator(data_root / "jobs" / "jobs.db", data_root=data_root,
-                                settings_store=settings_store)
+    # Legacy credentials remain on disk, but production no longer opens a key store.
+    orchestrator = Orchestrator(data_root / "jobs" / "jobs.db", data_root=data_root)
     app = create_app(token=args.token, orchestrator=orchestrator)
     if args.port == 0:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

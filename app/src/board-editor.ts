@@ -29,7 +29,7 @@ export function mountBoardEditor(root: HTMLElement, jobId: number, info: { port:
         (draft.timeline ? "" : "This legacy layout starts as an unsaved single-board proposal.");
       content.append(note);
       const proposalPanel = document.createElement("details");
-      const proposalTitle = document.createElement("summary"); proposalTitle.textContent = "AI board proposal — generate and review";
+      const proposalTitle = document.createElement("summary"); proposalTitle.textContent = "External board proposal — import and review";
       const proposalContent = document.createElement("div"); proposalPanel.append(proposalTitle, proposalContent);
       content.append(proposalPanel); mountBoardProposal(proposalContent, jobId, draft.revision, info);
       const intervals = document.createElement("div"); content.append(intervals);

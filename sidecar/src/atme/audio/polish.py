@@ -114,7 +114,7 @@ def dynamics_and_loudness(samples: np.ndarray, sample_rate: int, target_lufs: fl
     """Compressor -> gate -> limiter (pedalboard), then normalize to target LUFS (pyloudnorm)."""
     x = np.asarray(samples, dtype=np.float32)
     try:
-        from pedalboard import Compressor, Gain, Limiter, NoiseGate, Pedalboard
+        from pedalboard import Compressor, Limiter, NoiseGate, Pedalboard
 
         board = Pedalboard(
             [
@@ -150,9 +150,15 @@ def polish(
     do_denoise: bool = True,
     slice_cfg: SliceConfig | None = None,
     target_lufs: float = -16.0,
+    remove_silence: bool = True,
 ) -> tuple[np.ndarray, EditDecisionList]:
     """Full chain; returns final samples + the EDL bridging original->final timeline."""
     x = denoise(samples, sample_rate) if do_denoise else samples
-    x, edl = slice_silences(x, sample_rate, slice_cfg)
+    if remove_silence:
+        x, edl = slice_silences(x, sample_rate, slice_cfg)
+    else:
+        # Source-cleanup decisions are already represented by the immutable
+        # project timeline. Never make a second, hidden duration change here.
+        edl = EditDecisionList(sample_rate=sample_rate)
     x = dynamics_and_loudness(x, sample_rate, target_lufs)
     return x, edl

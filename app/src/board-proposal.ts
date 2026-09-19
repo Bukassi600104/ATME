@@ -10,19 +10,26 @@ export function mountBoardProposal(root: HTMLElement, jobId: number, revision: s
   const url = `http://127.0.0.1:${info.port}/jobs/${jobId}/board-proposal`;
   const headers = { Authorization: `Bearer ${info.token}` };
   const note = document.createElement("p");
-  note.textContent = "AI board proposal uses the saved layout and final narration, not unsaved editor fields. " +
-    "Generating calls your configured spatial director and may incur API charges. Geometry and camera stay unchanged. " +
-    "Acceptance replaces board/object timing and phrase links with measured times for this recording.";
-  const generate = document.createElement("button"); generate.textContent = "Generate AI board proposal (API usage)";
+  note.textContent = "Export the final-audio planning context for your preferred external AI, then import its proposal. " +
+    "ATME validates and previews locally without API keys. Geometry and camera stay unchanged. " +
+    "Acceptance replaces board/object timing and phrase links with measured times.";
+  const generate = document.createElement("button"); generate.textContent = "Import external board proposal";
+  const file = document.createElement("input"); file.type = "file"; file.accept = ".json,application/json";
+  file.setAttribute("aria-label", "External board proposal JSON");
+  const download = document.createElement("button"); download.textContent = "Export planning context";
   const load = document.createElement("button"); load.textContent = "Review saved proposal";
   const feedback = document.createElement("p"); feedback.setAttribute("role", "status");
-  const review = document.createElement("div"); root.append(note, generate, load, feedback, review);
+  const review = document.createElement("div"); root.append(note, download, file, generate, load, feedback, review);
   const request = async (generateNew: boolean) => {
     generate.disabled = load.disabled = true; review.replaceChildren();
-    feedback.textContent = generateNew ? "Generating and validating against final audio…" : "Loading saved proposal…";
+    feedback.textContent = generateNew ? "Validating imported proposal against final audio…" : "Loading saved proposal…";
     try {
+      const selected = file.files?.[0];
+      if (generateNew && !selected) throw new Error("Choose an external proposal JSON file.");
+      if (selected && selected.size > 1024 * 1024) throw new Error("Proposal exceeds 1 MiB.");
       const response = await fetch(url + (generateNew ? `?revision=${encodeURIComponent(revision)}` : ""),
-        { method: generateNew ? "POST" : "GET", headers });
+        { method: generateNew ? "POST" : "GET", headers: { ...headers, "Content-Type": "application/json" },
+          body: generateNew ? await selected!.text() : undefined });
       const body = await response.json(); if (!response.ok) throw new Error(body.detail || "Proposal request failed.");
       if (!root.isConnected) return;
       const proposal = body as Proposal;
@@ -97,6 +104,19 @@ export function mountBoardProposal(root: HTMLElement, jobId: number, revision: s
       };
     } catch (error) { feedback.textContent = error instanceof Error ? error.message : "Proposal request failed."; }
     finally { generate.disabled = load.disabled = false; }
+  };
+  download.onclick = async () => {
+    download.disabled = true;
+    try {
+      const response = await fetch(url + "/context", { headers });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Context export failed.");
+      const objectUrl = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+      const link = document.createElement("a"); link.href = objectUrl; link.download = "atme-board-planning-context.json";
+      link.click(); setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      feedback.textContent = "Context exported. Return JSON containing the unchanged source_hashes and a proposal matching proposal_schema.";
+    } catch (error) { feedback.textContent = error instanceof Error ? error.message : "Context export failed."; }
+    finally { download.disabled = false; }
   };
   generate.onclick = () => void request(true);
   load.onclick = () => void request(false);

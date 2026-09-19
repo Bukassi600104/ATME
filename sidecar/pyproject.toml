@@ -5,18 +5,21 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "atme"
 version = "0.1.0"
-description = "ATME Python sidecar: agents, LLM gateway, audio, alignment, rendering, assembly"
+description = "ATME local project, timing, rendering, and MCP sidecar"
 requires-python = ">=3.12"
 dependencies = [
   "pydantic>=2.7",
   "fastapi>=0.111",
   "uvicorn>=0.30",
   "jsonschema>=4.22",
+  "mcp==2.2.0",
+  "typesafe-sdk>=0.7,<1",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.2", "ruff>=0.4", "mypy>=1.10"]
-gateway = ["litellm>=1.40"]
+# The retired internal provider gateway remains only as migration-era source;
+# production dependencies and frozen builds contain no model-provider client.
 audio = ["numpy>=1.26", "soundfile>=0.12", "noisereduce>=3.0", "pedalboard>=0.9", "pyloudnorm>=0.1.1"]
 # resvg-py bundles its own native rasterizer (no GTK/cairo DLL hunt on Windows);
 # cairosvg kept as documented fallback only.

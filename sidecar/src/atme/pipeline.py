@@ -13,13 +13,11 @@ import logging
 import subprocess
 import time
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import soundfile as sf
 
 from atme.audio.align import align_words
-from atme.audio.edl import EditDecisionList
 from atme.audio.polish import SliceConfig, polish
 from atme.audio.segments import concat_with_gaps, load_segments
 from atme.render.animator import find_ffmpeg, render_video
@@ -45,9 +43,10 @@ def _mux(video: Path, wav: Path, out: Path) -> None:
            "-i", str(video), "-i", str(wav),
            "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
            "-shortest", "-movflags", "+faststart", str(out)]
-    proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+                          check=False)
     if proc.returncode != 0:
-        raise RuntimeError("mux failed: %s" % proc.stderr[-400:])
+        raise RuntimeError(f"mux failed: {proc.stderr[-400:]}")
 
 
 def load_voice(job_dir: Path, mode: str = "segments") -> tuple[np.ndarray, int, list[int]]:
@@ -58,11 +57,11 @@ def load_voice(job_dir: Path, mode: str = "segments") -> tuple[np.ndarray, int, 
         samples, sr = load_uploaded_voice(job_dir)
         return samples, sr, [0]
     if mode != "segments":
-        raise ValueError("unknown voice mode %r" % mode)
+        raise ValueError(f"unknown voice mode {mode!r}")
     seg_dir = job_dir / "segments"
     paths = sorted(seg_dir.glob("scene*.wav"))
     if not paths:
-        raise FileNotFoundError("no scene segments under %s" % seg_dir)
+        raise FileNotFoundError(f"no scene segments under {seg_dir}")
     segments = load_segments(paths)
     return concat_with_gaps(segments)
 
@@ -100,13 +99,15 @@ def _load_script(script_path: str | Path | None, script_dict: dict | None) -> di
 
 
 def polish_stage(job_dir: Path, voice_mode: str, slice_cfg: SliceConfig | None = None,
-                 target_lufs: float = -16.0, do_denoise: bool = True) -> dict:
+                 target_lufs: float = -16.0, do_denoise: bool = True,
+                 remove_silence: bool = True) -> dict:
     started = time.perf_counter()
     job_dir = Path(job_dir)
     (job_dir / "audio").mkdir(parents=True, exist_ok=True)
     full, sr, orig_starts = load_voice(job_dir, mode=voice_mode)
     final_samples, edl = polish(full, sr, do_denoise=do_denoise,
-                                slice_cfg=slice_cfg, target_lufs=target_lufs)
+                                slice_cfg=slice_cfg, target_lufs=target_lufs,
+                                remove_silence=remove_silence)
     final_wav = job_dir / "audio" / "final.wav"
     sf.write(str(final_wav), final_samples, sr, subtype="PCM_16")
     state = {
@@ -123,7 +124,8 @@ def polish_stage(job_dir: Path, voice_mode: str, slice_cfg: SliceConfig | None =
 
 def align_stage(job_dir: Path, script: dict, audio_state: dict, voice_mode: str,
                 layout_path: str | Path | None = None, layout_dict: dict | None = None,
-                target_lufs: float = -16.0) -> dict:
+                target_lufs: float = -16.0,
+                semantic_authority: str = "approved_external_script") -> dict:
     started = time.perf_counter()
     job_dir = Path(job_dir)
     samples, sr = sf.read(audio_state["final_wav"], dtype="float32", always_2d=False)
@@ -136,7 +138,8 @@ def align_stage(job_dir: Path, script: dict, audio_state: dict, voice_mode: str,
 
         try:
             words, starts, voice_report = reconcile_words(
-                words, script["scenes"], int(audio_state["duration_ms"]))
+                words, script["scenes"], int(audio_state["duration_ms"]),
+                semantic_source=semantic_authority)
         except VoiceScriptMismatch as exc:
             (job_dir / "audio" / "voice_report.json").write_text(
                 json.dumps(exc.report, indent=2), encoding="utf-8")
@@ -149,7 +152,8 @@ def align_stage(job_dir: Path, script: dict, audio_state: dict, voice_mode: str,
     from atme.planning_context import build_planning_context
     planning_context_file = job_dir / "planning_context.json"
     planning_context = build_planning_context(
-        script, words, int(audio_state["duration_ms"]), audio_state["sha256"])
+        script, words, int(audio_state["duration_ms"]), audio_state["sha256"],
+        semantic_authority=semantic_authority)
     planning_context_file.write_text(json.dumps(planning_context, indent=2), encoding="utf-8")
 
     if layout_dict is not None:
@@ -169,7 +173,7 @@ def align_stage(job_dir: Path, script: dict, audio_state: dict, voice_mode: str,
     else:
         visual_plan = build_visual_plan(script)
         visual_plan_file.write_text(json.dumps(visual_plan, indent=2), encoding="utf-8")
-    from atme.narration_events import resolve_narration_events, TriggerResolutionError
+    from atme.narration_events import TriggerResolutionError, resolve_narration_events
     trigger_report_file = job_dir / "narration_events.json"
     try:
         doc, trigger_report = resolve_narration_events(doc, words, int(audio_state["duration_ms"]))
@@ -226,7 +230,7 @@ def render_stage(job_dir: Path, align_state: dict, width: int, height: int, fps:
         if control_cb:
             control_cb()
         duration = min(segment_ms, total_ms - start)
-        path = segments_dir / ("seg_%04d.mp4" % index)
+        path = segments_dir / f"seg_{index:04d}.mp4"
         checkpoint = path.with_suffix(".json")
         identity = {"render_digest": render_digest, "start_ms": start, "duration_ms": duration}
         saved = None
@@ -261,15 +265,16 @@ def render_stage(job_dir: Path, align_state: dict, width: int, height: int, fps:
 
     concat_file = segments_dir / "concat.txt"
     concat_file.write_text("\n".join(
-        "file '%s'" % Path(item["path"]).resolve().as_posix().replace("'", "'\\''")
+        f"file '{Path(item['path']).resolve().as_posix().replace(chr(39), chr(39) + chr(92) + chr(39) + chr(39))}'"
         for item in segments) + "\n", encoding="utf-8")
     silent_video = out_dir / "video.mp4"
     ffmpeg = find_ffmpeg()
     cmd = [ffmpeg, "-y", "-hide_banner", "-v", "error", "-f", "concat", "-safe", "0",
            "-i", str(concat_file), "-c", "copy", "-movflags", "+faststart", str(silent_video)]
-    proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+                          check=False)
     if proc.returncode != 0:
-        raise RuntimeError("segment assembly failed: %s" % proc.stderr[-400:])
+        raise RuntimeError(f"segment assembly failed: {proc.stderr[-400:]}")
     state = {"silent_video": str(silent_video), "segments": segments,
              "render": aggregate, "wall_s": round(time.perf_counter() - started, 2)}
     (job_dir / "render_state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
@@ -321,8 +326,8 @@ def _retime_layout(doc: dict, scenes: list[dict], starts: list[int],
                 or any("visibility_intervals" in e for e in doc.get("elements", []))
                 or any("action" in c for c in doc.get("camera_plan", [])))
     if authored:
-        from atme.render.visibility import validate_visibility
         from atme.render.camera import validate_camera_intent
+        from atme.render.visibility import validate_visibility
 
         validate_visibility(doc)
         validate_camera_intent(doc.get("camera_plan", []))

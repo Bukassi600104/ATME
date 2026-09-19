@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atme.local/schemas/v1/source-timeline.schema.json",
+  "title": "SourceTimeline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "duration_ms", "clips"],
+  "properties": {
+    "contract_version": {"const": "1"},
+    "duration_ms": {"type": "integer", "minimum": 0},
+    "clips": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["clip_id", "media_id", "kind", "source_start_ms", "source_end_ms", "timeline_start_ms", "link_group_id", "crossfade_ms"],
+        "properties": {
+          "clip_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+          "media_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+          "kind": {"enum": ["audio", "video"]},
+          "stream": {"enum": ["audio", "video", "linked_av"]},
+          "track_index": {"type": "integer", "minimum": 0, "maximum": 31},
+          "audio_enabled": {"type": "boolean"},
+          "compound_group_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+          "source_start_ms": {"type": "integer", "minimum": 0},
+          "source_end_ms": {"type": "integer", "minimum": 1},
+          "timeline_start_ms": {"type": "integer", "minimum": 0},
+          "link_group_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+          "crossfade_ms": {"type": "integer", "minimum": 0, "maximum": 500}
+        }
+      }
+    }
+  }
+}

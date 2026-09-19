@@ -6,7 +6,7 @@ Python 3.12 · Node 24 + pnpm 11 · Rust 1.96+ · FFmpeg 8.1 (winget Gyan build)
 ## One-time setup
 
     py -3.12 -m venv sidecar\.venv
-    sidecar\.venv\Scripts\python -m pip install -e "./sidecar[dev,gateway,audio,align,tts,render]"
+    sidecar\.venv\Scripts\python -m pip install -e "./sidecar[dev,audio,align,tts,render]"
 
 Fixture VO for tests (Windows SAPI, no downloads):
 
@@ -26,14 +26,31 @@ Fixture VO for tests (Windows SAPI, no downloads):
 
 ## Production behavior
 
-- Desktop jobs always use configured LiteLLM roles; the fake provider is test-only.
-- The original-voice path is primary. Uploads are streamed to disk, decoded to mono 24 kHz WAV,
-  quality checked, polished, transcribed, reconciled against the approved script, then used as
-  the master timeline for diagrams and camera cues.
-- SAPI remains a local draft-voice option. Kokoro is not presented as a production-quality
-  default on this CPU.
-- The alignment model can be prepared from Settings and is cached under the per-user ATME data
-  directory. Starting a job also begins preparation in the background.
+- Desktop jobs import externally authored script/layout JSON; no user API keys are required.
+  Internal topic generation and provider settings writes return HTTP 410. Legacy credentials
+  are preserved, not loaded by the active workflow. See EXTERNAL_PRODUCTION.md.
+- The original-voice path is primary. PCM WAV uploads and supported source video are retained as
+  authoritative inputs; video receives a private mono timing derivative. Local speech processing
+  supplies technical timing only and does not create the semantic transcript. For script projects,
+  the approved external script is semantic authority; for recording-only projects, the recording is
+  both semantic and timing authority and the connected AI may provide a derived scene index through MCP.
+- Source cleanup is non-destructive and precedes final storyboard/director timing. Edit decisions
+  are immutable rows in `project_source_timeline_versions`; the current pointer and persisted
+  undo/redo events live in the same project database. Derived cleaned audio/video is content-addressed
+  under `project-timeline-cache` and can be regenerated from retained source media.
+- Waveform and thumbnail evidence is cached under `project-media-cache` by source hash, analysis
+  version, resolution/time bucket and image width. Remove from Project never deletes the original
+  external file or ATME's managed immutable source copy.
+- Source cleanup is non-destructive and precedes final storyboard/director timing. Edit decisions
+  are immutable rows in `project_source_timeline_versions`; the current pointer and persisted
+  undo/redo events live in the same project database. Derived cleaned media is content-addressed
+  under `project-timeline-cache` and can be regenerated from retained source media.
+- Waveforms and thumbnails are cached under `project-media-cache` by source hash, analysis version,
+  resolution/time bucket and image width. Remove from Project never deletes the external original
+  or ATME's managed immutable source copy.
+- SAPI remains available to offline test harnesses, not the current production import UI.
+- The timing model is a local implementation detail cached under the per-user ATME data directory.
+  Model state and preparation failures belong in Advanced/Diagnostics rather than the primary studio.
 - Cognitive and media stages are independently checkpointed; rendered output is subdivided into
   60-second MP4 segments. Missing checkpoint files are detected and rebuilt downstream.
 - Sidecar work is serialized to one worker on this machine. Sidecar health is monitored off the
@@ -53,10 +70,10 @@ Fixture VO for tests (Windows SAPI, no downloads):
     powershell -File app\sync-sidecar.ps1      # PyInstaller onedir + copy into src-tauri/binaries
     cd app\src-tauri && cargo tauri build       # NSIS installer (requires WiX-free NSIS toolchain via tauri cli)
 
-The faster-whisper alignment model is fetched on first preparation/use and cached in
+The local timing model is fetched on first preparation/use and cached in
 `%APPDATA%\dev.atme.engine\models`. Hugging Face's content-addressed cache validates downloaded
-artifacts. Provider setup and the first model preparation require internet access; media work is
-offline after the model is cached.
+artifacts. First model preparation requires internet access; creative provider setup does not exist.
+Technical timing and deterministic rendering are offline after the model is cached.
 
 ## Environment contract between host and sidecar
 

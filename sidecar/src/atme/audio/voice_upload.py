@@ -61,9 +61,10 @@ def prepare_voice_upload(source: Path, job_dir: Path) -> dict:
     cmd = [ffmpeg, "-y", "-hide_banner", "-v", "error", "-i", str(source),
            "-t", str(MAX_DURATION_SECONDS + 1), "-vn", "-ac", "1", "-ar", "24000",
            "-c:a", "pcm_s16le", str(decoded)]
-    proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+                          check=False)
     if proc.returncode != 0 or not decoded.exists():
-        raise VoiceUploadError("could not decode voiceover: %s" % proc.stderr[-300:])
+        raise VoiceUploadError(f"could not decode voiceover: {proc.stderr[-300:]}")
 
     info = sf.info(str(decoded))
     sample_rate = int(info.samplerate)
@@ -94,7 +95,7 @@ def prepare_voice_upload(source: Path, job_dir: Path) -> dict:
     report = {
         "source_path": str(source),
         "decoded_path": str(decoded),
-        "duration_ms": int(round(duration_s * 1000)),
+        "duration_ms": round(duration_s * 1000),
         "sample_rate": sample_rate,
         "peak_dbfs": round(20 * np.log10(max(peak, 1e-9)), 2),
         "rms_dbfs": round(20 * np.log10(max(rms, 1e-9)), 2),
@@ -114,8 +115,11 @@ def load_uploaded_voice(job_dir: Path) -> tuple[np.ndarray, int]:
     path = Path(job_dir) / "audio" / "upload.wav"
     if not path.exists():
         raise FileNotFoundError("uploaded voiceover is not ready")
-    samples, sr = sf.read(str(path), dtype="float32", always_2d=False)
-    return np.asarray(samples, dtype=np.float32).reshape(-1), int(sr)
+    samples, sr = sf.read(str(path), dtype="float32", always_2d=True)
+    # Preserve the recording timebase: flattening stereo would concatenate
+    # channels and falsely double its duration.
+    mono = np.asarray(samples, dtype=np.float32).mean(axis=1)
+    return mono, int(sr)
 
 
 def _token(text: str) -> list[str]:
@@ -123,8 +127,14 @@ def _token(text: str) -> list[str]:
 
 
 def reconcile_words(words: list[dict], scenes: list[dict], duration_ms: int,
-                    minimum_similarity: float = 0.65) -> tuple[list[dict], list[int], dict]:
-    """Assign recognized words to approved scenes and produce a deviation report."""
+                    minimum_similarity: float = 0.65,
+                    semantic_source: str = "approved_external_script") -> tuple[list[dict], list[int], dict]:
+    """Bind acoustic timestamps to approved-script tokens and report deviations.
+
+    Recognized text is used privately to locate matching speech. It is never
+    returned as semantic truth: exposed word labels come only from the externally
+    authored, user-approved script.
+    """
     expected: list[str] = []
     expected_scene: list[int] = []
     for scene in scenes:
@@ -135,23 +145,22 @@ def reconcile_words(words: list[dict], scenes: list[dict], duration_ms: int,
                 for w in words]
 
     matcher = difflib.SequenceMatcher(a=expected, b=observed, autojunk=False)
-    mapped: dict[int, int] = {}
+    mapped: dict[int, tuple[int, int]] = {}
     matched_expected: set[int] = set()
     matched_observed: set[int] = set()
     for block in matcher.get_matching_blocks():
         for offset in range(block.size):
             ei, oi = block.a + offset, block.b + offset
-            mapped[oi] = expected_scene[ei]
+            mapped[oi] = (ei, expected_scene[ei])
             matched_expected.add(ei)
             matched_observed.add(oi)
 
-    first_mapped = next((mapped[i] for i in range(len(observed)) if i in mapped), 1)
-    current_scene = first_mapped
     assigned: list[dict] = []
     for i, word in enumerate(words):
         if i in mapped:
-            current_scene = mapped[i]
-        assigned.append({**word, "scene_id": current_scene})
+            expected_index, scene_id = mapped[i]
+            assigned.append({**word, "word": expected[expected_index], "scene_id": scene_id,
+                             "semantic_source": semantic_source})
 
     scene_starts: list[int] = []
     for scene in scenes:
@@ -174,6 +183,7 @@ def reconcile_words(words: list[dict], scenes: list[dict], duration_ms: int,
     similarity = matcher.ratio()
     report = {
         "contract_version": "1",
+        "semantic_authority": semantic_source,
         "similarity": round(similarity, 4),
         "accepted": bool(similarity >= minimum_similarity and len(observed) >= 3),
         "minimum_similarity": minimum_similarity,

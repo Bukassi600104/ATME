@@ -5,7 +5,6 @@
 import os
 import shutil
 from pathlib import Path
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 block_cipher = None
 ROOT = Path(SPECPATH).parent                      # repo root
@@ -34,8 +33,8 @@ a = Analysis(
     pathex=["src"],
     binaries=[(find_ffmpeg(), "ffmpeg")],
     datas=[(str(ROOT / "schemas"), "schemas"),
-           (str(ROOT / "prompts"), "prompts")] + collect_data_files("litellm"),
-    hiddenimports=collect_submodules("litellm") + [
+           (str(ROOT / "prompts"), "prompts")],
+    hiddenimports=[
         "uvicorn.logging",
         "uvicorn.loops",
         "uvicorn.loops.auto",
@@ -51,7 +50,9 @@ a = Analysis(
     ],
     hookspath=[],
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib.tests", "pytest"],
+    # Internal model routing is retired in V4. Keep the old source adapter for
+    # migration tests, but never ship LiteLLM or provider integrations.
+    excludes=["litellm", "tkinter", "matplotlib.tests", "pytest"],
     noarchive=False,
 )
 

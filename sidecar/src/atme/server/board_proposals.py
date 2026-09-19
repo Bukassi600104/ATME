@@ -5,15 +5,13 @@ import io
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import Depends, HTTPException, Response
+from fastapi import Depends, HTTPException, Response, Request
 from jsonschema import ValidationError
 
-from atme.agents.board_planner import compile_proposal, propose_boards, _word_index
-from atme.gateway.router import Ledger
+from atme.board_compiler import compile_proposal, SCHEMA, _word_index
 
 
 def register_board_proposals(app, orch, store, auth, lock, running):
-    generating = set()
     names = ("layout.json", "planning_context.json", "script.json", "audio_state.json")
 
     def snapshot(job_id):
@@ -50,46 +48,48 @@ def register_board_proposals(app, orch, store, auth, lock, running):
                 "assignments": [{k: e[k] for k in ("id", "scene_id", "board_id", "appear_at_ms")}
                                 for e in candidate["layout"]["elements"]]}
 
-    @app.post("/jobs/{job_id}/board-proposal", dependencies=[Depends(auth)])
-    def generate(job_id: int, revision: str):
+    @app.get("/jobs/{job_id}/board-proposal/context", dependencies=[Depends(auth)])
+    def export_context(job_id: int):
         with lock:
-            job, directory, data, _, hashes = snapshot(job_id)
+            _, _, data, _, hashes = snapshot(job_id)
+            layout = data["layout.json"]
+            # External planning needs identity/timing/geometry, not embedded image bytes.
+            layout = json.loads(json.dumps(layout))
+            for element in layout["elements"]:
+                element.pop("png_base64", None)
+            return {"revision": hashes["layout.json"], "source_hashes": hashes,
+                    "context": data["planning_context.json"],
+                    "layout": layout, "proposal_schema": SCHEMA}
+
+    @app.post("/jobs/{job_id}/board-proposal", dependencies=[Depends(auth)])
+    async def import_proposal(job_id: int, revision: str, request: Request):
+        payload = bytearray()
+        async for chunk in request.stream():
+            payload.extend(chunk)
+            if len(payload) > 1024 * 1024:
+                raise HTTPException(413, "proposal exceeds 1 MiB")
+        try:
+            envelope = json.loads(payload)
+        except (ValueError, UnicodeError):
+            raise HTTPException(400, "Supply externally authored proposal JSON; internal AI generation is retired.")
+        with lock:
+            _, directory, data, _, hashes = snapshot(job_id)
             if hashes["layout.json"] != revision:
                 raise HTTPException(409, "layout changed; reload the editor")
-            if job_id in generating:
-                raise HTTPException(409, "a board proposal is already generating")
-            generating.add(job_id)
-        ledger = Ledger()
-        try:
+            if not isinstance(envelope, dict) or set(envelope) != {"source_hashes", "proposal"}:
+                raise HTTPException(400, "Supply source_hashes from the context export and proposal JSON")
+            if envelope["source_hashes"] != hashes:
+                raise HTTPException(409, "planning context changed; export fresh context and revise the proposal")
             try:
-                completes = orch._completes_for(job["settings"])
-                if not completes or "layouter" not in completes:
-                    raise HTTPException(409, "configure a live spatial director for this project")
-                candidate = propose_boards(data["layout.json"], data["planning_context.json"],
-                                           completes["layouter"], ledger)
-            except HTTPException:
-                raise
-            except Exception:
-                raise HTTPException(502, "board proposal failed validation or provider request; saved layout unchanged")
-            finally:
-                for entry in ledger.entries:
-                    # Provider exception strings can contain request details. Persist usage,
-                    # not raw provider errors, for this explicitly requested operation.
-                    entry.error = "board proposal request failed" if entry.error else None
-                    store.record_usage(job_id, entry)
-            with lock:
-                _, _, _, _, current = snapshot(job_id)
-                if current != hashes:
-                    raise HTTPException(409, "project changed during generation; proposal discarded")
-                record = {"proposal_id": uuid4().hex, "source_hashes": hashes,
-                          "proposal": candidate["proposal"]}
-                pending = directory / "board_proposal.pending.json"
-                pending.write_text(json.dumps(record, indent=2), encoding="utf-8")
-                pending.replace(directory / "board_proposal.json")
-                return summary(record, candidate)
-        finally:
-            with lock:
-                generating.discard(job_id)
+                candidate = compile_proposal(data["layout.json"], data["planning_context.json"], envelope["proposal"])
+            except (ValueError, KeyError, TypeError, ValidationError) as exc:
+                raise HTTPException(400, "Invalid external board proposal; saved layout unchanged") from exc
+            record = {"proposal_id": uuid4().hex, "source_hashes": hashes,
+                      "proposal": candidate["proposal"]}
+            pending = directory / "board_proposal.pending.json"
+            pending.write_text(json.dumps(record, indent=2), encoding="utf-8")
+            pending.replace(directory / "board_proposal.json")
+            return summary(record, candidate)
 
     def saved(job_id):
         _, directory, data, raw, hashes = snapshot(job_id)

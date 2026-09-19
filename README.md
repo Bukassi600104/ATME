@@ -1,13 +1,15 @@
 # ATME — Autonomous Technical Media Engine
 
-Local-first Windows desktop application that turns a technical topic into a fully rendered,
-hand-drawn-style explainer video (research -> script -> diagrams -> voiceover -> synced stroke
-animation -> MP4). Cloud is used ONLY for LLM API calls during the cognitive phase; all media
-work happens offline on CPU.
+Local-first Windows desktop application for hand-drawn-style explainer production.
+The approved no-key workflow imports externally authored scripts and production layouts,
+then handles review, original voiceover, alignment, animation and MP4 rendering locally.
+Desktop key-entry UI is retired. The approved V4 migration is replacing the remaining
+internal creative runtime with MCP-controlled project services; that migration is not complete.
 
-- Current approved sequence: [ATME V2 research-first plan](docs/ATME_V2_REFACTOR_PLAN.md)
-- Verified implementation status: [V2 progress](docs/ATME_V2_PROGRESS.md)
-- Historical milestone plan: PROJECT_PLAN.md (retained; V2 sequencing takes precedence)
+- Current approved architecture: [ATME V4 migration](docs/ATME_V4_MIGRATION.md)
+- Current implementation status: [V4 progress](docs/ATME_V4_PROGRESS.md)
+- Development MCP connection: [local setup and supported tools](docs/MCP_CONNECTION.md)
+- Renderer verification evidence: [research progress](docs/ATME_V2_PROGRESS.md)
 - Architecture decisions: docs/ADR-*.md
 - Measured performance envelope: docs/CALIBRATION.md (filled by bench/calibrate.py)
 - Contracts: schemas/*.schema.json (versioned; consumed by agents, renderer, UI)
@@ -15,7 +17,7 @@ work happens offline on CPU.
 ## Repository layout
 
     app/        Tauri v2 desktop shell (Rust backend + web frontend)        [M3]
-    sidecar/    Python package "atme": agents, gateway, audio, render, server
+    sidecar/    Python package "atme": projects, MCP, audio timing, render, server
     schemas/    Versioned JSON Schemas + valid examples (contract tests bind us)
     prompts/    Persona constitution + per-agent system prompts               [M2]
     bench/      Calibration harness (M0 kill-switch gate)
@@ -24,22 +26,26 @@ work happens offline on CPU.
 
 ## Current production workflow
 
-1. Open Settings and map researcher, verifier, writer, and spatial-director roles to LiteLLM
-   model identifiers. The researcher must be a web-grounded endpoint. Keys are encrypted with
-   Windows DPAPI and are never returned by the sidecar API.
-2. Compose a topic, choose the target duration and quality, and keep script review enabled for
-   the accuracy-first path.
-3. Review the generated narration beside renderer-produced sketch previews.
-4. Upload one continuous original WAV, MP3, M4A, AAC, or FLAC voiceover. ATME validates levels,
-   decodes to its canonical track, aligns every spoken word, and rejects recordings that do not
-   sufficiently match the approved script.
-5. Rendering is checkpointed in 60-second segments. Interrupted jobs resume from persisted
-   stage and segment state after restart; pause, resume, and cancel operate at safe checkpoints.
-6. Open the completed MP4 from Library. The library retains duration, file size, date, status,
-   and recorded provider cost.
+1. Open or create a project in the desktop studio and add an original PCM WAV narration or
+   MP4/MOV/MKV/WebM source video. Follow [external production contracts](docs/EXTERNAL_PRODUCTION.md).
+2. Let a trusted connected AI author the script/derived scene index, storyboard and layout through
+   local MCP. Script-based projects require explicit approval of the external script; recording-only
+   projects do not, because the recording remains both narrative and timing authority.
+3. Review renderer-backed frames in the central viewer, inspect sources and assets, and select clips
+   or an exact timeline range. Focused revisions can be requested from the connected AI and remain
+   proposals until the user accepts them.
+4. Use local editing only for targeted timing or script corrections. It is a secondary override,
+   not a second creative-authoring workflow.
+5. Resolve deterministic validation issues and render the exact saved revision locally. Both 16:9
+   long-form and 9:16 short-form use the same studio workspace and Caleb-derived renderer.
 
-The deterministic fake provider remains compiled solely for offline regression tests. The
-desktop interface creates production LiteLLM jobs only.
+Legacy credentials/history are retained, but the interface neither requests keys nor
+creates paid-provider jobs. The fake provider remains an offline test fixture only.
+External AI subscriptions are separate. AI Connection supports ChatGPT Desktop, Codex and Claude
+Desktop and exposes verified local MCP configuration. Optional TypeSafe Jev decisions use a key
+passed by the AI client's MCP environment and are never required for editing or rendering. The connection
+indicator reflects a live authenticated desktop bridge, not shared-database activity. Advanced configuration
+does not invent a client identity or connection count when the client has not reported one.
 
 ## Build and verification
 

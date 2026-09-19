@@ -8,6 +8,16 @@ User correction incorporated: research-derived video behavior must be implemente
 
 ## Approved decision
 
+### Approved amendment — 2026-09-08: no user API keys
+
+The user's latest explicit instruction brings the no-key cutover forward: ATME must not require users to enter API keys, irrespective of research-document wording or the remaining Phase 3 video gate. This amendment supersedes provider-retirement deferrals elsewhere in this plan. Preserve the researched renderer and remaining research-first sequence; do not delay this narrow input/workflow refactor behind live-model evaluation.
+
+- External tools prepare scripts and production plans. ATME imports and validates those artifacts, requires script approval, accepts the user's original narration, and aligns/previews/renders locally.
+- Remove active provider-key setup and internal paid creative-generation paths. Preserve existing encrypted credentials, project history and recoverable artifacts without exposing or deleting them.
+- External board proposals use exported measured narration context, local validation, preview and explicit acceptance; no internal model call is required.
+- Missing API keys are not a production or verification blocker. Local media dependencies/model downloads and original narration remain real prerequisites. External tools may have their own subscriptions; this decision does not promise free external AI or built-in autonomous research.
+- Initial compatibility uses the existing structured script/layout contracts. Full MCP integration, broad studio refactoring and the full narrated-video acceptance gate remain separate deliverables; do not claim them complete from this adapter.
+
 The user approved the research-first implementation sequence and release scope below. Work begins with Phase 0 baseline protection, then Phases 1-3 implement and demonstrate the researched video behavior. Broader refactoring cannot begin until the Phase 3 video-quality gate is accepted. This does not bypass the script, narrative, storyboard, preview, or revision approvals that the product itself will enforce.
 
 At initial plan authoring, the deliverable was this document only: no implementation, dependency installation, application launch, render, or database migration was performed. That source-level audit was not a runtime certification or exhaustive security review. After approval, baseline verification and narrow renderer implementation began; their current results are recorded separately in `ATME_V2_PROGRESS.md`.

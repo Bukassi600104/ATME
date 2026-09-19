@@ -81,12 +81,13 @@ def test_provider_settings_are_redacted_over_http(tmp_path):
         for role in ("researcher", "reasoner", "writer", "layouter")
     }
     response = client.put("/settings/providers", json={"roles": roles}, headers=headers)
-    assert response.status_code == 200, response.text
+    assert response.status_code == 410, response.text
     text = response.text
     assert "top-secret-value" not in text
     result = client.get("/settings/providers", headers=headers).json()
-    assert result["configured"] is True
-    assert all(config["has_api_key"] for config in result["roles"].values())
+    assert result["configured"] is False
+    assert result["roles"] == {}
+    assert result["api_keys_required"] is False
 
 
 def test_review_preview_uses_the_real_svg_renderer(tmp_path):

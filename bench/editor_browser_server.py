@@ -69,7 +69,7 @@ def main():
          "status": "ambiguous", "match_count": 2}]))
     if args.proposal_fixture:
         from atme.planning_context import build_planning_context
-        from atme.agents.board_planner import compile_proposal
+        from atme.board_compiler import compile_proposal
         script = json.loads((job_dir / "script.json").read_text(encoding="utf-8"))
         times = sorted({e["appear_at_ms"] for e in layout["elements"]} | {7000})
         words = [{"word": "synthetic", "scene_id": 1 if at < 4000 else 2 if at < 7000 else 3,

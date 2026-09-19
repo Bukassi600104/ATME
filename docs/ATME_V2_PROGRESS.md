@@ -2,6 +2,25 @@
 
 Approved sequence: `ATME_V2_REFACTOR_PLAN.md`, research behavior before broad refactoring.
 
+## Current approved override — 2026-09-08: no user API keys
+
+The user explicitly moved no-key production ahead of the remaining full-video gate, regardless of prior research wording. This supersedes historical references below to live-provider evaluation as the next prerequisite or provider retirement waiting for later phases. Missing keys must never block continued production work.
+
+Implemented in source:
+
+- Compose imports validated external ScriptScenes and explicit-board LayoutDoc JSON, pauses for script approval, and routes to original narration upload. No internal research, verification, scriptwriting or layout generation runs for external projects. External content is not falsely marked independently researched/verified.
+- Removed provider-key forms, paid topic generation and the production startup key store. Legacy credentials and history are preserved. Provider settings writes and topic generation now return actionable HTTP 410 responses; internal orchestrator provider resolution rejects paid-provider mode.
+- Board planning now exports measured narration context and imports externally authored proposals. The full source-hash envelope prevents applying a proposal from an old recording/context even if the layout hash is unchanged. Existing validation, PNG comparison, explicit acceptance, backups and invalidation remain.
+- Updated README/runbook and added `EXTERNAL_PRODUCTION.md`. The initial adapter requires matching structured files and currently uses 720p30 landscape; it is not full MCP integration or an autonomous no-input creative model. Script changes currently require importing a revised matching pair as a new project.
+
+Verification: 196 regression tests passed in 269.47 seconds with zero failures/errors/skips (`data/baselines/no-key-cutover-results.xml`). This includes real-loopback HTTP tests; the three long media integration modules were excluded. Frontend typecheck/build passed. The systematic-debugging skill identified one obsolete provider-call-count assertion; the corrected standalone preview test passed.
+
+A subsequent seven-test external-input run also passed, including the added orchestration test through polish, alignment, rendering and assembly with media doubles and fail-on-call creative agents. This proves routing/no-provider behavior, not actual full-video quality. No live API spending occurred. The isolated browser host was stopped and its tab closed after verification.
+
+Browser verification used the existing isolated host with synthetic fixtures, not user projects: Compose missing-file validation, Settings without keys, Library navigation, saved proposal review and both production-renderer PNG previews passed; captured JavaScript error/warning logs were empty. The browser-verification guide informed these checks. JSON import/approval is covered by API tests; a full native file-picker/upload/render journey has not been claimed.
+
+Still separate: rebuilding/installing the native app, the approved full original-narration acceptance video, and the broader studio/MCP refactor. No live-model evaluation or user API keys are required for those next steps. The installed app has not been updated by this source change.
+
 ## Baseline started 2026-09-06
 
 - Source commit: `175f9bad605d63b7b78520afb70d5c7771b4edaa`, with substantial pre-existing tracked and untracked changes preserved.

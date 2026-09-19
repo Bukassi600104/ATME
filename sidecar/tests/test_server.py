@@ -79,84 +79,30 @@ def test_healthz_open_but_rest_locked(api):
     assert status == 401
 
 
-def test_submit_empty_topic_rejected(api):
-    status, _body = _req(api, "POST", "/jobs", body={"topic": ""})
-    assert status == 400
+def test_internal_generation_retired(api):
+    status, _body = _req(api, "POST", "/jobs", body={"topic": "Legacy topic"})
+    assert status == 410
 
 
-def test_submit_run_reaches_done_with_review_gate_off(api):
-    status, body = _req(api, "POST", "/jobs",
-                        body={"topic": "Why inference is hard", "provider": "fake",
-                              "voice": "sapi", "target_seconds": 30,
-                              "review_gate": False})
+def test_external_import_review_and_artifacts_over_real_http(api):
+    from test_external_inputs import external_payload
+    payload = external_payload()
+    status, body = _req(api, "POST", "/jobs/external", body=payload)
     assert status == 200
     job_id = body["job_id"]
-
-    status, body = _req(api, "POST", "/jobs/%d/run" % job_id)
-    assert status == 200 and body["accepted"] is True
-
-    deadline = time.time() + 480
-    state = {}
-    while time.time() < deadline:
-        status, state = _req(api, "GET", "/jobs/%d" % job_id)
-        if state["job"]["status"] in ("done", "failed"):
-            break
-        time.sleep(3)
-    assert state["job"]["status"] == "done", state.get("stages")
-    assert len(state["stages"]) >= 10
-
-
-def test_review_gate_pauses_and_approves_over_http(api):
-    status, body = _req(api, "POST", "/jobs",
-                        body={"topic": "Gate over http", "provider": "fake",
-                              "voice": "sapi", "target_seconds": 30,
-                              "review_gate": True})
-    job_id = body["job_id"]
-    _req(api, "POST", "/jobs/%d/run" % job_id)
-
-    deadline = time.time() + 240
-    state = {}
-    approved = False
-    while time.time() < deadline:
-        status, state = _req(api, "GET", "/jobs/%d" % job_id)
-        if state["job"]["status"] == "paused" and not approved:
-            status, _b = _req(api, "POST", "/jobs/%d/review" % job_id,
-                              body={"approved": True})
-            assert status == 200
-            approved = True
-        if state["job"]["status"] in ("done", "failed"):
-            break
-        time.sleep(3)
-    assert state["job"]["status"] == "done"
-    assert approved
-
-
-def test_script_and_artifacts_endpoints(api):
-    status, body = _req(api, "POST", "/jobs",
-                        body={"topic": "Endpoint probe", "provider": "fake",
-                              "voice": "sapi", "target_seconds": 30,
-                              "review_gate": False})
-    job_id = body["job_id"]
-    _req(api, "POST", "/jobs/%d/run" % job_id)
-
-    deadline = time.time() + 480
-    state = {}
-    while time.time() < deadline:
-        status, state = _req(api, "GET", "/jobs/%d" % job_id)
-        if state["job"]["status"] in ("done", "failed"):
-            break
-        time.sleep(3)
-    assert state["job"]["status"] == "done"
-
-    status, doc = _req(api, "GET", "/jobs/%d/script" % job_id)
-    assert status == 200 and len(doc["scenes"]) >= 2
-
-    status, arts = _req(api, "GET", "/jobs/%d/artifacts" % job_id)
+    status, state = _req(api, "GET", f"/jobs/{job_id}")
+    assert state["job"]["status"] == "paused"
+    status, doc = _req(api, "GET", f"/jobs/{job_id}/script")
+    assert status == 200 and doc == payload["script"]
+    status, approved = _req(api, "POST", f"/jobs/{job_id}/review",
+                           body={"approved": True, "scenes": doc["scenes"]})
+    assert status == 200 and approved["status"] == "waiting_voice"
+    status, arts = _req(api, "GET", f"/jobs/{job_id}/artifacts")
     assert status == 200
-    assert any(a["kind"] == "video" for a in arts["artifacts"])
-
+    assert any(a["kind"] == "approved_script" for a in arts["artifacts"])
+    status, history = _req(api, "GET", f"/jobs/{job_id}/history")
+    assert history["usage"] == []
     status, listing = _req(api, "GET", "/jobs")
     assert any(j["id"] == job_id for j in listing["jobs"])
-
     status, _body = _req(api, "GET", "/jobs/999999/script")
     assert status == 404

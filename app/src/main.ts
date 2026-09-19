@@ -39,6 +39,20 @@ interface Scene {
 }
 interface ScriptDoc { topic?: string; title?: string; scenes: Scene[]; }
 
+type ProjectInputKind = "script+audio" | "script+video" | "audio-only" | "video-only";
+interface ProjectState {
+  project_id: number;
+  revision: number;
+  input_kind: ProjectInputKind;
+  status: string;
+  approved_script_revision: number | null;
+  artifacts: Record<string, number>;
+  authoritative_narrative_source: {
+    mode: "script_authority" | "recording_authority";
+    ready_for_timing: boolean;
+  };
+}
+
 let currentJob: number | null = null;
 let pollTimer: number | null = null;
 let eventSource: EventSource | null = null;
@@ -92,6 +106,130 @@ function stopWatchers(): void {
   if (eventSource !== null) { eventSource.close(); eventSource = null; }
 }
 
+function projectError(value: unknown, fallback: string): string {
+  if (!value || typeof value !== "object") return fallback;
+  const payload = value as { detail?: string | { message?: string }; message?: string };
+  if (typeof payload.detail === "string") return payload.detail;
+  if (payload.detail && typeof payload.detail.message === "string") return payload.detail.message;
+  return payload.message || fallback;
+}
+
+async function projectRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const info = await sidecar();
+  const headers = new Headers(init?.headers);
+  headers.set("Authorization", `Bearer ${info.token}`);
+  const response = await fetch(`http://127.0.0.1:${info.port}${path}`, { ...init, headers });
+  const value = await response.json().catch(() => null) as T | null;
+  if (!response.ok) throw new Error(projectError(value, `ATME request failed (${response.status}).`));
+  if (value === null) throw new Error("ATME returned an empty response.");
+  return value;
+}
+
+function refreshNarrativeFields(): void {
+  const kind = ($<HTMLSelectElement>("project-input-kind")).value as ProjectInputKind;
+  const scriptBased = kind.startsWith("script+");
+  $("project-script-row").classList.toggle("hidden", !scriptBased);
+  const recording = $<HTMLInputElement>("project-recording");
+  recording.accept = kind.endsWith("video")
+    ? "video/mp4,video/quicktime,video/x-matroska,video/webm,.mp4,.mov,.mkv,.webm"
+    : "audio/wav,.wav";
+  $("project-source-explanation").textContent = scriptBased
+    ? `The external script supplies meaning; your ${kind.endsWith("video") ? "video" : "WAV"} supplies exact timing.`
+    : `Your ${kind === "video-only" ? "video" : "WAV"} is both the narrative and timing authority. Your connected AI may derive a semantic scene index through MCP.`;
+}
+
+async function waitForProjectTiming(projectId: number, runId: string): Promise<Record<string, unknown>> {
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    const state = await projectRequest<Record<string, unknown>>(`/projects/${projectId}/timing/${runId}`);
+    if (state.status === "done" || state.status === "failed") return state;
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+  }
+  throw new Error("Timing continues in the background. Open this project again to check its status.");
+}
+
+async function createAuthoritativeProject(): Promise<void> {
+  const title = $<HTMLInputElement>("project-title").value.trim();
+  const profile = $<HTMLSelectElement>("project-profile").value;
+  const inputKind = $<HTMLSelectElement>("project-input-kind").value as ProjectInputKind;
+  const scriptFile = $<HTMLInputElement>("project-script").files?.[0];
+  const recording = $<HTMLInputElement>("project-recording").files?.[0];
+  const feedback = $("project-feedback");
+  const result = $("project-result");
+  const button = $<HTMLButtonElement>("create-project");
+  let createdState: ProjectState | null = null;
+  result.classList.add("hidden");
+  if (!title) { feedback.textContent = "Enter a project title."; return; }
+  if (inputKind.startsWith("script+") && !scriptFile) {
+    feedback.textContent = "Choose the externally authored script JSON for this project."; return;
+  }
+  if (!recording) { feedback.textContent = "Choose the authoritative recording."; return; }
+  const wantsVideo = inputKind.endsWith("video");
+  const extension = recording.name.slice(recording.name.lastIndexOf(".")).toLowerCase();
+  if (wantsVideo !== [".mp4", ".mov", ".mkv", ".webm"].includes(extension)) {
+    feedback.textContent = wantsVideo ? "Choose an MP4, MOV, MKV, or WebM video." : "Choose an uncompressed PCM WAV recording.";
+    return;
+  }
+  button.disabled = true;
+  feedback.textContent = "Creating the project…";
+  try {
+    let scriptDocument: ScriptDoc | null = null;
+    if (scriptFile) {
+      if (scriptFile.size > 1024 * 1024) throw new Error("Script JSON exceeds 1 MiB.");
+      scriptDocument = JSON.parse(await scriptFile.text()) as ScriptDoc;
+    }
+    let state = await projectRequest<ProjectState>("/projects", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, profile, input_kind: inputKind }),
+    });
+    createdState = state;
+    if (scriptDocument) {
+      state = await projectRequest<ProjectState>(`/projects/${state.project_id}/artifacts/script`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ document: scriptDocument, expected_revision: state.revision }),
+      });
+      createdState = state;
+      state = await projectRequest<ProjectState>(`/projects/${state.project_id}/script-approval`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ script_revision: state.artifacts.script,
+          expected_revision: state.revision, approved: true }),
+      });
+      createdState = state;
+    }
+    feedback.textContent = `Uploading ${recording.name}…`;
+    const mediaPath = wantsVideo ? "video" : "wav";
+    const media = await projectRequest<{ project: ProjectState }>(
+      `/projects/${state.project_id}/media/${mediaPath}?expected_revision=${state.revision}`, {
+        method: "POST", headers: wantsVideo
+          ? { "Content-Type": recording.type || "application/octet-stream", "X-Filename": recording.name }
+          : { "Content-Type": "audio/wav" }, body: recording,
+      });
+    state = media.project;
+    createdState = state;
+    feedback.textContent = "Preparing local technical speech timing…";
+    const timing = await projectRequest<{ run_id: string }>(`/projects/${state.project_id}/timing`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expected_revision: state.revision }),
+    });
+    const timingState = await waitForProjectTiming(state.project_id, timing.run_id);
+    const timingDocument = timingState.timing as { status?: string } | undefined;
+    const next = state.authoritative_narrative_source.mode === "recording_authority"
+      ? "Connect your external AI through MCP so it can derive and store the semantic scene structure."
+      : "Connect your external AI through MCP to create the storyboard and production layout.";
+    feedback.textContent = "Authoritative narrative stored and timed locally.";
+    result.textContent = `Project #${state.project_id} · revision ${state.revision}\nAuthority: ${state.authoritative_narrative_source.mode.replace("_", " ")}\nTiming: ${timingDocument?.status || timingState.status}\nNext: ${next}`;
+    result.classList.remove("hidden");
+  } catch (error) {
+    feedback.textContent = error instanceof Error ? error.message : "Project creation failed.";
+    if (createdState) {
+      result.textContent = `Project #${createdState.project_id} was saved at revision ${createdState.revision}.\nResolve the message above, then continue through MCP; no uploaded source has been discarded.`;
+      result.classList.remove("hidden");
+    }
+  } finally {
+    button.disabled = false;
+  }
+}
+
 /** Live progress: SSE primary, poll fallback. Closes on terminal/paused states. */
 function watch(jobId: number): void {
   stopWatchers();
@@ -136,44 +274,26 @@ function watch(jobId: number): void {
   })();
 }
 
-async function startRun(): Promise<void> {
-  const topic = ($("topic") as HTMLTextAreaElement).value.trim();
-  if (!topic) { ($("topic") as HTMLTextAreaElement).focus(); return; }
-  const info = await sidecar();
-  const auth = { Authorization: `Bearer ${info.token}`,
-                 "Content-Type": "application/json" };
-  const voice = ($("voice") as HTMLSelectElement).value;
-  const durationMinutes = Math.max(1, Math.min(60,
-    Number(($("duration-minutes") as HTMLInputElement).value) || 8));
-  const reviewGate = ($("review-gate") as HTMLInputElement).checked;
-  const quality = ($("quality") as HTMLSelectElement).value;
-  const presets: Record<string, {width: number; height: number; fps: number}> = {
-    "720p24": { width: 1280, height: 720, fps: 24 },
-    "720p30": { width: 1280, height: 720, fps: 30 },
-    "1080p30": { width: 1920, height: 1080, fps: 30 },
-  };
-  const submit = await fetch(`http://127.0.0.1:${info.port}/jobs`, {
-    method: "POST", headers: auth,
-    body: JSON.stringify({ topic, provider: "litellm", voice, ...presets[quality],
-                           review_gate: reviewGate,
-                           target_seconds: Math.round(durationMinutes * 60) }) });
-  if (!submit.ok) {
-    const error = await submit.json().catch(() => ({ detail: "Could not create the job" }));
-    $("compose-feedback").textContent = error.detail || "Could not create the job";
-    return;
-  }
-  $("compose-feedback").textContent = "";
-  const { job_id } = await submit.json();
-  void fetch(`http://127.0.0.1:${info.port}/models/alignment`, {
-    method: "POST", headers: { Authorization: `Bearer ${info.token}` },
-  });
-  currentJob = job_id;
-  show("run");
-  $("log").textContent = "";
-  $("job-status").textContent = "running";
-  await fetch(`http://127.0.0.1:${info.port}/jobs/${job_id}/run`,
-              { method: "POST", headers: auth });
-  watch(job_id);
+async function importExternal(): Promise<void> {
+  const script = ($("external-script") as HTMLInputElement).files?.[0];
+  const layout = ($("external-layout") as HTMLInputElement).files?.[0];
+  const feedback = $("external-feedback");
+  if (!script || !layout) { feedback.textContent = "Choose both script and production layout JSON files."; return; }
+  const button = $("import-external") as HTMLButtonElement; button.disabled = true;
+  try {
+    if (script.size + layout.size > 12 * 1024 * 1024) throw new Error("Inputs exceed the 12 MiB limit.");
+    const payload = { script: JSON.parse(await script.text()), layout: JSON.parse(await layout.text()) };
+    const info = await sidecar();
+    const response = await fetch(`http://127.0.0.1:${info.port}/jobs/external`, {
+      method: "POST", headers: { Authorization: `Bearer ${info.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "Import failed.");
+    feedback.textContent = "Imported without AI calls. Review the supplied script before uploading narration.";
+    await openReview(result.job_id);
+  } catch (error) { feedback.textContent = error instanceof Error ? error.message : "Import failed."; }
+  finally { button.disabled = false; }
 }
 
 async function controlJob(action: "pause" | "resume" | "cancel"): Promise<void> {
@@ -267,7 +387,7 @@ async function openReview(jobId: number, visualOnly = false): Promise<void> {
   document.querySelector("#review h1")!.textContent = visualOnly ? "Visual review" : "Script review";
   document.querySelector("#review .hint")!.textContent = visualOnly
     ? "Approved narration is read-only here. Edit evidence or board timing, then resume to realign and render."
-    : "Edit narration, then approve. Upload your original voice or use the selected draft voice.";
+    : "Review the imported script, then approve and upload your original voice. To revise narration, import a matching revised script and layout.";
   $("approve").textContent = visualOnly ? "Resume with visual changes" : "Approve & continue";
   $("cancel-job").textContent = visualOnly ? "Back to Library" : "Cancel job";
   mountBoardEditor($("board-editor"), jobId, info);
@@ -289,7 +409,7 @@ async function openReview(jobId: number, visualOnly = false): Promise<void> {
     label.textContent = `scene ${s.scene_id} - ${s.phase}`;
     const ta = document.createElement("textarea");
     ta.rows = 3; ta.value = s.spoken_text; ta.dataset.sid = String(s.scene_id);
-    ta.readOnly = visualOnly;
+    ta.readOnly = true;
     const preview = document.createElement("img");
     preview.className = "scene-preview";
     preview.alt = `Draft drawing through scene ${s.scene_id}`;
@@ -548,28 +668,15 @@ async function jobWasReviewed(jobId: number): Promise<boolean> {
   return (state.done_stages || []).includes("reviewed");
 }
 
-type RoleName = "researcher" | "reasoner" | "writer" | "layouter";
-const roleNames: RoleName[] = ["researcher", "reasoner", "writer", "layouter"];
-
 async function loadSettings(): Promise<void> {
   const info = await sidecar();
-  const response = await fetch(`http://127.0.0.1:${info.port}/settings/providers`,
-    { headers: { Authorization: `Bearer ${info.token}` } });
-  if (!response.ok) return;
-  const data = await response.json() as { configured: boolean; roles: Record<string, {
-    model?: string; api_base?: string; has_api_key?: boolean; web_grounded?: boolean;
-  }> };
-  $("provider-state").textContent = data.configured ? "configured" : "not configured";
-  for (const role of roleNames) {
-    const fieldset = document.querySelector(`fieldset[data-role='${role}']`) as HTMLFieldSetElement;
-    const current = data.roles?.[role] || {};
-    (fieldset.querySelector("[data-field='model']") as HTMLInputElement).value = current.model || "";
-    (fieldset.querySelector("[data-field='api_base']") as HTMLInputElement).value = current.api_base || "";
-    const key = fieldset.querySelector("[data-field='api_key']") as HTMLInputElement;
-    key.value = "";
-    key.placeholder = current.has_api_key ? "Saved securely — enter only to replace" : "API key";
-    const grounded = fieldset.querySelector("[data-field='web_grounded']") as HTMLInputElement | null;
-    if (grounded) grounded.checked = Boolean(current.web_grounded);
+  try {
+    const connection = await invoke<{ command: string; args: string[] }>("mcp_connection_info");
+    $<HTMLTextAreaElement>("mcp-config").value = JSON.stringify({
+      mcpServers: { atme: { command: connection.command, args: connection.args } },
+    }, null, 2);
+  } catch (error) {
+    $("mcp-feedback").textContent = error instanceof Error ? error.message : "Could not locate the local MCP server.";
   }
   const modelResponse = await fetch(
     `http://127.0.0.1:${info.port}/models/alignment`,
@@ -581,6 +688,18 @@ async function loadSettings(): Promise<void> {
   }
 }
 
+async function copyMcpConfig(): Promise<void> {
+  const config = $<HTMLTextAreaElement>("mcp-config").value;
+  if (!config) { $("mcp-feedback").textContent = "MCP configuration is not available yet."; return; }
+  try {
+    await navigator.clipboard.writeText(config);
+    $("mcp-feedback").textContent = "MCP configuration copied. Paste it into your trusted AI client's MCP settings.";
+  } catch {
+    $<HTMLTextAreaElement>("mcp-config").select();
+    $("mcp-feedback").textContent = "Copy was blocked; the configuration has been selected for manual copying.";
+  }
+}
+
 async function prepareModel(): Promise<void> {
   const info = await sidecar();
   const response = await fetch(`http://127.0.0.1:${info.port}/models/alignment`, {
@@ -589,40 +708,6 @@ async function prepareModel(): Promise<void> {
   const result = await response.json().catch(() => ({ detail: "Could not start model setup" }));
   $("alignment-model-state").textContent = response.ok
     ? result.status : (result.detail || "setup failed");
-}
-
-async function saveSettings(): Promise<void> {
-  const saveButton = $("save-settings") as HTMLButtonElement;
-  saveButton.disabled = true;
-  saveButton.textContent = "Saving…";
-  $("settings-feedback").textContent = "Encrypting and saving provider settings…";
-  const roles: Record<string, object> = {};
-  for (const role of roleNames) {
-    const fieldset = document.querySelector(`fieldset[data-role='${role}']`) as HTMLFieldSetElement;
-    const value = (name: string) =>
-      (fieldset.querySelector(`[data-field='${name}']`) as HTMLInputElement).value.trim();
-    const grounded = fieldset.querySelector("[data-field='web_grounded']") as HTMLInputElement | null;
-    roles[role] = { model: value("model"), api_base: value("api_base"), api_key: value("api_key"),
-                    web_grounded: grounded ? grounded.checked : false };
-  }
-  try {
-    const info = await sidecar();
-    const response = await fetch(`http://127.0.0.1:${info.port}/settings/providers`, {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${info.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ roles }),
-    });
-    const result = await response.json().catch(() => ({ detail: "Could not save settings" }));
-    $("settings-feedback").textContent = response.ok
-      ? "Saved securely. All four roles are ready." : (result.detail || "Could not save settings");
-    if (response.ok) await loadSettings();
-  } catch (error) {
-    $("settings-feedback").textContent = error instanceof Error
-      ? `Could not save settings: ${error.message}` : "Could not save settings";
-  } finally {
-    saveButton.disabled = false;
-    saveButton.textContent = "Save provider settings";
-  }
 }
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -637,7 +722,9 @@ window.addEventListener("DOMContentLoaded", () => {
       if (view === "settings") void loadSettings();
     });
   });
-  $("start").addEventListener("click", () => void startRun());
+  $("import-external").addEventListener("click", () => void importExternal());
+  $("project-input-kind").addEventListener("change", refreshNarrativeFields);
+  $("create-project").addEventListener("click", () => void createAuthoritativeProject());
   $("upload-voice").addEventListener("click", () => void uploadVoice());
   $("back-to-review").addEventListener("click", () => {
     if (currentJob !== null) void openReview(currentJob);
@@ -646,10 +733,11 @@ window.addEventListener("DOMContentLoaded", () => {
     const file = ($("voice-file") as HTMLInputElement).files?.[0];
     $("voice-file-name").textContent = file ? file.name : "Choose your voiceover";
   });
-  $("save-settings").addEventListener("click", () => void saveSettings());
   $("prepare-model").addEventListener("click", () => void prepareModel());
+  $("copy-mcp-config").addEventListener("click", () => void copyMcpConfig());
   $("pause-run").addEventListener("click", () => void controlJob("pause"));
   $("resume-run").addEventListener("click", () => void controlJob("resume"));
   $("cancel-run").addEventListener("click", () => void controlJob("cancel"));
+  refreshNarrativeFields();
   void loadSettings();
 });

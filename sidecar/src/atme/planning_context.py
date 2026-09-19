@@ -3,13 +3,14 @@
 This is timing evidence, not an inferred storyboard or an assertion of alignment
 quality. Missing/uncertain scenes must be reviewed before automatic planning.
 """
-from copy import deepcopy
 import hashlib
 import json
 import math
+from copy import deepcopy
 
 
-def build_planning_context(script, words, duration_ms, audio_sha256):
+def build_planning_context(script, words, duration_ms, audio_sha256,
+                           semantic_authority="approved_external_script"):
     if type(duration_ms) is not int or duration_ms <= 0:
         raise ValueError("final audio duration must be a positive integer")
     if (not isinstance(audio_sha256, str) or len(audio_sha256) != 64
@@ -57,6 +58,7 @@ def build_planning_context(script, words, duration_ms, audio_sha256):
                        "end_ms": max((w["end_ms"] for w in observed), default=None),
                        "words": observed})
     return {"contract_version": "1", "timebase": "final_audio_ms",
+            "semantic_authority": semantic_authority,
             "status": "needs_review" if issues else "ready",
             "audio_sha256": audio_sha256, "duration_ms": duration_ms,
             "script_sha256": hashlib.sha256(json.dumps(script, sort_keys=True,

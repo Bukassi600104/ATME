@@ -60,6 +60,7 @@ def viewbox_at(camera_plan: list[dict], canvas_w: float, canvas_h: float,
     """Return the viewBox rect for time t_ms, aspect-fitted to the output frame."""
     if any("action" in cue for cue in camera_plan):
         focus = _intent_focus(camera_plan, t_ms)
+        focus = _composition_padding(focus, canvas_w, canvas_h)
         return _fit_viewbox(focus["x"], focus["y"], focus["width"], focus["height"],
                             out_w, out_h)
     if not camera_plan:
@@ -88,7 +89,21 @@ def viewbox_at(camera_plan: list[dict], canvas_w: float, canvas_h: float,
             fw += (f2["width"] - fw) * p
             fh += (f2["height"] - fh) * p
 
+    if camera_plan:
+        padded = _composition_padding({"x": fx, "y": fy, "width": fw, "height": fh}, canvas_w, canvas_h)
+        fx, fy, fw, fh = padded["x"], padded["y"], padded["width"], padded["height"]
     return _fit_viewbox(fx, fy, fw, fh, out_w, out_h)
+
+
+def _composition_padding(focus: dict, canvas_w: float, canvas_h: float) -> dict:
+    """Add restrained board context without changing authored cue timing or target."""
+    width = min(canvas_w, focus["width"] * 1.22)
+    height = min(canvas_h, focus["height"] * 1.22)
+    center_x = focus["x"] + focus["width"] / 2
+    center_y = focus["y"] + focus["height"] / 2
+    return {"x": max(0, min(canvas_w - width, center_x - width / 2)),
+            "y": max(0, min(canvas_h - height, center_y - height / 2)),
+            "width": width, "height": height}
 
 
 def _fit_viewbox(fx, fy, fw, fh, out_w, out_h) -> dict:

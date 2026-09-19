@@ -3,159 +3,151 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ATME</title>
-  <link rel="stylesheet" href="/src/tokens.css" />
+  <meta name="theme-color" content="#0b1018" />
+  <title>ATME Studio</title>
+  <link rel="stylesheet" href="/src/studio.css" />
 </head>
 <body>
-  <div id="app">
-    <header class="titlestrip">
-      <span class="mark" aria-hidden="true"></span>
-      <span class="title">ATME</span>
-      <span class="pill" id="job-status">idle</span>
-      <span class="spacer"></span>
-      <nav class="nav">
-        <button data-view="compose" class="navlink active">Compose</button>
-        <button data-view="library" class="navlink">Library</button>
-        <button data-view="settings" class="navlink">Settings</button>
+  <section id="project-launcher" class="project-launcher" aria-label="ATME projects">
+    <header class="launcher-header"><div class="brand launcher-brand"><span class="brand-mark">✂</span><strong>ATME</strong></div><span>Local production studio</span></header>
+    <main class="launcher-main"><div class="launcher-actions"><button id="launcher-new-project" class="launcher-new">＋<span><strong>Create project</strong><small>Start a new production</small></span></button><button id="launcher-connect-ai" class="launcher-new connect-ai">⌁<span><strong>Connect an AI</strong><small>Get the correct setup instruction</small></span></button></div><div class="launcher-title"><div><h1>Projects</h1><p>Choose a production to open in the studio.</p></div></div><div id="launcher-project-list" class="launcher-project-grid"></div></main>
+  </section>
+  <div id="studio" class="studio-shell hidden">
+    <aside class="sidebar" aria-label="Studio navigation">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">✂</span><strong>ATME</strong></div>
+      <nav id="workspace-nav" class="workspace-nav">
+        <button class="nav-item" data-workspace="sources"><span>⊞</span>Sources</button>
+        <button class="nav-item" data-workspace="script"><span>≡</span>Script</button>
+        <button class="nav-item" data-workspace="storyboard"><span>▦</span>Storyboard</button>
+        <button class="nav-item" data-workspace="timeline"><span>⌁</span>Timeline</button>
+        <button class="nav-item" data-workspace="assets"><span>◇</span>Assets</button>
+        <button class="nav-item" data-workspace="style"><span>◉</span>Style</button>
+        <button class="nav-item" data-workspace="validation"><span>✓</span>Export Check</button>
+        <button class="nav-item" data-workspace="renders"><span>▢</span>Renders</button>
+        <button class="nav-item" data-workspace="connection"><span>⌘</span>AI Connection</button>
       </nav>
+      <section class="connection-card" aria-label="AI connection status">
+        <div><span id="connection-dot" class="status-dot neutral"></span><strong>AI Connection</strong></div>
+        <p id="connection-status">Waiting for activity</p>
+        <p id="project-access">No project selected</p>
+        <button id="open-connection" class="text-button">Connection details</button>
+      </section>
+    </aside>
+
+    <header class="project-bar">
+      <button id="return-projects" class="icon-button" aria-label="Return to projects">⌂</button>
+      <button id="project-picker" class="project-picker"><span id="project-name">No project open</span><span>⌄</span></button>
+      <span id="save-state" class="subtle">Local studio</span>
+      <div class="profile-switch" aria-label="Output profile">
+        <button id="profile-landscape" data-profile="LONG_FORM_16_9" class="active">▭ <span>16:9</span></button>
+        <button id="profile-portrait" data-profile="SHORT_FORM_9_16">▯ <span>9:16</span></button>
+      </div>
+      <div class="bar-spacer"></div>
+      <button id="validation-pill" class="status-button"><span class="status-dot neutral"></span><span>Export not checked</span></button>
+      <button id="render-project" class="primary-button" disabled>▶ Render</button>
     </header>
 
-    <main class="surface">
-      <section id="compose" class="pane">
-        <h1>What are we explaining?</h1>
-        <textarea id="topic" rows="3"
-          placeholder="Type the topic — e.g. Why inference is hard"></textarea>
-        <div class="chiprow">
-          <label class="chip">Voice
-            <select id="voice">
-              <option value="upload">My uploaded voice</option>
-              <option value="sapi">Windows draft voice</option>
-            </select>
-          </label>
-          <label class="chip">Quality
-            <select id="quality">
-              <option value="720p30">720p30</option>
-              <option value="720p24">720p24 (faster)</option>
-              <option value="1080p30">1080p30 (overnight)</option>
-            </select>
-          </label>
-          <label class="chip">Provider
-            <span id="provider-state">not configured</span>
-          </label>
-        </div>
-        <details class="fine-tuning">
-          <summary>Fine-tuning</summary>
-          <div class="fine-grid">
-            <label>Target duration (minutes)
-              <input id="duration-minutes" type="number" min="1" max="60" value="8" />
-            </label>
-            <label class="check"><input id="review-gate" type="checkbox" checked /> Review script before voice and rendering</label>
+    <main class="workspace">
+      <section class="viewer-column">
+        <div id="viewer" class="viewer panel">
+          <div id="viewer-empty" class="viewer-empty">
+            <div class="empty-mark">ATME</div>
+            <strong>Open a project to begin</strong>
+            <p>Your connected AI can plan while you review and edit here.</p>
+            <button id="empty-new-project" class="small-primary">New project</button>
           </div>
-        </details>
-        <div id="compose-feedback" class="mono feedback"></div>
-        <button id="start" class="primary">Start run</button>
-      </section>
-
-      <section id="voice-upload" class="pane hidden">
-        <h1>Record the approved script</h1>
-        <p class="hint">Upload one continuous WAV, MP3, M4A, AAC, or FLAC recording. Your delivery becomes the master timeline for every drawing and camera move.</p>
-        <label class="filebox" for="voice-file">
-          <span id="voice-file-name">Choose your voiceover</span>
-          <input id="voice-file" type="file" accept="audio/wav,audio/mpeg,audio/mp4,audio/aac,audio/flac,.wav,.mp3,.m4a,.aac,.flac" />
-        </label>
-        <div id="voice-feedback" class="mono feedback"></div>
-        <div class="rowgap">
-          <button id="upload-voice" class="primary">Upload &amp; render</button>
-          <button id="back-to-review" class="ghost">Back to script</button>
+          <div id="viewer-stage" class="viewer-stage" aria-label="Program viewer">
+            <div id="viewer-canvas" class="viewer-canvas" data-profile="LONG_FORM_16_9">
+              <img id="preview-image" class="preview-image hidden" alt="Renderer preview at the current playhead" />
+              <video id="source-video" class="source-video hidden" preload="metadata" playsinline></video>
+              <video id="render-video" class="render-video hidden" controls playsinline></video>
+            </div>
+          </div>
+          <div id="viewer-message" class="viewer-message hidden"></div>
+          <div class="viewer-controls">
+            <button id="play-preview" class="transport" aria-label="Play preview">▶</button>
+            <span id="viewer-time">00:00 / 00:00</span>
+            <div class="bar-spacer"></div><button id="viewer-fit" class="control-chip">Fit</button><button id="viewer-fullscreen" class="control-chip">Fullscreen</button>
+          </div>
         </div>
       </section>
 
-      <section id="run" class="pane hidden">
-        <svg id="runline" viewBox="0 0 1000 24" preserveAspectRatio="none">
-          <path id="runline-path" d="" />
-        </svg>
-        <div id="run-meta" class="mono">—</div>
-        <pre id="log" class="mono"></pre>
-        <details>
-          <summary>Narration timing report</summary>
-          <p class="hint">Last saved alignment report. Refresh after alignment; this does not approve or modify timing.</p>
-          <button class="ghost" data-timing-refresh>Load timing report</button>
-          <div data-timing-report role="status" aria-live="polite"></div>
-        </details>
-        <div class="rowgap run-controls">
-          <button id="pause-run" class="ghost">Pause at checkpoint</button>
-          <button id="resume-run" class="ghost">Resume</button>
-          <button id="cancel-run" class="ghost danger">Cancel run</button>
+      <aside id="media-panel" class="media-panel panel" aria-label="Project media">
+        <div class="tabbar"><button class="tab active" data-media-tab="sources">Sources</button><button class="tab" data-media-tab="assets">Assets</button></div>
+        <button id="add-source" class="add-source" disabled>＋ Add Source</button>
+        <input id="source-file" class="hidden" type="file" accept="audio/wav,.wav,video/mp4,video/quicktime,video/x-matroska,video/webm,.mp4,.mov,.mkv,.webm" />
+        <div id="source-drop" class="source-drop">Drop narration or source video here</div>
+        <div id="source-list" class="source-list"></div>
+      </aside>
+
+      <aside class="inspector panel" aria-label="Inspector">
+        <div class="tabbar inspector-tabs">
+          <button class="tab active" data-inspector="scene">Scene</button><button class="tab" data-inspector="style">Style</button><button class="tab" data-inspector="audio">Audio</button><button class="tab" data-inspector="ai">AI</button>
+        </div>
+        <div id="inspector-content" class="inspector-content"><div class="inspector-empty"><strong>Nothing selected</strong><p>Select a scene, clip or timeline range.</p></div></div>
+      </aside>
+
+      <div id="workspace-splitter" class="workspace-splitter" role="separator" aria-orientation="horizontal" aria-label="Resize timeline"></div>
+      <section class="timeline panel" aria-label="Timeline editor">
+        <div class="timeline-toolbar">
+          <strong>Timeline</strong><span id="selection-label">No selection</span>
+          <div class="edit-actions" role="toolbar" aria-label="Edit commands">
+            <button id="undo-edit" class="command-button" aria-label="Undo" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
+            <button id="redo-edit" class="command-button" aria-label="Redo" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
+            <span class="toolbar-divider"></span>
+            <button id="select-tool" class="command-button active-tool" aria-pressed="true" title="Selection tool (V)">↖ Select</button>
+            <button id="blade-tool" class="command-button" aria-pressed="false" title="Blade tool (B)">✂ Blade</button>
+            <button id="snap-toggle" class="command-button active-tool" aria-pressed="true" title="Snapping (S)">🧲 Snap</button>
+            <button id="cut-edit" class="command-button" aria-label="Cut selected clip" title="Split at playhead (Ctrl+K)" disabled>│ Split</button>
+            <button id="delete-edit" class="command-button danger-command" aria-label="Delete selected range" disabled>⌫ Delete</button>
+            <button id="ripple-delete" class="command-button danger-command" aria-label="Ripple delete selected range" disabled>⇤ Ripple</button>
+            <button id="silence-markers" class="command-button" aria-pressed="false">Silences</button>
+          </div>
+          <div class="bar-spacer"></div><button id="fit-timeline" class="command-button">Fit Timeline</button><button id="zoom-out" class="icon-button" aria-label="Zoom out">−</button><span id="zoom-label">100%</span><button id="zoom-in" class="icon-button" aria-label="Zoom in">＋</button>
+        </div>
+        <div id="timeline-ruler-viewport" class="ruler-viewport"><div id="timeline-ruler" class="ruler"></div></div>
+        <div id="timeline-tracks" class="timeline-tracks">
+          <div class="track" data-track="illustrations"><div class="track-label"><span>▧</span>Illustrations</div><div class="track-lane"></div></div>
+          <div class="track" data-track="captions"><div class="track-label"><span>CC</span>Captions</div><div class="track-lane"></div></div>
+          <div class="track" data-track="sfx"><div class="track-label"><span>✦</span>SFX</div><div class="track-lane"></div></div>
+          <div class="track" data-track="video" data-track-index="0"><div class="track-label"><span>▣</span>Video 1</div><div class="track-lane"></div><button class="track-resizer" aria-label="Resize video track"></button></div>
+          <div class="track" data-track="audio" data-track-index="0"><div class="track-label"><span>≋</span>Audio 1</div><div class="track-lane"></div><button class="track-resizer" aria-label="Resize audio track"></button></div>
+          <div id="playhead" class="playhead"><button id="playhead-handle" class="playhead-handle" aria-label="Drag playhead"></button></div>
+          <div id="range-selection" class="range-selection hidden"></div>
         </div>
       </section>
-
-      <section id="review" class="pane hidden">
-        <h1>Script review</h1>
-        <p class="hint mono">Edit any narration below, then approve. Voice synthesis starts on approval.</p>
-        <div id="scenes"></div>
-        <details>
-          <summary>Board timeline and object assignments</summary>
-          <p class="hint">Requires a saved layout and final polished audio. Saving preserves a backup and requires realignment and rendering.</p>
-          <div id="board-editor"></div>
-        </details>
-        <details>
-          <summary>Narration timing report</summary>
-          <p class="hint">Available after voice alignment. Script edits may make the last saved report outdated.</p>
-          <button class="ghost" data-timing-refresh>Load timing report</button>
-          <div data-timing-report role="status" aria-live="polite"></div>
-        </details>
-        <div class="rowgap">
-          <button id="approve" class="primary">Approve &amp; continue</button>
-          <button id="cancel-job" class="ghost">Cancel job</button>
-        </div>
-      </section>
-
-      <section id="library" class="pane hidden">
-        <h1>Library</h1>
-        <div id="lib-rows"></div>
-      </section>
-
-      <section id="settings" class="pane hidden">
-        <h1>AI providers</h1>
-        <p class="hint">Map each production role to a LiteLLM model. API keys are encrypted for your Windows account and never returned to the interface.</p>
-        <p class="hint">OpenRouter defaults are filled in as real values. Paste the same OpenRouter API key into all four key fields, then save.</p>
-        <p class="hint mono">Alignment model: <span id="alignment-model-state">not ready</span></p>
-        <div id="provider-roles" class="provider-roles">
-          <fieldset data-role="researcher">
-            <legend>Researcher <span class="required">web grounded</span></legend>
-            <input data-field="model" placeholder="Model identifier" autocomplete="off" />
-            <input data-field="api_base" placeholder="API base URL (optional)" autocomplete="off" />
-            <input data-field="api_key" type="password" placeholder="API key" autocomplete="new-password" />
-            <label class="check"><input data-field="web_grounded" type="checkbox" checked /> Endpoint performs live web search</label>
-          </fieldset>
-          <fieldset data-role="reasoner">
-            <legend>Verifier / reasoner</legend>
-            <input data-field="model" placeholder="Model identifier" autocomplete="off" />
-            <input data-field="api_base" placeholder="API base URL (optional)" autocomplete="off" />
-            <input data-field="api_key" type="password" placeholder="API key" autocomplete="new-password" />
-          </fieldset>
-          <fieldset data-role="writer">
-            <legend>Scriptwriter</legend>
-            <input data-field="model" placeholder="Model identifier" autocomplete="off" />
-            <input data-field="api_base" placeholder="API base URL (optional)" autocomplete="off" />
-            <input data-field="api_key" type="password" placeholder="API key" autocomplete="new-password" />
-          </fieldset>
-          <fieldset data-role="layouter">
-            <legend>Spatial director</legend>
-            <input data-field="model" placeholder="Model identifier" autocomplete="off" />
-            <input data-field="api_base" placeholder="API base URL (optional)" autocomplete="off" />
-            <input data-field="api_key" type="password" placeholder="API key" autocomplete="new-password" />
-          </fieldset>
-        </div>
-        <div id="settings-feedback" class="mono feedback" role="status" aria-live="polite"></div>
-        <div class="rowgap">
-          <button id="save-settings" class="primary">Save provider settings</button>
-          <button id="prepare-model" class="ghost">Prepare alignment model</button>
-        </div>
-      </section>
-
     </main>
   </div>
-  <script type="module" src="/src/main.ts"></script>
+
+  <dialog id="new-project-dialog" class="studio-dialog">
+    <form method="dialog" id="new-project-form">
+      <div class="dialog-heading"><div><strong>New project</strong><p>Start empty or add the first recording. ATME handles the production structure.</p></div><button id="close-new-project" type="button" class="icon-button" aria-label="Close">×</button></div>
+      <label>Project name<input id="new-project-title" required maxlength="300" autocomplete="off" /></label>
+      <label>Output profile<select id="new-project-profile"><option value="LONG_FORM_16_9">16:9 long-form</option><option value="SHORT_FORM_9_16">9:16 short-form</option></select></label>
+      <label>Initial source <span class="subtle">optional</span><input id="new-project-source" type="file" accept="audio/wav,.wav,video/mp4,video/quicktime,video/x-matroska,video/webm,.mp4,.mov,.mkv,.webm" /></label>
+      <p id="new-project-error" class="error" role="status"></p>
+      <div class="dialog-actions"><button id="cancel-new-project" type="button" class="secondary-button">Cancel</button><button id="confirm-new-project" type="submit" class="primary-button">Create project</button></div>
+    </form>
+  </dialog>
+  <dialog id="ai-setup-dialog" class="studio-dialog wide-dialog"><div class="dialog-heading"><div><strong>Connect an AI</strong><p>Copy the exact local MCP settings for one supported Windows AI client.</p></div><button id="close-ai-setup" class="icon-button">×</button></div><div class="dialog-content"><label>AI client<select id="ai-client"><option value="chatgpt">ChatGPT Desktop</option><option value="codex">Codex</option><option value="claude">Claude Desktop</option></select></label><label class="check-row"><input id="enable-jev" type="checkbox">Enable optional TypeSafe Jev decisions</label><label id="jev-key-row" class="hidden">TypeSafe API key<input id="jev-key" type="password" autocomplete="off" placeholder="Paste key for this copied configuration only"></label><textarea id="ai-setup-command" readonly></textarea><p class="field-help">ATME does not store this key. When enabled, it is copied into your AI client's local MCP environment.</p><div class="dialog-actions"><button id="copy-ai-setup" class="primary-button">Copy setup</button></div></div></dialog>
+
+  <dialog id="workspace-dialog" class="studio-dialog wide-dialog">
+    <div class="dialog-heading"><div><strong id="workspace-dialog-title">Project</strong><p id="workspace-dialog-subtitle"></p></div><button id="close-workspace-dialog" class="icon-button" aria-label="Close">×</button></div>
+    <div id="workspace-dialog-content" class="dialog-content"></div>
+  </dialog>
+
+  <dialog id="source-removal-dialog" class="studio-dialog removal-dialog">
+    <div class="dialog-heading"><div><strong id="source-removal-title">Remove source?</strong><p>This changes the project, not your original file.</p></div></div>
+    <div class="dialog-content">
+      <p id="source-removal-message" class="removal-message"></p>
+      <div class="retention-note"><strong>Your file is safe</strong><span>ATME will not delete the original video or audio from your computer.</span></div>
+      <div class="dialog-actions"><button id="cancel-source-removal" class="secondary-button">Cancel</button><button id="confirm-source-removal" class="danger-button">Remove source</button></div>
+    </div>
+  </dialog>
+  <dialog id="project-removal-dialog" class="studio-dialog removal-dialog"><div class="dialog-heading"><div><strong>Remove project?</strong><p>The project will leave your project screen.</p></div></div><div class="dialog-content"><p id="project-removal-message" class="removal-message"></p><div class="retention-note"><strong>Media files are retained</strong><span>ATME will not delete your original external files.</span></div><div class="dialog-actions"><button id="cancel-project-removal" class="secondary-button">Cancel</button><button id="confirm-project-removal" class="danger-button">Remove project</button></div></div></dialog>
+  <div id="timeline-context-menu" class="context-menu hidden" role="menu"><button data-action="remove-clip">Remove from timeline</button><button data-action="detach-audio">Detach audio</button><button data-action="split-clip">Split at playhead</button><button data-action="compound-clips">Create compound clip</button></div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <script type="module" src="/src/studio.ts"></script>
 </body>
 </html>

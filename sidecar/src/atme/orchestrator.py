@@ -63,18 +63,8 @@ class Orchestrator:
     # ------------------------------------------------------------------ helpers
     def _completes_for(self, settings: dict):
         provider = settings.get("provider", "fake")
-        if provider == "litellm":
-            pj = settings.get("providers_json")
-            if not pj and self.settings_store is not None:
-                cfg = self.settings_store.runtime_roles()
-            elif pj:
-                cfg = json.loads(pj) if isinstance(pj, str) else pj
-            else:
-                raise ValueError("AI providers are not configured")
-            from atme.gateway.router import RoleConfig, make_litellm_complete
-
-            return {role: make_litellm_complete(role, RoleConfig(**cfg[role]))
-                    for role in ("reasoner", "researcher", "writer", "layouter")}
+        if provider != "fake":
+            raise ValueError("Internal AI providers are retired. Import external script and layout; no API keys required.")
         return None  # fake
 
     def _stage(self, job_id: int, name: str, fn, attempt: int = 1,
@@ -164,6 +154,8 @@ class Orchestrator:
         if not job:
             raise KeyError("job %s not found" % job_id)
         settings = job["settings"]
+        if settings.get("project_service"):
+            raise ValueError("Project-service rendering awaits validated project compilation; no legacy fallback is allowed")
         topic = job["topic"]
         job_dir = self._job_dir(job_id)
         job_dir.mkdir(parents=True, exist_ok=True)
@@ -188,6 +180,10 @@ class Orchestrator:
         from atme import cognitive
 
         completes_cache: list[Any] = [None]
+        external = settings.get("provider") == "external"
+        if external:
+            from atme.external_inputs import validate_external_inputs
+            validate_external_inputs(_load_json(job_dir / "script.json"), _load_layout(job_dir))
 
         def get_completes():
             if completes_cache[0] is None:
@@ -204,16 +200,19 @@ class Orchestrator:
                 self.store.record_usage(job_id, entry)
             return out
 
-        research_out = self._stage(
+        research_out = None if external else self._stage(
             job_id, "researched", do_research,
             artifact_fn=lambda _out: [("fact_sheet", job_dir / "fact_sheet.json")])
-        if research_out is None:
+        if external:
+            fact_sheet = {}  # No research/verification claim for externally authored content.
+        elif research_out is None:
             fact_sheet = _load_json(job_dir / "fact_sheet.json")
         else:
             fact_sheet = research_out["fact_sheet"]
         # The research agent includes adversarial verification and cite-or-cut. Keeping a
         # distinct checkpoint makes the audit state explicit without repeating provider calls.
-        self._stage(job_id, "verified", lambda: True)
+        if not external:
+            self._stage(job_id, "verified", lambda: True)
 
         def do_script():
             out = cognitive.script_stage(
@@ -225,7 +224,7 @@ class Orchestrator:
                 job_id, out["script_doc"].get("title") or topic)
             return out
 
-        script_out = self._stage(
+        script_out = {"script_doc": _load_json(job_dir / "script.json")} if external else self._stage(
             job_id, "scripted", do_script,
             artifact_fn=lambda _out: [("script", job_dir / "script.json"),
                                       ("review_flags", job_dir / "review_flags.json")])
@@ -251,6 +250,9 @@ class Orchestrator:
             progress_cb("cognitive", job_id)
 
         def do_layout():
+            if external:
+                validate_external_inputs(script_doc, _load_layout(job_dir))
+                return {}  # Supplied layout; never invoke the creative layouter.
             out = cognitive.layout_stage(script_doc, job_dir, completes=get_completes())
             for entry in out["ledger_entries"]:
                 self.store.record_usage(job_id, entry)
@@ -258,7 +260,7 @@ class Orchestrator:
 
         self._stage(
             job_id, "laid_out", do_layout,
-            artifact_fn=lambda _out: [("layout", job_dir / "layout.json"),
+            artifact_fn=lambda _out: [("layout", job_dir / "layout.json")] if external else [("layout", job_dir / "layout.json"),
                                       ("layout_report", job_dir / "layout_report.json"),
                                       ("visual_plan", job_dir / "visual_plan.json")])
 
