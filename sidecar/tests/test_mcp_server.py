@@ -31,7 +31,8 @@ def test_real_stdio_mcp_project_correction_and_persistence(tmp_path):
                     "atme.get_source_timeline",
                     "atme.prepare_timing", "atme.get_timing_status",
                     "atme.get_render_status", "atme.set_output_profile",
-                    "atme.list_revision_requests", "atme.submit_revision_proposal"} <= names
+                    "atme.list_revision_requests", "atme.apply_revision_request",
+                    "atme.submit_revision_proposal", "atme.duplicate_project"} <= names
             assert "atme.list_project_assets" in names
             assert not names & {"atme.shell", "atme.read_file"}
 
@@ -95,7 +96,10 @@ def test_real_stdio_mcp_project_correction_and_persistence(tmp_path):
             assert any(getattr(item, "type", None) == "audio" for item in audio.content)
             resource = await client.read_resource(f"atme://projects/{pid}/authoritative-narrative")
             assert resource.contents and getattr(resource.contents[0], "blob", None)
-            assert (await call("get_project_artifact", {"project_id": pid, "kind": "layout"}))["result"]["stale"]
+            timeline_layout = (await call("get_project_artifact", {
+                "project_id": pid, "kind": "layout"}))["result"]
+            assert timeline_layout["stale"] is False
+            assert timeline_layout["basis_timeline_revision"] == 0
 
             # Replace the short test recording and author both plans after that media
             # revision so the real MCP preview path can prove binary image transport.

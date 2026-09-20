@@ -40,6 +40,7 @@ let inspectorTab: "scene" | "style" | "audio" | "ai" = "scene";
 let previewTimer: number | null = null;
 let rangeAnchorMs: number | null = null;
 let syncInFlight = false;
+let projectCatalogLoaded = false;
 let connectionDetailsRoot: HTMLElement | null = null;
 let lastOverlayRefresh = 0;
 let viewerClip: TimelineClip | null = null;
@@ -114,6 +115,7 @@ function friendlyStatus(project: ProjectState): string {
 async function loadProjects(selectId?: number): Promise<void> {
   const response = await api<{ projects: ProjectState[] }>("/projects");
   state.projects = response.projects;
+  projectCatalogLoaded = true;
   renderProjectList();
   const id = selectId ?? state.project?.project_id;
   if (id) await openProject(id);
@@ -169,10 +171,11 @@ async function refreshStudioSync(forceProjects = false): Promise<void> {
     const sync = await api<StudioSync>("/studio/sync");
     state.mcp = sync.mcp;
     renderMcpStatus();
-    if (!forceProjects && sync.project_version === state.projectVersion) return;
+    if (!forceProjects && projectCatalogLoaded && sync.project_version === state.projectVersion) return;
     const response = await api<{ projects: ProjectState[] }>("/projects");
     state.projectVersion = sync.project_version;
     state.projects = response.projects;
+    projectCatalogLoaded = true;
     renderProjectList();
     const currentId = state.project?.project_id;
     if (!currentId) {
@@ -182,10 +185,10 @@ async function refreshStudioSync(forceProjects = false): Promise<void> {
     }
     const updated = state.projects.find((project) => project.project_id === currentId);
     if (!updated) {
-      if (state.projects[0]) await openProject(state.projects[0].project_id, false);
-      else renderEmptyStudio();
+      renderEmptyStudio();
+      showProjectBrowser(true);
     } else if (updated.revision !== state.project?.revision) {
-      await openProject(currentId, false);
+      await openProject(currentId, false, true);
     }
   } finally {
     syncInFlight = false;
@@ -200,14 +203,29 @@ function renderProjectList(): void {
     list.append(empty); return;
   }
   for (const project of state.projects) {
-    const row = document.createElement("button"); row.className = "launcher-project";
+    const row = document.createElement("article"); row.className = "launcher-project";
+    const open = document.createElement("button"); open.className = "launcher-project-open"; open.type = "button";
     const thumb = document.createElement("span"); thumb.className = "launcher-project-preview"; thumb.textContent = project.profile === "SHORT_FORM_9_16" ? "▯" : "▭";
     const text = document.createElement("span"); text.className = "launcher-project-copy"; const title = document.createElement("strong"); title.textContent = project.title;
     const meta = document.createElement("small"); meta.textContent = friendlyStatus(project); text.append(title, meta);
-    const remove = document.createElement("button"); remove.className = "launcher-project-delete"; remove.textContent = "⌫"; remove.title = "Remove project";
-    remove.onclick = (event) => { event.stopPropagation(); void removeProject(project); };
-    row.append(thumb, text, remove); row.onclick = () => void openProject(project.project_id); list.append(row);
+    open.append(thumb, text); open.onclick = () => void openProject(project.project_id);
+    const actions = document.createElement("details"); actions.className = "launcher-project-actions";
+    const summary = document.createElement("summary"); summary.textContent = "•••"; summary.title = "Project actions";
+    const menu = document.createElement("div"); menu.className = "launcher-project-menu";
+    const openAction = document.createElement("button"); openAction.textContent = "Open"; openAction.type = "button"; openAction.onclick = () => { actions.removeAttribute("open"); void openProject(project.project_id); };
+    const duplicate = document.createElement("button"); duplicate.textContent = "Duplicate"; duplicate.type = "button"; duplicate.onclick = () => { actions.removeAttribute("open"); void duplicateProject(project); };
+    const remove = document.createElement("button"); remove.className = "danger-command"; remove.textContent = "Delete"; remove.type = "button"; remove.onclick = () => { actions.removeAttribute("open"); void removeProject(project); };
+    actions.addEventListener("toggle", () => { if (actions.open) document.querySelectorAll<HTMLDetailsElement>(".launcher-project-actions[open]").forEach((item) => { if (item !== actions) item.removeAttribute("open"); }); });
+    menu.append(openAction, duplicate, remove); actions.append(summary, menu); row.append(open, actions); list.append(row);
   }
+}
+
+async function duplicateProject(project: ProjectState): Promise<void> {
+  try {
+    const copy = await api<ProjectState>(`/projects/${project.project_id}/duplicate`, { method: "POST" });
+    await loadProjects();
+    toast(`“${copy.title}” was created.`);
+  } catch (error) { toast(error instanceof Error ? error.message : "Project could not be duplicated."); }
 }
 
 async function removeProject(project: ProjectState): Promise<void> {
@@ -225,7 +243,8 @@ async function optionalArtifact<T>(kind: string): Promise<T | null> {
   catch { return null; }
 }
 
-async function openProject(id: number, hideDrawer = true): Promise<void> {
+async function openProject(id: number, hideDrawer = true, preservePosition = false): Promise<void> {
+  const previousPlayhead = preservePosition ? state.playheadMs : 0;
   stopPreviewPlayback();
   for (const url of objectUrls) URL.revokeObjectURL(url); objectUrls.clear();
   state.project = await api<ProjectState>(`/projects/${id}`);
@@ -239,8 +258,9 @@ async function openProject(id: number, hideDrawer = true): Promise<void> {
   ]);
   state.media = Array.isArray(media) ? media : media.media || [];
   state.assets = assets.assets;
-  state.script = script; state.layout = layout; state.sourceTimeline = sourceTimeline; state.editHistory = sourceTimeline.history; state.validation = null; state.playheadMs = 0; state.selected = null;
+  state.script = script; state.layout = layout; state.sourceTimeline = sourceTimeline; state.editHistory = sourceTimeline.history; state.validation = null; state.selected = null;
   state.durationMs = Math.max(1000, sourceTimeline.document.duration_ms || deriveLayoutDuration(layout) || 60_000);
+  state.playheadMs = Math.min(previousPlayhead, Math.max(0, state.durationMs - 1));
   $("project-name").textContent = state.project.title;
   $("save-state").textContent = `Saved locally · revision ${state.project.revision}`;
   $("add-source").toggleAttribute("disabled", false);
@@ -250,6 +270,9 @@ async function openProject(id: number, hideDrawer = true): Promise<void> {
   renderProjectList(); renderSources(); renderTimeline(); renderInspector(); updateClock(); updateEditCommands();
   $("viewer-empty").classList.add("hidden");
   await loadSourcePlayback(); await refreshValidation(false); await refreshPreview();
+  const workspaceDialog = $<HTMLDialogElement>("workspace-dialog");
+  if (workspaceDialog.open && $("workspace-dialog-title").textContent === "Script") showScript();
+  else if (workspaceDialog.open && $("workspace-dialog-title").textContent === "Storyboard") showStoryboard();
 }
 
 function deriveLayoutDuration(layout: LayoutDoc | null): number {
@@ -524,9 +547,8 @@ async function refreshPreview(): Promise<void> {
   if (!sourceVideo.classList.contains("hidden")) {
     $("viewer").classList.add("source-video-active");
     message.classList.add("hidden");
-    if (!state.project.render_ready) { image.classList.add("hidden"); return; }
   }
-  if (!state.project.render_ready) {
+  if (!state.layout) {
     image.classList.add("hidden");
     if ($<HTMLVideoElement>("source-video").classList.contains("hidden")) { message.textContent = viewerStatusMessage(); message.classList.remove("hidden"); }
     else message.classList.add("hidden");
@@ -542,17 +564,18 @@ async function refreshPreview(): Promise<void> {
 }
 
 async function loadSourcePlayback(): Promise<void> {
-  const video = $<HTMLVideoElement>("source-video"); video.pause(); video.removeAttribute("src"); video.load(); video.classList.add("hidden");
+  const video = $<HTMLVideoElement>("source-video"); video.pause(); video.removeAttribute("src"); video.load(); video.classList.add("hidden"); video.classList.remove("audio-preview");
   $("viewer").classList.remove("source-video-active");
   $<HTMLVideoElement>("render-video").classList.add("hidden");
   viewerClip = null; viewerUsesCleanedTimeline = false;
   if (!state.project || !(state.sourceTimeline?.document.clips.length)) return;
-  const videoClips = state.sourceTimeline.document.clips.filter((clip) => clip.kind === "video"); if (!videoClips.length) return;
+  const playableClips = state.sourceTimeline.document.clips.filter((clip) => clip.kind === "video" || clip.kind === "audio"); if (!playableClips.length) return;
+  const videoClips = playableClips.filter((clip) => clip.kind === "video");
   const allVideo = videoClips.length === state.sourceTimeline.document.clips.length;
-  viewerClip = videoClips[0]; viewerUsesCleanedTimeline = allVideo;
+  viewerClip = playableClips[0]; viewerUsesCleanedTimeline = allVideo;
   try {
     const info = await sidecar(); const ticket = await api<{ path: string }>(`/projects/${state.project.project_id}/playback-ticket`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expected_revision: state.project.revision, media_id: allVideo ? null : viewerClip.media_id, cleaned: allVideo }) });
-    video.src = `http://127.0.0.1:${info.port}${ticket.path}`; video.classList.remove("hidden"); $("viewer").classList.add("source-video-active");
+    video.src = `http://127.0.0.1:${info.port}${ticket.path}`; video.classList.toggle("audio-preview", viewerClip?.kind === "audio"); video.classList.remove("hidden"); $("viewer").classList.add("source-video-active");
     $("preview-image").classList.add("hidden"); $("viewer-message").classList.add("hidden");
     video.onloadedmetadata = () => { if (viewerUsesCleanedTimeline && Number.isFinite(video.duration) && video.duration > 0) state.durationMs = Math.max(1000, Math.round(video.duration * 1000)); else if (viewerClip) video.currentTime = viewerClip.source_start_ms / 1000; renderTimeline(); updateClock(); };
     video.onerror = () => { $("viewer").classList.remove("source-video-active"); video.classList.add("hidden"); const message = $("viewer-message"); message.textContent = "This video could not be played. Remove it and import the original file again."; message.classList.remove("hidden"); };
@@ -563,7 +586,7 @@ async function loadSourcePlayback(): Promise<void> {
         : viewerClip ? viewerClip.timeline_start_ms + Math.round(video.currentTime * 1000) - viewerClip.source_start_ms : 0;
       if (viewerClip && !viewerUsesCleanedTimeline && video.currentTime * 1000 >= viewerClip.source_end_ms) video.pause();
       updatePlayheadPositionOnly();
-      if (state.project?.render_ready && performance.now() - lastOverlayRefresh > 450) { lastOverlayRefresh = performance.now(); void refreshPreview(); }
+      if (state.layout && performance.now() - lastOverlayRefresh > 450) { lastOverlayRefresh = performance.now(); void refreshPreview(); }
     };
     video.onplay = () => { $("play-preview").textContent = "Ⅱ"; };
     video.onpause = () => { $("play-preview").textContent = "▶"; };
@@ -768,6 +791,17 @@ function appendAiRevision(root: HTMLElement): void {
   ai.append(note, button); root.append(ai); void appendRevisionState(root);
 }
 
+function annotateAtPlayhead(): void {
+  if (!state.project) return;
+  const start = Math.min(state.playheadMs, Math.max(0, state.durationMs - 1));
+  const end = Math.min(state.durationMs, start + 1000);
+  const boundedStart = end > start ? start : Math.max(0, end - 1000);
+  state.selected = { kind: "timeline", id: `playhead-${boundedStart}`, label: `Review note at ${formatTime(boundedStart)}`, startMs: boundedStart, endMs: Math.max(boundedStart + 1, end) };
+  inspectorTab = "ai";
+  renderInspector();
+  $<HTMLTextAreaElement>("inspector-content").querySelector<HTMLTextAreaElement>("textarea")?.focus();
+}
+
 async function sendRevisionRequest(note: HTMLTextAreaElement, button: HTMLButtonElement): Promise<void> {
   if (!state.project || !state.selected || !note.value.trim()) return;
   button.disabled = true;
@@ -908,7 +942,7 @@ async function createProject(event: SubmitEvent): Promise<void> {
 
 function showDialog(title: string, subtitle: string, content: HTMLElement): void {
   $("workspace-dialog-title").textContent = title; $("workspace-dialog-subtitle").textContent = subtitle;
-  const root = $("workspace-dialog-content"); root.replaceChildren(content); $<HTMLDialogElement>("workspace-dialog").showModal();
+  const root = $("workspace-dialog-content"); root.replaceChildren(content); const dialog = $<HTMLDialogElement>("workspace-dialog"); if (!dialog.open) dialog.showModal();
 }
 
 function showValidationDialog(): void {
@@ -976,11 +1010,19 @@ function showScript(): void {
   if (!state.script) { card.innerHTML = "<h3>No semantic script yet</h3><p>Your connected AI can derive or author the scene structure through MCP.</p>"; showDialog("Script", state.project.title, card); return; }
   const heading = document.createElement("h3"); heading.textContent = state.script.title || state.project.title;
   const copy = document.createElement("p"); copy.className = "script-copy"; copy.textContent = state.script.scenes.map((scene) => scene.spoken_text).join("\n\n");
+  const currentRevision = state.project.artifacts.script;
+  if (state.project.authoritative_narrative_source.mode === "script_authority") {
+    if (state.project.approved_script_revision === currentRevision) {
+      const approved = document.createElement("p"); approved.className = "retention-note"; approved.textContent = "✓ Script approved. The connected AI can continue production."; card.append(heading, copy, approved);
+    } else {
+      const approve = document.createElement("button"); approve.className = "primary-button"; approve.textContent = "Approve script and continue"; approve.onclick = () => void approveCurrentScript(); card.append(heading, copy, approve);
+    }
+  } else card.append(heading, copy);
   const override = document.createElement("details"); const summary = document.createElement("summary"); summary.textContent = "Manual override";
   const note = document.createElement("p"); note.textContent = "Use this only for a targeted correction. External AI remains the primary authoring path.";
   const editor = document.createElement("textarea"); editor.value = JSON.stringify(state.script, null, 2);
   const save = document.createElement("button"); save.className = "small-primary"; save.textContent = "Save manual revision";
-  save.onclick = () => void saveScriptOverride(editor.value); override.append(summary, note, editor, save); card.append(heading, copy, override); showDialog("Script", "Externally authored · local override available", card);
+  save.onclick = () => void saveScriptOverride(editor.value); override.append(summary, note, editor, save); card.append(override); showDialog("Script", "Externally authored · local override available", card);
 }
 
 async function saveScriptOverride(raw: string): Promise<void> {
@@ -1159,7 +1201,8 @@ window.addEventListener("DOMContentLoaded", () => {
   $("launcher-connect-ai").onclick=()=>void showAiSetup();$("close-ai-setup").onclick=()=> $<HTMLDialogElement>("ai-setup-dialog").close();$("copy-ai-setup").onclick=async()=>{const button=$<HTMLButtonElement>("copy-ai-setup"),status=$("copy-ai-status");try{await navigator.clipboard.writeText($<HTMLTextAreaElement>("ai-setup-command").value);button.textContent="✓ Copied";button.classList.add("copied");status.textContent="Configuration copied to clipboard.";window.setTimeout(()=>{button.textContent="Copy configuration";button.classList.remove("copied");status.textContent="";},2500);}catch{status.textContent="Clipboard access failed. Select the configuration and press Ctrl+C.";}};
   $("install-ai-setup").onclick=()=>void installAiConnection();$("remove-ai-setup").onclick=()=>void installAiConnection(true);
   document.querySelector(".app-menu")?.addEventListener("click",event=>{const button=(event.target as HTMLElement).closest<HTMLButtonElement>("[data-menu-action]");if(!button)return;document.querySelectorAll<HTMLDetailsElement>(".app-menu details[open]").forEach(item=>item.removeAttribute("open"));runMenuAction(button.dataset.menuAction||"");});
-  document.addEventListener("pointerdown",event=>{if(!(event.target as HTMLElement).closest(".app-menu"))document.querySelectorAll<HTMLDetailsElement>(".app-menu details[open]").forEach(item=>item.removeAttribute("open"));});
+  document.querySelectorAll<HTMLDetailsElement>(".app-menu details").forEach(menu=>menu.addEventListener("toggle",()=>{if(menu.open)document.querySelectorAll<HTMLDetailsElement>(".app-menu details[open]").forEach(item=>{if(item!==menu)item.removeAttribute("open");});}));
+  document.addEventListener("pointerdown",event=>{const target=event.target as HTMLElement;if(!target.closest(".app-menu"))document.querySelectorAll<HTMLDetailsElement>(".app-menu details[open]").forEach(item=>item.removeAttribute("open"));if(!target.closest(".launcher-project-actions"))document.querySelectorAll<HTMLDetailsElement>(".launcher-project-actions[open]").forEach(item=>item.removeAttribute("open"));});
   $("cancel-new-project").onclick = closeNewProject; $("close-new-project").onclick = closeNewProject;
   $<HTMLFormElement>("new-project-form").addEventListener("submit", (event) => void createProject(event));
   $("close-workspace-dialog").onclick = () => $<HTMLDialogElement>("workspace-dialog").close();
@@ -1171,6 +1214,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const tracks=$("timeline-tracks"); tracks.addEventListener("dragover",event=>event.preventDefault()); tracks.addEventListener("drop",event=>{event.preventDefault();const at=timelineTime(event.clientX);const mediaId=event.dataTransfer?.getData("application/x-atme-media");if(mediaId)void insertMedia(mediaId,at);else if(event.dataTransfer?.files[0])void (async()=>{const media=await uploadSource(event.dataTransfer!.files[0]);if(media)await insertMedia(media.media_id,at)})();});
   $("validation-pill").onclick = () => void refreshValidation(true); $("render-project").onclick = () => void renderProject(); $("open-connection").onclick = showConnection;
   $("play-preview").onclick = togglePreviewPlayback;
+  $("annotate-playhead").onclick = annotateAtPlayhead;
   $("undo-edit").onclick = () => void historyAction("undo");
   $("redo-edit").onclick = () => void historyAction("redo");
   $("cut-edit").onclick = cutSelected;
@@ -1199,8 +1243,8 @@ window.addEventListener("DOMContentLoaded", () => {
     else if (event.key.toLowerCase()==="v") setTool("select"); else if(event.key.toLowerCase()==="b")setTool("blade");else if(event.key.toLowerCase()==="s")$("snap-toggle").click();
     else if (event.key === "Delete" || event.key === "Backspace") { const clip=selectedSourceClip();if(clip){event.preventDefault();void applySourceEdit("remove_clip",{clip_id:clip.clip_id,linked:true});}else if (state.selected?.kind === "timeline") { event.preventDefault(); deleteSelected(false); } }
   });
-  void refreshStudioSync(true).catch((error) => toast(error instanceof Error ? error.message : "Could not load projects."));
-  window.setInterval(() => void refreshStudioSync().catch(() => undefined), 2000);
+  void refreshStudioSync(true).catch((error) => { projectCatalogLoaded = false; toast(error instanceof Error ? error.message : "Could not load projects."); });
+  window.setInterval(() => void refreshStudioSync(!projectCatalogLoaded).catch(() => { projectCatalogLoaded = false; }), 750);
   void watchMcpConnection();
   window.addEventListener("focus", () => void refreshStudioSync(true).catch(() => undefined));
   new ResizeObserver(() => { sizeViewerCanvas(); if (state.project) renderTimeline(); }).observe($("viewer-stage"));

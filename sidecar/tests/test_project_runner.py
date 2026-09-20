@@ -100,6 +100,25 @@ def test_validation_and_immutable_compilation(tmp_path):
     core.store.close()
 
 
+def test_draft_layout_preview_is_available_before_export_validation(tmp_path):
+    """Studio review is not the same gate as a final deterministic export."""
+    core = ProjectService(JobStore(tmp_path / "draft-preview.db"))
+    pid = core.create("Reviewable draft", "LONG_FORM_16_9", "script+audio")["project_id"]
+    script = external_payload()["script"]
+    core.write(pid, "script", script, 0)
+    core.approve_script(pid, 1, 1, True)
+    core.attach_wav(pid, wav_bytes(), 2)
+    layout = board_doc()
+    layout["canvas"] = {"width": 1280, "height": 720}
+    state = core.write(pid, "layout", layout, 3)
+
+    assert state["render_ready"] is False  # storyboard is still absent
+    preview = core.preview_project(pid, state["revision"], 2500)
+    assert preview["png"].startswith(b"\x89PNG\r\n\x1a\n")
+    assert (preview["width"], preview["height"]) == (960, 540)
+    core.store.close()
+
+
 def test_profile_geometry_and_duration_are_hard_gates(tmp_path):
     core, state = ready_project(tmp_path, "SHORT_FORM_9_16")
     assert core.validate_project(state["project_id"])["ready"]

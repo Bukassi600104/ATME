@@ -19,6 +19,44 @@ def test_project_archive_removes_launcher_entry_without_deleting_managed_data(tm
     assert result["archived"] and result["files_retained"] and managed.is_file()
     assert core.list() == []
     core.store.close()
+
+
+def test_project_duplicate_is_independent_and_keeps_immutable_content(tmp_path):
+    core = ProjectService(JobStore(tmp_path / "duplicate.db"))
+    original = core.create("Original", "SHORT_FORM_9_16", "idea-first")
+    original = core.write(original["project_id"], "brief", {"description": "Explain it."}, 0)
+
+    duplicate = core.duplicate(original["project_id"])
+
+    assert duplicate["project_id"] != original["project_id"]
+    assert duplicate["title"] == "Original copy"
+    assert duplicate["profile"] == "SHORT_FORM_9_16"
+    assert core.artifact(duplicate["project_id"], "brief")["document"] == {"description": "Explain it."}
+    core.write(duplicate["project_id"], "brief", {"description": "A separate revision."}, duplicate["revision"])
+    assert core.artifact(original["project_id"], "brief")["document"] == {"description": "Explain it."}
+    core.store.close()
+
+
+def test_user_authored_revision_request_can_be_applied_without_second_approval(tmp_path):
+    core = ProjectService(JobStore(tmp_path / "direct-revision.db"))
+    pid = core.create("Review loop", "LONG_FORM_16_9", "script-first")["project_id"]
+    original = external_payload()["script"]
+    state = core.write(pid, "script", original, 0)
+    request = core.create_revision_request(pid, state["revision"], {
+        "kind": "script", "id": "scene-1", "start_ms": 0, "end_ms": 1000,
+    }, "Make the opening clearer.")
+    revised = {**original, "scenes": [
+        {**original["scenes"][0], "spoken_text": "A clearer opening."},
+        *original["scenes"][1:],
+    ]}
+
+    result = core.apply_revision_request(pid, request["request_id"], state["revision"],
+                                         "script", revised, "Clarified the opening")
+
+    assert result["request"]["status"] == "applied"
+    assert result["project"]["revision"] == state["revision"] + 1
+    assert core.artifact(pid, "script")["document"] == revised
+    core.store.close()
 from test_external_inputs import external_payload
 from test_server_controls import _client, _wav_bytes
 
@@ -112,7 +150,7 @@ def test_http_project_ingress_auth_and_correction(tmp_path):
     assert client.get("/projects").status_code == 401
     caps = client.get("/projects/capabilities", headers=headers).json()
     assert caps["api_keys_required"] is False and caps["mcp_available"] is True
-    assert caps["mcp_connection_status"] == "shared_activity"
+    assert caps["mcp_connection_status"] == "live_desktop_bridge"
     response = client.post("/projects", headers=headers, json={
         "title": "External script", "profile": "LONG_FORM_16_9", "input_kind": "script-first"})
     assert response.status_code == 200, response.text

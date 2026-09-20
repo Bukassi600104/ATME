@@ -114,16 +114,18 @@ class ProjectService:
         return {"schema_version": "1", "api_keys_required": False,
                 "artifact_kinds": ["brief", "script", "storyboard", "layout"],
                 "output_profiles": list(PROFILES),
-                "operations": ["create_project", "open_project", "list_projects", "archive_project",
+                "operations": ["create_project", "open_project", "list_projects", "duplicate_project", "archive_project",
                                "get_schema", "write_artifact", "get_artifact", "approve_script",
                                "list_media", "get_narrative_source", "validate_project", "preview_project",
                                "prepare_timing", "get_timing_status", "create_revision_request",
-                               "list_revision_requests", "submit_revision_proposal", "decide_revision_proposal",
+                               "list_revision_requests", "apply_revision_request", "submit_revision_proposal", "decide_revision_proposal",
                                "set_output_profile", "list_assets", "read_asset",
                                "get_source_timeline", "edit_source_timeline", "remove_source",
                                "get_media_analysis", "get_video_thumbnail", "create_playback_ticket",
                                "render_project", "get_render_status"],
-                "collaboration": {"bounded_revision_requests": True, "proposal_requires_user_acceptance": True},
+                "collaboration": {"bounded_revision_requests": True,
+                                  "user_request_can_apply_directly": True,
+                                  "optional_proposal_review": True},
                 "local_upload": {"formats": ["pcm_wav", "mp4", "mov", "mkv", "webm"],
                                  "audio_max_bytes": 67108864, "video_max_bytes": 1073741824,
                                  "transport": "authenticated_http"},
@@ -241,6 +243,55 @@ class ProjectService:
             except Exception:
                 conn.rollback(); raise
         return {"project_id": project_id, "archived": True, "files_retained": True}
+
+    def duplicate(self, project_id):
+        """Clone project metadata and immutable production inputs, never source bytes.
+
+        Managed media and asset paths are immutable and may safely be shared by two
+        project records.  Later revisions are keyed by the new project ID, so the
+        copy immediately diverges without modifying the original.
+        """
+        with self.store._lock:
+            conn = self.store.conn
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                state = self._row(project_id)
+                job = conn.execute("SELECT * FROM jobs WHERE id=?", (project_id,)).fetchone()
+                title = (job["title"] or "Untitled project") + " copy"
+                cursor = conn.execute(
+                    "INSERT INTO jobs(created_at,topic,title,status,settings_json) VALUES(?,?,?,?,?)",
+                    (time.time(), job["topic"], title, "draft", job["settings_json"]),
+                )
+                copy_id = cursor.lastrowid
+                conn.execute(
+                    "INSERT INTO project_state(job_id,revision,profile,input_kind,approved_script_revision) "
+                    "VALUES(?,?,?,?,?)",
+                    (copy_id, state["revision"], state["profile"], state["input_kind"],
+                     state["approved_script_revision"]),
+                )
+                copies = (
+                    ("project_artifact_versions", "kind,revision,document,created_at"),
+                    ("project_approval_events", "project_revision,script_revision,approved_at"),
+                    ("project_artifact_dependencies", "kind,revision,script_revision"),
+                    ("project_source_media", "media_id,revision,relative_path,metadata"),
+                    ("project_media_derivatives", "media_id,kind,relative_path,metadata"),
+                    ("project_assets", "asset_id,revision,relative_path,metadata"),
+                    ("project_source_timeline_versions", "timeline_revision,project_revision,document,operation,created_at"),
+                    ("project_source_timeline_state", "current_timeline_revision"),
+                    ("project_media_removals", "media_id,project_revision,created_at"),
+                    ("project_timeline_dependencies", "kind,artifact_revision,timeline_revision"),
+                )
+                for table, columns in copies:
+                    conn.execute(
+                        f"INSERT INTO {table}(job_id,{columns}) "
+                        f"SELECT ?,{columns} FROM {table} WHERE job_id=?",
+                        (copy_id, project_id),
+                    )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        return self.open(copy_id)
 
     def _serialized_artifact(self, kind, document):
         schema = self.schema(kind)
@@ -554,6 +605,11 @@ class ProjectService:
                                  artifact_kind, document, summary):
         return self.revisions.propose(project_id, request_id, expected_revision,
                                       artifact_kind, document, summary)
+
+    def apply_revision_request(self, project_id, request_id, expected_revision,
+                               artifact_kind, document, summary):
+        return self.revisions.apply_requested(project_id, request_id, expected_revision,
+                                              artifact_kind, document, summary)
 
     def decide_revision_proposal(self, project_id, request_id, expected_revision, accepted):
         return self.revisions.decide(project_id, request_id, expected_revision, accepted)

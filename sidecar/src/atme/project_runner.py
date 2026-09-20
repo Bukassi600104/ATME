@@ -296,12 +296,30 @@ class ProjectRunner:
     def preview(self, project_id, expected_revision, at_ms):
         if type(at_ms) is not int or at_ms < 0:
             raise ProjectError("invalid_request", "Preview time must be a nonnegative integer")
-        state, _, _, layout, _media = self._selection(project_id, expected_revision)
-        duration = state["authoritative_narrative_source"]["timing_authority"]["duration_ms"]
+        # A studio preview is deliberately available before final export
+        # validation.  The user must be able to review the latest externally
+        # authored layout while storyboard/timing/export checks are still in
+        # progress.  Final render continues to use _selection() and all of its
+        # deterministic gates.
+        with self.service.store._lock:
+            row = self.service._row(project_id)
+            self.service._expected(row, expected_revision)
+            try:
+                layout = self.service.artifact(project_id, "layout")
+            except ProjectError as exc:
+                raise ProjectError("layout_missing", "A layout is required for visual preview") from exc
+            doc = layout["document"]
+            timeline_duration = self.service.source_timeline.get(project_id)["document"]["duration_ms"]
+            layout_duration = max(
+                (item["end_ms"] for item in doc.get("board_timeline", {}).get("activations", [])),
+                default=0,
+            )
+            duration = max(timeline_duration, layout_duration)
+            profile = PROFILE_SETTINGS[row["profile"]]
+        if duration <= 0:
+            raise ProjectError("preview_unavailable", "The current layout has no previewable duration")
         if at_ms >= duration:
-            raise ProjectError("invalid_request", "Preview time must be within the selected narration")
-        doc = layout["document"]
-        profile = PROFILE_SETTINGS[state["profile"]]
+            raise ProjectError("invalid_request", "Preview time must be within the current project")
         return self._preview_document(doc, profile, project_id, expected_revision, at_ms)
 
     def preview_layout(self, project_id, expected_revision, document, at_ms):
@@ -313,7 +331,9 @@ class ProjectRunner:
             media = self._latest_media_row(project_id)
             if media is None:
                 raise ProjectError("narration_missing", "A recording is required for proposal preview")
-            duration = self.service.source_timeline.get(project_id)["document"]["duration_ms"]
+            timeline_duration = self.service.source_timeline.get(project_id)["document"]["duration_ms"]
+            media_duration = json.loads(media["metadata"]).get("duration_ms", 0)
+            duration = timeline_duration or media_duration
             if at_ms >= duration:
                 raise ProjectError("invalid_request", "Preview time must be within the narration")
             profile = PROFILE_SETTINGS[row["profile"]]

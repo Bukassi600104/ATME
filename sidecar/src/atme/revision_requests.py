@@ -148,6 +148,19 @@ class RevisionRequests:
             self.service.store.conn.commit()
         return {"request": self.get(project_id, request_id), "project": project}
 
+    def apply_requested(self, project_id, request_id, expected_revision,
+                        artifact_kind, document, summary):
+        """Apply an edit that answers an explicit user-authored bounded request.
+
+        The request itself is the user's authorization, so requiring a second
+        approval would only add a redundant production gate.  The same schema,
+        revision and dependency validation used by proposals and normal writes
+        still applies.
+        """
+        self.propose(project_id, request_id, expected_revision,
+                     artifact_kind, document, summary)
+        return self.decide(project_id, request_id, expected_revision, True)
+
     def preview(self, project_id, request_id, expected_revision, at_ms):
         request = self.get(project_id, request_id)
         if request["status"] != "proposed" or request["project_revision"] != expected_revision:

@@ -69,6 +69,10 @@ def register_projects(app, store, auth):
     def open_project(project_id: int):
         return call(service.open, project_id)
 
+    @app.post("/projects/{project_id}/duplicate", dependencies=[Depends(auth)])
+    def duplicate_project(project_id: int):
+        return call(service.duplicate, project_id)
+
     @app.post("/projects/{project_id}/archive", dependencies=[Depends(auth)])
     async def archive_project(project_id: int, request: Request):
         value = await body(request, ("expected_revision", "confirmed"))
