@@ -1,0 +1,1341 @@
+{
+  "$defs": {
+    "Anchor": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor_id": {
+          "minLength": 1,
+          "title": "Anchor Id",
+          "type": "string"
+        },
+        "point": {
+          "$ref": "#/$defs/Point"
+        }
+      },
+      "required": [
+        "anchor_id",
+        "point"
+      ],
+      "title": "Anchor",
+      "type": "object"
+    },
+    "BoardActivation": {
+      "additionalProperties": false,
+      "properties": {
+        "activation_id": {
+          "title": "Activation Id",
+          "type": "string"
+        },
+        "board_id": {
+          "title": "Board Id",
+          "type": "string"
+        },
+        "start_ms": {
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "end_ms": {
+          "exclusiveMinimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "activation_id",
+        "board_id",
+        "start_ms",
+        "end_ms",
+        "reason"
+      ],
+      "title": "BoardActivation",
+      "type": "object"
+    },
+    "BoardSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "board_id": {
+          "title": "Board Id",
+          "type": "string"
+        },
+        "template": {
+          "enum": [
+            "timeline",
+            "layer_stack",
+            "comparison",
+            "hub_spokes",
+            "flow",
+            "nested_boundary",
+            "quantity_ladder",
+            "evidence_annotation",
+            "recap",
+            "custom"
+          ],
+          "title": "Template",
+          "type": "string"
+        },
+        "object_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Object Ids",
+          "type": "array"
+        },
+        "persistence_policy": {
+          "enum": [
+            "within_board",
+            "returnable",
+            "single_beat"
+          ],
+          "title": "Persistence Policy",
+          "type": "string"
+        },
+        "density_limit": {
+          "maximum": 12,
+          "minimum": 1,
+          "title": "Density Limit",
+          "type": "integer"
+        },
+        "creation_reason": {
+          "title": "Creation Reason",
+          "type": "string"
+        },
+        "departure_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Departure Reason"
+        },
+        "return_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Return Reason"
+        },
+        "expected_prior_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Prior State"
+        },
+        "activation_policy": {
+          "enum": [
+            "once",
+            "returnable",
+            "persistent"
+          ],
+          "title": "Activation Policy",
+          "type": "string"
+        },
+        "aspect_composition": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "propertyNames": {
+            "enum": [
+              "LONG_FORM_16_9",
+              "SHORT_FORM_9_16"
+            ]
+          },
+          "title": "Aspect Composition",
+          "type": "object"
+        }
+      },
+      "required": [
+        "board_id",
+        "template",
+        "object_ids",
+        "persistence_policy",
+        "density_limit",
+        "creation_reason",
+        "activation_policy",
+        "aspect_composition"
+      ],
+      "title": "BoardSpec",
+      "type": "object"
+    },
+    "Bounds": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "number"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "Bounds",
+      "type": "object"
+    },
+    "ConnectorObject": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "enum": [
+            "arrow",
+            "network"
+          ],
+          "title": "Object Type",
+          "type": "string"
+        },
+        "source_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Object Id"
+        },
+        "source_anchor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Anchor Id"
+        },
+        "destination_object_id": {
+          "title": "Destination Object Id",
+          "type": "string"
+        },
+        "destination_anchor_id": {
+          "title": "Destination Anchor Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "pointer",
+            "semantic_connector"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "routing": {
+          "enum": [
+            "straight",
+            "elbow",
+            "curve"
+          ],
+          "title": "Routing",
+          "type": "string"
+        },
+        "allow_self_loop": {
+          "default": false,
+          "title": "Allow Self Loop",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "object_type",
+        "destination_object_id",
+        "destination_anchor_id",
+        "role",
+        "routing"
+      ],
+      "title": "ConnectorObject",
+      "type": "object"
+    },
+    "ContainerObject": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "enum": [
+            "group",
+            "mask",
+            "clip"
+          ],
+          "title": "Object Type",
+          "type": "string"
+        },
+        "child_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Child Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "object_type",
+        "child_ids"
+      ],
+      "title": "ContainerObject",
+      "type": "object"
+    },
+    "Geometry": {
+      "additionalProperties": false,
+      "properties": {
+        "bounds": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "points": {
+          "items": {
+            "$ref": "#/$defs/Point"
+          },
+          "title": "Points",
+          "type": "array"
+        },
+        "corner_radius": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corner Radius"
+        }
+      },
+      "required": [
+        "bounds"
+      ],
+      "title": "Geometry",
+      "type": "object"
+    },
+    "MarkObject": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "enum": [
+            "freehand",
+            "line",
+            "rectangle",
+            "rounded_rectangle",
+            "ellipse",
+            "polygon",
+            "bracket",
+            "underline",
+            "highlight"
+          ],
+          "title": "Object Type",
+          "type": "string"
+        },
+        "path_data": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path Data"
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "object_type"
+      ],
+      "title": "MarkObject",
+      "type": "object"
+    },
+    "OutputProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": {
+          "enum": [
+            "LONG_FORM_16_9",
+            "SHORT_FORM_9_16"
+          ],
+          "title": "Profile Id",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "fps": {
+          "exclusiveMinimum": 0,
+          "title": "Fps",
+          "type": "number"
+        }
+      },
+      "required": [
+        "profile_id",
+        "width",
+        "height",
+        "fps"
+      ],
+      "title": "OutputProfile",
+      "type": "object"
+    },
+    "Point": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "Point",
+      "type": "object"
+    },
+    "StyleRefs": {
+      "additionalProperties": false,
+      "properties": {
+        "stroke": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stroke"
+        },
+        "fill": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fill"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "effect": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effect"
+        }
+      },
+      "title": "StyleRefs",
+      "type": "object"
+    },
+    "TextObject": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "enum": [
+            "text",
+            "list",
+            "callout",
+            "code"
+          ],
+          "title": "Object Type",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "object_type",
+        "text"
+      ],
+      "title": "TextObject",
+      "type": "object"
+    },
+    "Transform": {
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/Point"
+        },
+        "scale_x": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Scale X",
+          "type": "number"
+        },
+        "scale_y": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Scale Y",
+          "type": "number"
+        },
+        "rotation_degrees": {
+          "default": 0,
+          "title": "Rotation Degrees",
+          "type": "number"
+        },
+        "origin": {
+          "$ref": "#/$defs/Point"
+        }
+      },
+      "required": [
+        "position"
+      ],
+      "title": "Transform",
+      "type": "object"
+    },
+    "VisualObject": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "enum": [
+            "icon",
+            "pictogram",
+            "character",
+            "image",
+            "evidence",
+            "chart",
+            "comparison",
+            "browser",
+            "application",
+            "terminal",
+            "document",
+            "device",
+            "server",
+            "database",
+            "folder",
+            "composition",
+            "instance"
+          ],
+          "title": "Object Type",
+          "type": "string"
+        },
+        "variant": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Variant"
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "object_type"
+      ],
+      "title": "VisualObject",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "2.0.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "layout_id": {
+      "title": "Layout Id",
+      "type": "string"
+    },
+    "project_id": {
+      "minimum": 1,
+      "title": "Project Id",
+      "type": "integer"
+    },
+    "project_revision": {
+      "minimum": 0,
+      "title": "Project Revision",
+      "type": "integer"
+    },
+    "plan_id": {
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "plan_revision": {
+      "minimum": 1,
+      "title": "Plan Revision",
+      "type": "integer"
+    },
+    "plan_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Plan Sha256",
+      "type": "string"
+    },
+    "output_profile": {
+      "$ref": "#/$defs/OutputProfile"
+    },
+    "style_system_version": {
+      "title": "Style System Version",
+      "type": "string"
+    },
+    "asset_registry_version": {
+      "title": "Asset Registry Version",
+      "type": "string"
+    },
+    "canvas": {
+      "$ref": "#/$defs/Bounds"
+    },
+    "boards": {
+      "items": {
+        "$ref": "#/$defs/BoardSpec"
+      },
+      "minItems": 1,
+      "title": "Boards",
+      "type": "array"
+    },
+    "objects": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "application": "#/$defs/VisualObject",
+            "arrow": "#/$defs/ConnectorObject",
+            "bracket": "#/$defs/MarkObject",
+            "browser": "#/$defs/VisualObject",
+            "callout": "#/$defs/TextObject",
+            "character": "#/$defs/VisualObject",
+            "chart": "#/$defs/VisualObject",
+            "clip": "#/$defs/ContainerObject",
+            "code": "#/$defs/TextObject",
+            "comparison": "#/$defs/VisualObject",
+            "composition": "#/$defs/VisualObject",
+            "database": "#/$defs/VisualObject",
+            "device": "#/$defs/VisualObject",
+            "document": "#/$defs/VisualObject",
+            "ellipse": "#/$defs/MarkObject",
+            "evidence": "#/$defs/VisualObject",
+            "folder": "#/$defs/VisualObject",
+            "freehand": "#/$defs/MarkObject",
+            "group": "#/$defs/ContainerObject",
+            "highlight": "#/$defs/MarkObject",
+            "icon": "#/$defs/VisualObject",
+            "image": "#/$defs/VisualObject",
+            "instance": "#/$defs/VisualObject",
+            "line": "#/$defs/MarkObject",
+            "list": "#/$defs/TextObject",
+            "mask": "#/$defs/ContainerObject",
+            "network": "#/$defs/ConnectorObject",
+            "pictogram": "#/$defs/VisualObject",
+            "polygon": "#/$defs/MarkObject",
+            "rectangle": "#/$defs/MarkObject",
+            "rounded_rectangle": "#/$defs/MarkObject",
+            "server": "#/$defs/VisualObject",
+            "terminal": "#/$defs/VisualObject",
+            "text": "#/$defs/TextObject",
+            "underline": "#/$defs/MarkObject"
+          },
+          "propertyName": "object_type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/MarkObject"
+          },
+          {
+            "$ref": "#/$defs/ConnectorObject"
+          },
+          {
+            "$ref": "#/$defs/TextObject"
+          },
+          {
+            "$ref": "#/$defs/VisualObject"
+          },
+          {
+            "$ref": "#/$defs/ContainerObject"
+          }
+        ]
+      },
+      "minItems": 1,
+      "title": "Objects",
+      "type": "array"
+    },
+    "activations": {
+      "items": {
+        "$ref": "#/$defs/BoardActivation"
+      },
+      "minItems": 1,
+      "title": "Activations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "contract_version",
+    "layout_id",
+    "project_id",
+    "project_revision",
+    "plan_id",
+    "plan_revision",
+    "plan_sha256",
+    "output_profile",
+    "style_system_version",
+    "asset_registry_version",
+    "canvas",
+    "boards",
+    "objects",
+    "activations"
+  ],
+  "title": "ExecutableLayoutV2",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atme.local/schemas/v2/executable-layout-v2.schema.json"
+}

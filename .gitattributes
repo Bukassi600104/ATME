@@ -1,0 +1,6 @@
+*.pdf binary
+production-assets/paper-ink-v2/*.json text eol=lf
+production-assets/paper-ink-v2/*.md text eol=lf
+production-assets/paper-ink-v2/assets/*.svg text eol=lf
+production-assets/paper-ink-v2/fonts/*.txt text eol=lf
+schemas/paper-ink-*-v2.schema.json text eol=lf

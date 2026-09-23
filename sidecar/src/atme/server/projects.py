@@ -53,8 +53,8 @@ def register_projects(app, store, auth):
         return live.wait(max(0, after))
 
     @app.get("/projects/schemas/{kind}", dependencies=[Depends(auth)])
-    def schema(kind: str):
-        return call(service.schema, kind)
+    def schema(kind: str, version: str = "1"):
+        return call(service.schema, kind, version)
 
     @app.get("/projects", dependencies=[Depends(auth)])
     def list_projects():
@@ -77,6 +77,11 @@ def register_projects(app, store, auth):
     async def archive_project(project_id: int, request: Request):
         value = await body(request, ("expected_revision", "confirmed"))
         return call(service.archive, project_id, value["expected_revision"], value["confirmed"])
+
+    @app.post("/projects/{project_id}/migrate-visual-contracts-v1", dependencies=[Depends(auth)])
+    async def migrate_visual_contracts_v1(project_id: int, request: Request):
+        value = await body(request, ("expected_revision",))
+        return call(service.migrate_visual_contracts_v1, project_id, value["expected_revision"])
 
     @app.put("/projects/{project_id}/profile", dependencies=[Depends(auth)])
     async def set_profile(project_id: int, request: Request):

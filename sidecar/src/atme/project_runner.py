@@ -86,6 +86,9 @@ class ProjectRunner:
                 issues.append({"code": "narrative_media_mismatch",
                                "message": f"This project requires {source['expected_media_kind']} narrative media"})
             if layout is not None:
+                if layout["document"].get("contract_version") != "1":
+                    issues.append({"code": "renderer_contract_unsupported",
+                                   "message": "Visual contract v2 is stored safely but is not executable until the v2 renderer phase is installed"})
                 canvas = layout["document"].get("canvas", {})
                 actual = float(canvas.get("width", 0)) / max(1.0, float(canvas.get("height", 0)))
                 profile = PROFILE_SETTINGS[state["profile"]]
@@ -115,6 +118,11 @@ class ProjectRunner:
                         "source_timeline": self.service.source_timeline.get(project_id)["timeline_revision"]}}
 
     def _selection(self, project_id, expected_revision):
+        try:
+            self._require_v1_renderer(self.service.artifact(project_id, "layout")["document"])
+        except ProjectError as exc:
+            if exc.code == "renderer_contract_unsupported":
+                raise
         report = self.validate(project_id)
         if report["project_revision"] != expected_revision:
             raise ProjectError("revision_conflict", "Project changed; reload before compiling")
@@ -309,6 +317,7 @@ class ProjectRunner:
             except ProjectError as exc:
                 raise ProjectError("layout_missing", "A layout is required for visual preview") from exc
             doc = layout["document"]
+            self._require_v1_renderer(doc)
             timeline_duration = self.service.source_timeline.get(project_id)["document"]["duration_ms"]
             layout_duration = max(
                 (item["end_ms"] for item in doc.get("board_timeline", {}).get("activations", [])),
@@ -328,6 +337,7 @@ class ProjectRunner:
         with self.service.store._lock:
             row = self.service._row(project_id)
             self.service._expected(row, expected_revision)
+            self._require_v1_renderer(document)
             media = self._latest_media_row(project_id)
             if media is None:
                 raise ProjectError("narration_missing", "A recording is required for proposal preview")
@@ -341,6 +351,7 @@ class ProjectRunner:
 
     @staticmethod
     def _preview_document(doc, profile, project_id, expected_revision, at_ms):
+        ProjectRunner._require_v1_renderer(doc)
         import io
 
         from atme.render.animator import _FrameRenderer, build_draw_windows
@@ -354,6 +365,14 @@ class ProjectRunner:
         renderer.frame(at_ms).save(buffer, format="PNG")
         return {"png": buffer.getvalue(), "at_ms": at_ms, "width": width, "height": height,
                 "project_id": project_id, "project_revision": expected_revision}
+
+    @staticmethod
+    def _require_v1_renderer(document):
+        if document.get("contract_version") != "1":
+            raise ProjectError(
+                "renderer_contract_unsupported",
+                "Visual contract v2 is stored safely but cannot be previewed or rendered until the v2 renderer is installed",
+            )
 
     def _finish(self, project_id, run_id, status, manifest, error):
         with self.service.store._lock:
@@ -430,6 +449,7 @@ def _compose_talking_head(source_video, caleb_video, destination, profile):
     the visual base while retaining authored ink, captions and illustrations.
     """
     import subprocess
+
     from atme.render.animator import find_ffmpeg
 
     pending = Path(destination).with_name(Path(destination).stem + ".composite.pending.mp4")

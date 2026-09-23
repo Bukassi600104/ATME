@@ -92,15 +92,28 @@ class RevisionRequests:
         if len(serialized.encode("utf-8")) > 1024 * 1024:
             raise ProjectError("too_large", "Revision proposal exceeds 1 MiB")
         errors = [{"path": "/" + "/".join(map(str, error.absolute_path)), "message": error.message}
-                  for error in Draft202012Validator(self.service.schema(artifact_kind)).iter_errors(document)]
-        if not errors and artifact_kind == "layout":
+                  for error in Draft202012Validator(self.service.schema(
+                      artifact_kind, document.get("contract_version", "1")
+                  )).iter_errors(document)]
+        version = document.get("contract_version", "1")
+        if not errors and version == "2.0.0":
+            try:
+                if artifact_kind == "storyboard":
+                    from atme.store.contracts_v2 import VisualPlanV2
+                    VisualPlanV2.model_validate(document)
+                elif artifact_kind == "layout":
+                    from atme.store.contracts_v2 import ExecutableLayoutV2
+                    ExecutableLayoutV2.model_validate(document)
+            except ValueError as exc:
+                errors.append({"path": "/", "message": str(exc)})
+        if not errors and artifact_kind == "layout" and version == "1":
             from atme.external_inputs import validate_external_inputs
             try:
                 script = self.service.artifact(project_id, "script")["document"]
                 validate_external_inputs(script, document)
             except (ProjectError, ValueError, TypeError, KeyError) as exc:
                 errors.append({"path": "/", "message": str(exc)})
-        if not errors and artifact_kind == "storyboard":
+        if not errors and artifact_kind == "storyboard" and version == "1":
             try:
                 scenes = {scene["scene_id"]: scene["spoken_text"]
                           for scene in self.service.artifact(project_id, "script")["document"]["scenes"]}

@@ -31,6 +31,9 @@ CONTRACTS = [
     "cue-timeline",
     "reference-video-analysis",
     "visual-plan",
+    "visual-plan-v2",
+    "executable-layout-v2",
+    "resolved-visual-timeline-v2",
 ]
 
 

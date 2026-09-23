@@ -1,0 +1,173 @@
+{
+  "contract": "atme.paper-ink-style",
+  "version": "2.0.0",
+  "system_id": "atme-style-v2",
+  "identity": "ATME Paper & Ink",
+  "colors": {
+    "paper": "#FAF8F1",
+    "ink": "#172033",
+    "muted": "#526071",
+    "accent": "#2457D6",
+    "accent-soft": "#DCE6FF",
+    "attention": "#B93838",
+    "success": "#237252",
+    "evidence-mask": "#172033",
+    "evidence-highlight": "#F4C95D",
+    "caption-bg": "#172033",
+    "caption-fg": "#FFFFFF"
+  },
+  "fonts": [
+    {
+      "id": "kalam-regular",
+      "family": "Kalam",
+      "role": "display",
+      "weight": 400,
+      "file": "fonts/Kalam-Regular.ttf",
+      "sha256": "57cecb63d4608019371954274ae1d8c397764debd5b19d4a33c1efa4dc923c0b",
+      "license": "OFL-1.1",
+      "license_file": "fonts/OFL-Kalam.txt",
+      "license_sha256": "f62ef357d3a1c3d27edd35a6e1ba350e8a8d13499797964eeadefbf0b3b15d1f",
+      "source_url": "https://raw.githubusercontent.com/google/fonts/e44c4b011a820c2cbe2fd2cfa8052037d7edb571/ofl/kalam/Kalam-Regular.ttf"
+    },
+    {
+      "id": "kalam-bold",
+      "family": "Kalam",
+      "role": "display",
+      "weight": 700,
+      "file": "fonts/Kalam-Bold.ttf",
+      "sha256": "2f6576601db015d4f6c08678120277fc8510b98c06e932ce7a6a9cbff4cbdded",
+      "license": "OFL-1.1",
+      "license_file": "fonts/OFL-Kalam.txt",
+      "license_sha256": "f62ef357d3a1c3d27edd35a6e1ba350e8a8d13499797964eeadefbf0b3b15d1f",
+      "source_url": "https://raw.githubusercontent.com/google/fonts/e44c4b011a820c2cbe2fd2cfa8052037d7edb571/ofl/kalam/Kalam-Bold.ttf"
+    },
+    {
+      "id": "atkinson-regular",
+      "family": "Atkinson Hyperlegible",
+      "role": "body",
+      "weight": 400,
+      "file": "fonts/AtkinsonHyperlegible-Regular.otf",
+      "sha256": "4a0397a3709c5fc99e38d05469dcfbf1b3481196e89a01b7377f3163b188258e",
+      "license": "OFL-1.1",
+      "license_file": "fonts/OFL-Atkinson-Hyperlegible.txt",
+      "license_sha256": "f32d22b3908fcad2c86a74000614ec22e6a7f66ea7e867e616026a27aebdc143",
+      "source_url": "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible/1cb311624b2ddf88e9e37873999d165a8cd28b46/fonts/otf/AtkinsonHyperlegible-Regular.otf"
+    },
+    {
+      "id": "atkinson-bold",
+      "family": "Atkinson Hyperlegible",
+      "role": "body",
+      "weight": 700,
+      "file": "fonts/AtkinsonHyperlegible-Bold.otf",
+      "sha256": "682c9737bfb6c1d3ba4f9cd5fdc814775c097f317656aad177867cc07d7e15df",
+      "license": "OFL-1.1",
+      "license_file": "fonts/OFL-Atkinson-Hyperlegible.txt",
+      "license_sha256": "f32d22b3908fcad2c86a74000614ec22e6a7f66ea7e867e616026a27aebdc143",
+      "source_url": "https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible/1cb311624b2ddf88e9e37873999d165a8cd28b46/fonts/otf/AtkinsonHyperlegible-Bold.otf"
+    }
+  ],
+  "typography": {
+    "title": {
+      "font_id": "kalam-bold",
+      "size_px": 56,
+      "line_height": 1.1,
+      "max_characters_per_line": 28
+    },
+    "label": {
+      "font_id": "kalam-bold",
+      "size_px": 26,
+      "line_height": 1.15,
+      "max_characters_per_line": 32
+    },
+    "body": {
+      "font_id": "atkinson-regular",
+      "size_px": 32,
+      "line_height": 1.35,
+      "max_characters_per_line": 52
+    },
+    "caption": {
+      "font_id": "atkinson-bold",
+      "size_px": 28,
+      "line_height": 1.25,
+      "max_characters_per_line": 42
+    }
+  },
+  "spacing_px": {
+    "xs": 8,
+    "sm": 16,
+    "md": 24,
+    "lg": 40,
+    "xl": 64,
+    "xxl": 96
+  },
+  "strokes": {
+    "fine_px": 2.0,
+    "regular_px": 4.0,
+    "emphasis_px": 7.0,
+    "corner_radius_px": 14,
+    "roughness_px": 1.6
+  },
+  "aspects": {
+    "landscape-16:9": {
+      "width": 1920,
+      "height": 1080,
+      "safe_area": {
+        "top_px": 54,
+        "right_px": 64,
+        "bottom_px": 90,
+        "left_px": 64
+      },
+      "columns": 12,
+      "column_gap_px": 24,
+      "density": {
+        "max_primary_objects": 7,
+        "max_context_objects": 12,
+        "min_object_gap_px": 24,
+        "min_read_hold_ms": 1400
+      }
+    },
+    "portrait-9:16": {
+      "width": 1080,
+      "height": 1920,
+      "safe_area": {
+        "top_px": 92,
+        "right_px": 48,
+        "bottom_px": 160,
+        "left_px": 48
+      },
+      "columns": 4,
+      "column_gap_px": 20,
+      "density": {
+        "max_primary_objects": 5,
+        "max_context_objects": 8,
+        "min_object_gap_px": 28,
+        "min_read_hold_ms": 1600
+      }
+    }
+  },
+  "motion": {
+    "draw_min_ms": 250,
+    "draw_max_ms": 850,
+    "transition_ms": 420,
+    "emphasis_ms": 700,
+    "reduced_motion_uses_reveal": true
+  },
+  "captions": {
+    "max_lines": 2,
+    "max_characters_per_line": 42,
+    "bottom_safe_offset_px": 64,
+    "background_color_token": "caption-bg",
+    "foreground_color_token": "caption-fg"
+  },
+  "evidence": {
+    "mask_color_token": "evidence-mask",
+    "mask_opacity": 0.62,
+    "highlight_color_token": "evidence-highlight",
+    "source_label_color_token": "muted",
+    "min_read_hold_ms": 2200
+  },
+  "accessibility": {
+    "minimum_text_contrast": 4.5,
+    "minimum_large_text_contrast": 3.0
+  }
+}

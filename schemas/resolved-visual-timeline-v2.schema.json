@@ -1,0 +1,2009 @@
+{
+  "$defs": {
+    "AbsoluteTrigger": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "absolute",
+          "title": "Kind",
+          "type": "string"
+        },
+        "at_ms": {
+          "minimum": 0,
+          "title": "At Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "at_ms"
+      ],
+      "title": "AbsoluteTrigger",
+      "type": "object"
+    },
+    "BeatStartTrigger": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "beat_start",
+          "title": "Kind",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "offset_ms": {
+          "default": 0,
+          "title": "Offset Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "beat_id"
+      ],
+      "title": "BeatStartTrigger",
+      "type": "object"
+    },
+    "CameraAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "source_instruction_id": {
+          "minLength": 1,
+          "title": "Source Instruction Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "semantic_reason": {
+          "minLength": 1,
+          "title": "Semantic Reason",
+          "type": "string"
+        },
+        "trigger": {
+          "discriminator": {
+            "mapping": {
+              "absolute": "#/$defs/AbsoluteTrigger",
+              "beat_start": "#/$defs/BeatStartTrigger",
+              "phrase": "#/$defs/PhraseTrigger",
+              "prior_action": "#/$defs/PriorActionTrigger",
+              "word": "#/$defs/WordTrigger"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BeatStartTrigger"
+            },
+            {
+              "$ref": "#/$defs/WordTrigger"
+            },
+            {
+              "$ref": "#/$defs/PhraseTrigger"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteTrigger"
+            },
+            {
+              "$ref": "#/$defs/PriorActionTrigger"
+            }
+          ],
+          "title": "Trigger"
+        },
+        "easing": {
+          "default": "ease_out",
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out",
+            "step"
+          ],
+          "title": "Easing",
+          "type": "string"
+        },
+        "expected_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State"
+        },
+        "post_state": {
+          "minLength": 1,
+          "title": "Post State",
+          "type": "string"
+        },
+        "fallback": {
+          "$ref": "#/$defs/FallbackPolicy"
+        },
+        "coverage_id": {
+          "minLength": 1,
+          "title": "Coverage Id",
+          "type": "string"
+        },
+        "verb": {
+          "enum": [
+            "camera_hold",
+            "camera_cut",
+            "camera_pan",
+            "camera_zoom",
+            "camera_reframe"
+          ],
+          "title": "Verb",
+          "type": "string"
+        },
+        "target_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Target Ids",
+          "type": "array"
+        },
+        "framing": {
+          "enum": [
+            "wide",
+            "medium",
+            "close",
+            "detail",
+            "safe_area"
+          ],
+          "title": "Framing",
+          "type": "string"
+        },
+        "movement_purpose": {
+          "enum": [
+            "orient",
+            "reveal",
+            "compare",
+            "follow",
+            "emphasize",
+            "return"
+          ],
+          "title": "Movement Purpose",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "source_instruction_id",
+        "board_id",
+        "semantic_reason",
+        "trigger",
+        "post_state",
+        "fallback",
+        "coverage_id",
+        "verb",
+        "target_ids",
+        "framing",
+        "movement_purpose"
+      ],
+      "title": "CameraAction",
+      "type": "object"
+    },
+    "ConnectionAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "source_instruction_id": {
+          "minLength": 1,
+          "title": "Source Instruction Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "semantic_reason": {
+          "minLength": 1,
+          "title": "Semantic Reason",
+          "type": "string"
+        },
+        "trigger": {
+          "discriminator": {
+            "mapping": {
+              "absolute": "#/$defs/AbsoluteTrigger",
+              "beat_start": "#/$defs/BeatStartTrigger",
+              "phrase": "#/$defs/PhraseTrigger",
+              "prior_action": "#/$defs/PriorActionTrigger",
+              "word": "#/$defs/WordTrigger"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BeatStartTrigger"
+            },
+            {
+              "$ref": "#/$defs/WordTrigger"
+            },
+            {
+              "$ref": "#/$defs/PhraseTrigger"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteTrigger"
+            },
+            {
+              "$ref": "#/$defs/PriorActionTrigger"
+            }
+          ],
+          "title": "Trigger"
+        },
+        "easing": {
+          "default": "ease_out",
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out",
+            "step"
+          ],
+          "title": "Easing",
+          "type": "string"
+        },
+        "expected_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State"
+        },
+        "post_state": {
+          "minLength": 1,
+          "title": "Post State",
+          "type": "string"
+        },
+        "fallback": {
+          "$ref": "#/$defs/FallbackPolicy"
+        },
+        "coverage_id": {
+          "minLength": 1,
+          "title": "Coverage Id",
+          "type": "string"
+        },
+        "verb": {
+          "enum": [
+            "connect",
+            "disconnect"
+          ],
+          "title": "Verb",
+          "type": "string"
+        },
+        "connector_id": {
+          "title": "Connector Id",
+          "type": "string"
+        },
+        "source_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Object Id"
+        },
+        "source_anchor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Anchor Id"
+        },
+        "destination_object_id": {
+          "title": "Destination Object Id",
+          "type": "string"
+        },
+        "destination_anchor_id": {
+          "title": "Destination Anchor Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "source_instruction_id",
+        "board_id",
+        "semantic_reason",
+        "trigger",
+        "post_state",
+        "fallback",
+        "coverage_id",
+        "verb",
+        "connector_id",
+        "destination_object_id",
+        "destination_anchor_id"
+      ],
+      "title": "ConnectionAction",
+      "type": "object"
+    },
+    "CoverageRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage_id": {
+          "title": "Coverage Id",
+          "type": "string"
+        },
+        "instruction_id": {
+          "title": "Instruction Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "executed",
+            "degraded",
+            "rejected"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "action_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Action Ids",
+          "type": "array"
+        },
+        "fallback_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fallback Id"
+        }
+      },
+      "required": [
+        "coverage_id",
+        "instruction_id",
+        "status",
+        "action_ids"
+      ],
+      "title": "CoverageRecord",
+      "type": "object"
+    },
+    "EvidenceAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "source_instruction_id": {
+          "minLength": 1,
+          "title": "Source Instruction Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "semantic_reason": {
+          "minLength": 1,
+          "title": "Semantic Reason",
+          "type": "string"
+        },
+        "trigger": {
+          "discriminator": {
+            "mapping": {
+              "absolute": "#/$defs/AbsoluteTrigger",
+              "beat_start": "#/$defs/BeatStartTrigger",
+              "phrase": "#/$defs/PhraseTrigger",
+              "prior_action": "#/$defs/PriorActionTrigger",
+              "word": "#/$defs/WordTrigger"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BeatStartTrigger"
+            },
+            {
+              "$ref": "#/$defs/WordTrigger"
+            },
+            {
+              "$ref": "#/$defs/PhraseTrigger"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteTrigger"
+            },
+            {
+              "$ref": "#/$defs/PriorActionTrigger"
+            }
+          ],
+          "title": "Trigger"
+        },
+        "easing": {
+          "default": "ease_out",
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out",
+            "step"
+          ],
+          "title": "Easing",
+          "type": "string"
+        },
+        "expected_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State"
+        },
+        "post_state": {
+          "minLength": 1,
+          "title": "Post State",
+          "type": "string"
+        },
+        "fallback": {
+          "$ref": "#/$defs/FallbackPolicy"
+        },
+        "coverage_id": {
+          "minLength": 1,
+          "title": "Coverage Id",
+          "type": "string"
+        },
+        "verb": {
+          "enum": [
+            "insert_evidence",
+            "return_board"
+          ],
+          "title": "Verb",
+          "type": "string"
+        },
+        "evidence_asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Asset Id"
+        },
+        "destination_board_id": {
+          "title": "Destination Board Id",
+          "type": "string"
+        },
+        "destination_state": {
+          "title": "Destination State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "source_instruction_id",
+        "board_id",
+        "semantic_reason",
+        "trigger",
+        "post_state",
+        "fallback",
+        "coverage_id",
+        "verb",
+        "destination_board_id",
+        "destination_state"
+      ],
+      "title": "EvidenceAction",
+      "type": "object"
+    },
+    "FallbackPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "fallback_id": {
+          "title": "Fallback Id",
+          "type": "string"
+        },
+        "on_failure": {
+          "enum": [
+            "block",
+            "degrade",
+            "skip_with_exception"
+          ],
+          "title": "On Failure",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fallback_id",
+        "on_failure"
+      ],
+      "title": "FallbackPolicy",
+      "type": "object"
+    },
+    "FallbackRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "fallback_id": {
+          "title": "Fallback Id",
+          "type": "string"
+        },
+        "affected_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Affected Ids",
+          "type": "array"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "degradation_class": {
+          "enum": [
+            "none",
+            "visual_simplification",
+            "asset_substitution",
+            "timing_relaxation",
+            "omission"
+          ],
+          "title": "Degradation Class",
+          "type": "string"
+        },
+        "substitute": {
+          "title": "Substitute",
+          "type": "string"
+        },
+        "recoverable": {
+          "title": "Recoverable",
+          "type": "boolean"
+        },
+        "production_blocking": {
+          "title": "Production Blocking",
+          "type": "boolean"
+        },
+        "user_exception_required": {
+          "title": "User Exception Required",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "unused",
+            "selected",
+            "resolved",
+            "rejected"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fallback_id",
+        "affected_ids",
+        "reason_code",
+        "degradation_class",
+        "substitute",
+        "recoverable",
+        "production_blocking",
+        "user_exception_required",
+        "status"
+      ],
+      "title": "FallbackRecord",
+      "type": "object"
+    },
+    "GroupAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "source_instruction_id": {
+          "minLength": 1,
+          "title": "Source Instruction Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "semantic_reason": {
+          "minLength": 1,
+          "title": "Semantic Reason",
+          "type": "string"
+        },
+        "trigger": {
+          "discriminator": {
+            "mapping": {
+              "absolute": "#/$defs/AbsoluteTrigger",
+              "beat_start": "#/$defs/BeatStartTrigger",
+              "phrase": "#/$defs/PhraseTrigger",
+              "prior_action": "#/$defs/PriorActionTrigger",
+              "word": "#/$defs/WordTrigger"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BeatStartTrigger"
+            },
+            {
+              "$ref": "#/$defs/WordTrigger"
+            },
+            {
+              "$ref": "#/$defs/PhraseTrigger"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteTrigger"
+            },
+            {
+              "$ref": "#/$defs/PriorActionTrigger"
+            }
+          ],
+          "title": "Trigger"
+        },
+        "easing": {
+          "default": "ease_out",
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out",
+            "step"
+          ],
+          "title": "Easing",
+          "type": "string"
+        },
+        "expected_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State"
+        },
+        "post_state": {
+          "minLength": 1,
+          "title": "Post State",
+          "type": "string"
+        },
+        "fallback": {
+          "$ref": "#/$defs/FallbackPolicy"
+        },
+        "coverage_id": {
+          "minLength": 1,
+          "title": "Coverage Id",
+          "type": "string"
+        },
+        "verb": {
+          "enum": [
+            "group",
+            "ungroup",
+            "split"
+          ],
+          "title": "Verb",
+          "type": "string"
+        },
+        "target_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Target Ids",
+          "type": "array"
+        },
+        "container_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Container Id"
+        }
+      },
+      "required": [
+        "action_id",
+        "source_instruction_id",
+        "board_id",
+        "semantic_reason",
+        "trigger",
+        "post_state",
+        "fallback",
+        "coverage_id",
+        "verb",
+        "target_ids"
+      ],
+      "title": "GroupAction",
+      "type": "object"
+    },
+    "ObjectState": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "title": "Object Id",
+          "type": "string"
+        },
+        "state": {
+          "title": "State",
+          "type": "string"
+        },
+        "state_version": {
+          "minimum": 1,
+          "title": "State Version",
+          "type": "integer"
+        },
+        "visible": {
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "object_id",
+        "state",
+        "state_version",
+        "visible"
+      ],
+      "title": "ObjectState",
+      "type": "object"
+    },
+    "OutputProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": {
+          "enum": [
+            "LONG_FORM_16_9",
+            "SHORT_FORM_9_16"
+          ],
+          "title": "Profile Id",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "fps": {
+          "exclusiveMinimum": 0,
+          "title": "Fps",
+          "type": "number"
+        }
+      },
+      "required": [
+        "profile_id",
+        "width",
+        "height",
+        "fps"
+      ],
+      "title": "OutputProfile",
+      "type": "object"
+    },
+    "PhraseTrigger": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "phrase",
+          "title": "Kind",
+          "type": "string"
+        },
+        "phrase": {
+          "minLength": 1,
+          "title": "Phrase",
+          "type": "string"
+        },
+        "occurrence": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Occurrence",
+          "type": "integer"
+        },
+        "offset_ms": {
+          "default": 0,
+          "title": "Offset Ms",
+          "type": "integer"
+        },
+        "minimum_confidence": {
+          "default": 0.75,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Minimum Confidence",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "phrase"
+      ],
+      "title": "PhraseTrigger",
+      "type": "object"
+    },
+    "Point": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "Point",
+      "type": "object"
+    },
+    "PriorActionTrigger": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "prior_action",
+          "title": "Kind",
+          "type": "string"
+        },
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "offset_ms": {
+          "default": 0,
+          "title": "Offset Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "action_id"
+      ],
+      "title": "PriorActionTrigger",
+      "type": "object"
+    },
+    "ReplaceAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "source_instruction_id": {
+          "minLength": 1,
+          "title": "Source Instruction Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "semantic_reason": {
+          "minLength": 1,
+          "title": "Semantic Reason",
+          "type": "string"
+        },
+        "trigger": {
+          "discriminator": {
+            "mapping": {
+              "absolute": "#/$defs/AbsoluteTrigger",
+              "beat_start": "#/$defs/BeatStartTrigger",
+              "phrase": "#/$defs/PhraseTrigger",
+              "prior_action": "#/$defs/PriorActionTrigger",
+              "word": "#/$defs/WordTrigger"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BeatStartTrigger"
+            },
+            {
+              "$ref": "#/$defs/WordTrigger"
+            },
+            {
+              "$ref": "#/$defs/PhraseTrigger"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteTrigger"
+            },
+            {
+              "$ref": "#/$defs/PriorActionTrigger"
+            }
+          ],
+          "title": "Trigger"
+        },
+        "easing": {
+          "default": "ease_out",
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out",
+            "step"
+          ],
+          "title": "Easing",
+          "type": "string"
+        },
+        "expected_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State"
+        },
+        "post_state": {
+          "minLength": 1,
+          "title": "Post State",
+          "type": "string"
+        },
+        "fallback": {
+          "$ref": "#/$defs/FallbackPolicy"
+        },
+        "coverage_id": {
+          "minLength": 1,
+          "title": "Coverage Id",
+          "type": "string"
+        },
+        "verb": {
+          "enum": [
+            "replace",
+            "morph"
+          ],
+          "title": "Verb",
+          "type": "string"
+        },
+        "from_object_id": {
+          "title": "From Object Id",
+          "type": "string"
+        },
+        "to_object_id": {
+          "title": "To Object Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "source_instruction_id",
+        "board_id",
+        "semantic_reason",
+        "trigger",
+        "post_state",
+        "fallback",
+        "coverage_id",
+        "verb",
+        "from_object_id",
+        "to_object_id"
+      ],
+      "title": "ReplaceAction",
+      "type": "object"
+    },
+    "ResolvedAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "discriminator": {
+            "mapping": {
+              "annotate": "#/$defs/TargetAction",
+              "camera_cut": "#/$defs/CameraAction",
+              "camera_hold": "#/$defs/CameraAction",
+              "camera_pan": "#/$defs/CameraAction",
+              "camera_reframe": "#/$defs/CameraAction",
+              "camera_zoom": "#/$defs/CameraAction",
+              "connect": "#/$defs/ConnectionAction",
+              "count": "#/$defs/TargetAction",
+              "cross_out": "#/$defs/TargetAction",
+              "dim": "#/$defs/TargetAction",
+              "disconnect": "#/$defs/ConnectionAction",
+              "draw": "#/$defs/TargetAction",
+              "enter": "#/$defs/TargetAction",
+              "exit": "#/$defs/TargetAction",
+              "fade": "#/$defs/TransformAction",
+              "group": "#/$defs/GroupAction",
+              "highlight": "#/$defs/TargetAction",
+              "insert_evidence": "#/$defs/EvidenceAction",
+              "isolate": "#/$defs/TargetAction",
+              "morph": "#/$defs/ReplaceAction",
+              "move": "#/$defs/TransformAction",
+              "music_state": "#/$defs/SoundAction",
+              "progressive_reveal": "#/$defs/TargetAction",
+              "purposeful_silence": "#/$defs/SoundAction",
+              "replace": "#/$defs/ReplaceAction",
+              "return_board": "#/$defs/EvidenceAction",
+              "reveal": "#/$defs/TargetAction",
+              "rotate": "#/$defs/TransformAction",
+              "scale": "#/$defs/TransformAction",
+              "sound_cue": "#/$defs/SoundAction",
+              "split": "#/$defs/GroupAction",
+              "ungroup": "#/$defs/GroupAction",
+              "write": "#/$defs/TargetAction"
+            },
+            "propertyName": "verb"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/TargetAction"
+            },
+            {
+              "$ref": "#/$defs/TransformAction"
+            },
+            {
+              "$ref": "#/$defs/ConnectionAction"
+            },
+            {
+              "$ref": "#/$defs/ReplaceAction"
+            },
+            {
+              "$ref": "#/$defs/GroupAction"
+            },
+            {
+              "$ref": "#/$defs/EvidenceAction"
+            },
+            {
+              "$ref": "#/$defs/CameraAction"
+            },
+            {
+              "$ref": "#/$defs/SoundAction"
+            }
+          ],
+          "title": "Action"
+        },
+        "start_ms": {
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "end_ms": {
+          "exclusiveMinimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "resolved_trigger": {
+          "$ref": "#/$defs/ResolvedTrigger"
+        }
+      },
+      "required": [
+        "action",
+        "start_ms",
+        "end_ms",
+        "resolved_trigger"
+      ],
+      "title": "ResolvedAction",
+      "type": "object"
+    },
+    "ResolvedAsset": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "managed_ref": {
+          "title": "Managed Ref",
+          "type": "string"
+        },
+        "checksum_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Checksum Sha256",
+          "type": "string"
+        },
+        "provenance_verified": {
+          "title": "Provenance Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "asset_id",
+        "revision",
+        "managed_ref",
+        "checksum_sha256",
+        "provenance_verified"
+      ],
+      "title": "ResolvedAsset",
+      "type": "object"
+    },
+    "ResolvedBeatAnchor": {
+      "additionalProperties": false,
+      "properties": {
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "start_ms": {
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "beat_id",
+        "start_ms"
+      ],
+      "title": "ResolvedBeatAnchor",
+      "type": "object"
+    },
+    "ResolvedTrigger": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "discriminator": {
+            "mapping": {
+              "absolute": "#/$defs/AbsoluteTrigger",
+              "beat_start": "#/$defs/BeatStartTrigger",
+              "phrase": "#/$defs/PhraseTrigger",
+              "prior_action": "#/$defs/PriorActionTrigger",
+              "word": "#/$defs/WordTrigger"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BeatStartTrigger"
+            },
+            {
+              "$ref": "#/$defs/WordTrigger"
+            },
+            {
+              "$ref": "#/$defs/PhraseTrigger"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteTrigger"
+            },
+            {
+              "$ref": "#/$defs/PriorActionTrigger"
+            }
+          ],
+          "title": "Source"
+        },
+        "alignment_anchor_ms": {
+          "minimum": 0,
+          "title": "Alignment Anchor Ms",
+          "type": "integer"
+        },
+        "resolved_at_ms": {
+          "minimum": 0,
+          "title": "Resolved At Ms",
+          "type": "integer"
+        },
+        "matched_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Matched Text"
+        },
+        "matched_occurrence": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Matched Occurrence"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "exact": {
+          "title": "Exact",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "source",
+        "alignment_anchor_ms",
+        "resolved_at_ms",
+        "confidence",
+        "exact"
+      ],
+      "title": "ResolvedTrigger",
+      "type": "object"
+    },
+    "SoundAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "source_instruction_id": {
+          "minLength": 1,
+          "title": "Source Instruction Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "semantic_reason": {
+          "minLength": 1,
+          "title": "Semantic Reason",
+          "type": "string"
+        },
+        "trigger": {
+          "discriminator": {
+            "mapping": {
+              "absolute": "#/$defs/AbsoluteTrigger",
+              "beat_start": "#/$defs/BeatStartTrigger",
+              "phrase": "#/$defs/PhraseTrigger",
+              "prior_action": "#/$defs/PriorActionTrigger",
+              "word": "#/$defs/WordTrigger"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BeatStartTrigger"
+            },
+            {
+              "$ref": "#/$defs/WordTrigger"
+            },
+            {
+              "$ref": "#/$defs/PhraseTrigger"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteTrigger"
+            },
+            {
+              "$ref": "#/$defs/PriorActionTrigger"
+            }
+          ],
+          "title": "Trigger"
+        },
+        "easing": {
+          "default": "ease_out",
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out",
+            "step"
+          ],
+          "title": "Easing",
+          "type": "string"
+        },
+        "expected_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State"
+        },
+        "post_state": {
+          "minLength": 1,
+          "title": "Post State",
+          "type": "string"
+        },
+        "fallback": {
+          "$ref": "#/$defs/FallbackPolicy"
+        },
+        "coverage_id": {
+          "minLength": 1,
+          "title": "Coverage Id",
+          "type": "string"
+        },
+        "verb": {
+          "enum": [
+            "sound_cue",
+            "music_state",
+            "purposeful_silence"
+          ],
+          "title": "Verb",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "gain_db": {
+          "default": 0,
+          "maximum": 12,
+          "minimum": -60,
+          "title": "Gain Db",
+          "type": "number"
+        },
+        "state": {
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "source_instruction_id",
+        "board_id",
+        "semantic_reason",
+        "trigger",
+        "post_state",
+        "fallback",
+        "coverage_id",
+        "verb",
+        "state"
+      ],
+      "title": "SoundAction",
+      "type": "object"
+    },
+    "TargetAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "source_instruction_id": {
+          "minLength": 1,
+          "title": "Source Instruction Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "semantic_reason": {
+          "minLength": 1,
+          "title": "Semantic Reason",
+          "type": "string"
+        },
+        "trigger": {
+          "discriminator": {
+            "mapping": {
+              "absolute": "#/$defs/AbsoluteTrigger",
+              "beat_start": "#/$defs/BeatStartTrigger",
+              "phrase": "#/$defs/PhraseTrigger",
+              "prior_action": "#/$defs/PriorActionTrigger",
+              "word": "#/$defs/WordTrigger"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BeatStartTrigger"
+            },
+            {
+              "$ref": "#/$defs/WordTrigger"
+            },
+            {
+              "$ref": "#/$defs/PhraseTrigger"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteTrigger"
+            },
+            {
+              "$ref": "#/$defs/PriorActionTrigger"
+            }
+          ],
+          "title": "Trigger"
+        },
+        "easing": {
+          "default": "ease_out",
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out",
+            "step"
+          ],
+          "title": "Easing",
+          "type": "string"
+        },
+        "expected_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State"
+        },
+        "post_state": {
+          "minLength": 1,
+          "title": "Post State",
+          "type": "string"
+        },
+        "fallback": {
+          "$ref": "#/$defs/FallbackPolicy"
+        },
+        "coverage_id": {
+          "minLength": 1,
+          "title": "Coverage Id",
+          "type": "string"
+        },
+        "verb": {
+          "enum": [
+            "reveal",
+            "write",
+            "draw",
+            "enter",
+            "exit",
+            "highlight",
+            "dim",
+            "isolate",
+            "cross_out",
+            "annotate",
+            "count",
+            "progressive_reveal"
+          ],
+          "title": "Verb",
+          "type": "string"
+        },
+        "target_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Target Ids",
+          "type": "array"
+        },
+        "annotation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Annotation"
+        }
+      },
+      "required": [
+        "action_id",
+        "source_instruction_id",
+        "board_id",
+        "semantic_reason",
+        "trigger",
+        "post_state",
+        "fallback",
+        "coverage_id",
+        "verb",
+        "target_ids"
+      ],
+      "title": "TargetAction",
+      "type": "object"
+    },
+    "Transform": {
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/Point"
+        },
+        "scale_x": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Scale X",
+          "type": "number"
+        },
+        "scale_y": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Scale Y",
+          "type": "number"
+        },
+        "rotation_degrees": {
+          "default": 0,
+          "title": "Rotation Degrees",
+          "type": "number"
+        },
+        "origin": {
+          "$ref": "#/$defs/Point"
+        }
+      },
+      "required": [
+        "position"
+      ],
+      "title": "Transform",
+      "type": "object"
+    },
+    "TransformAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "source_instruction_id": {
+          "minLength": 1,
+          "title": "Source Instruction Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "semantic_reason": {
+          "minLength": 1,
+          "title": "Semantic Reason",
+          "type": "string"
+        },
+        "trigger": {
+          "discriminator": {
+            "mapping": {
+              "absolute": "#/$defs/AbsoluteTrigger",
+              "beat_start": "#/$defs/BeatStartTrigger",
+              "phrase": "#/$defs/PhraseTrigger",
+              "prior_action": "#/$defs/PriorActionTrigger",
+              "word": "#/$defs/WordTrigger"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BeatStartTrigger"
+            },
+            {
+              "$ref": "#/$defs/WordTrigger"
+            },
+            {
+              "$ref": "#/$defs/PhraseTrigger"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteTrigger"
+            },
+            {
+              "$ref": "#/$defs/PriorActionTrigger"
+            }
+          ],
+          "title": "Trigger"
+        },
+        "easing": {
+          "default": "ease_out",
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out",
+            "step"
+          ],
+          "title": "Easing",
+          "type": "string"
+        },
+        "expected_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State"
+        },
+        "post_state": {
+          "minLength": 1,
+          "title": "Post State",
+          "type": "string"
+        },
+        "fallback": {
+          "$ref": "#/$defs/FallbackPolicy"
+        },
+        "coverage_id": {
+          "minLength": 1,
+          "title": "Coverage Id",
+          "type": "string"
+        },
+        "verb": {
+          "enum": [
+            "move",
+            "scale",
+            "rotate",
+            "fade"
+          ],
+          "title": "Verb",
+          "type": "string"
+        },
+        "target_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Target Ids",
+          "type": "array"
+        },
+        "destination": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Transform"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "opacity": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Opacity"
+        }
+      },
+      "required": [
+        "action_id",
+        "source_instruction_id",
+        "board_id",
+        "semantic_reason",
+        "trigger",
+        "post_state",
+        "fallback",
+        "coverage_id",
+        "verb",
+        "target_ids"
+      ],
+      "title": "TransformAction",
+      "type": "object"
+    },
+    "ValidationIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "severity": {
+          "enum": [
+            "warning",
+            "error"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "affected_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Affected Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "severity",
+        "code",
+        "message",
+        "affected_ids"
+      ],
+      "title": "ValidationIssue",
+      "type": "object"
+    },
+    "ValidationState": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "pass",
+            "warn",
+            "fail"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "production_ready": {
+          "title": "Production Ready",
+          "type": "boolean"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/ValidationIssue"
+          },
+          "title": "Issues",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status",
+        "production_ready",
+        "issues"
+      ],
+      "title": "ValidationState",
+      "type": "object"
+    },
+    "WordTrigger": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "word",
+          "title": "Kind",
+          "type": "string"
+        },
+        "word": {
+          "minLength": 1,
+          "title": "Word",
+          "type": "string"
+        },
+        "occurrence": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Occurrence",
+          "type": "integer"
+        },
+        "offset_ms": {
+          "default": 0,
+          "title": "Offset Ms",
+          "type": "integer"
+        },
+        "minimum_confidence": {
+          "default": 0.75,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Minimum Confidence",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "word"
+      ],
+      "title": "WordTrigger",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "2.0.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "timeline_id": {
+      "title": "Timeline Id",
+      "type": "string"
+    },
+    "project_id": {
+      "minimum": 1,
+      "title": "Project Id",
+      "type": "integer"
+    },
+    "project_revision": {
+      "minimum": 0,
+      "title": "Project Revision",
+      "type": "integer"
+    },
+    "plan_id": {
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "plan_revision": {
+      "minimum": 1,
+      "title": "Plan Revision",
+      "type": "integer"
+    },
+    "plan_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Plan Sha256",
+      "type": "string"
+    },
+    "layout_id": {
+      "title": "Layout Id",
+      "type": "string"
+    },
+    "layout_revision": {
+      "minimum": 1,
+      "title": "Layout Revision",
+      "type": "integer"
+    },
+    "layout_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Layout Sha256",
+      "type": "string"
+    },
+    "cleaned_timeline_revision": {
+      "minimum": 0,
+      "title": "Cleaned Timeline Revision",
+      "type": "integer"
+    },
+    "cleaned_timeline_fingerprint": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Cleaned Timeline Fingerprint",
+      "type": "string"
+    },
+    "output_profile": {
+      "$ref": "#/$defs/OutputProfile"
+    },
+    "style_system_version": {
+      "title": "Style System Version",
+      "type": "string"
+    },
+    "asset_registry_version": {
+      "title": "Asset Registry Version",
+      "type": "string"
+    },
+    "duration_ms": {
+      "exclusiveMinimum": 0,
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "compilation_fingerprint": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Compilation Fingerprint",
+      "type": "string"
+    },
+    "resolved_assets": {
+      "items": {
+        "$ref": "#/$defs/ResolvedAsset"
+      },
+      "title": "Resolved Assets",
+      "type": "array"
+    },
+    "initial_object_states": {
+      "items": {
+        "$ref": "#/$defs/ObjectState"
+      },
+      "title": "Initial Object States",
+      "type": "array"
+    },
+    "beat_anchors": {
+      "items": {
+        "$ref": "#/$defs/ResolvedBeatAnchor"
+      },
+      "minItems": 1,
+      "title": "Beat Anchors",
+      "type": "array"
+    },
+    "actions": {
+      "items": {
+        "$ref": "#/$defs/ResolvedAction"
+      },
+      "minItems": 1,
+      "title": "Actions",
+      "type": "array"
+    },
+    "coverage": {
+      "items": {
+        "$ref": "#/$defs/CoverageRecord"
+      },
+      "minItems": 1,
+      "title": "Coverage",
+      "type": "array"
+    },
+    "fallbacks": {
+      "items": {
+        "$ref": "#/$defs/FallbackRecord"
+      },
+      "title": "Fallbacks",
+      "type": "array"
+    },
+    "validation": {
+      "$ref": "#/$defs/ValidationState"
+    }
+  },
+  "required": [
+    "contract_version",
+    "timeline_id",
+    "project_id",
+    "project_revision",
+    "plan_id",
+    "plan_revision",
+    "plan_sha256",
+    "layout_id",
+    "layout_revision",
+    "layout_sha256",
+    "cleaned_timeline_revision",
+    "cleaned_timeline_fingerprint",
+    "output_profile",
+    "style_system_version",
+    "asset_registry_version",
+    "duration_ms",
+    "compilation_fingerprint",
+    "resolved_assets",
+    "initial_object_states",
+    "beat_anchors",
+    "actions",
+    "coverage",
+    "fallbacks",
+    "validation"
+  ],
+  "title": "ResolvedVisualTimelineV2",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atme.local/schemas/v2/resolved-visual-timeline-v2.schema.json"
+}

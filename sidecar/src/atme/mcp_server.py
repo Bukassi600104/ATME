@@ -32,6 +32,8 @@ from atme.store.db import JobStore
 Id = Annotated[int, Field(strict=True, ge=1)]
 Revision = Annotated[int, Field(strict=True, ge=0)]
 Kind = Literal["brief", "script", "storyboard", "layout"]
+SchemaKind = Literal["brief", "script", "storyboard", "layout", "resolved_timeline", "migration_report"]
+SchemaVersion = Literal["1", "2.0.0"]
 MAX_RESOURCE_BYTES = 128 * 1024 * 1024
 
 
@@ -95,9 +97,9 @@ def create_mcp(service: ProjectService, activity: McpActivity | None = None):
                       tool="atme.get_capabilities")
 
     @server.tool(name="atme.get_schema", annotations=read)
-    def get_schema(kind: Kind) -> CallToolResult:
-        """Read the runtime schema before authoring an artifact."""
-        return invoke(service.schema, kind, tool="atme.get_schema")
+    def get_schema(kind: SchemaKind, version: SchemaVersion = "1") -> CallToolResult:
+        """Read one explicit contract version; v2 authoring does not imply v2 render support."""
+        return invoke(service.schema, kind, version, tool="atme.get_schema")
 
     @server.tool(name="atme.list_projects", annotations=read)
     def list_projects(limit: Annotated[int, Field(strict=True, ge=1, le=100)] = 50,
@@ -142,6 +144,12 @@ def create_mcp(service: ProjectService, activity: McpActivity | None = None):
         """Receive externally authored JSON. Reject invalid/stale writes without modifying the project."""
         return invoke(service.write, project_id, kind, document, expected_revision,
                       tool="atme.write_artifact", project_id=project_id)
+
+    @server.tool(name="atme.migrate_visual_contracts_v1", annotations=write)
+    def migrate_visual_contracts_v1(project_id: Id, expected_revision: Revision) -> CallToolResult:
+        """Create immutable v2 plan/layout revisions; retain all v1 history and migration evidence."""
+        return invoke(service.migrate_visual_contracts_v1, project_id, expected_revision,
+                      tool="atme.migrate_visual_contracts_v1", project_id=project_id)
 
     @server.tool(name="atme.approve_script", annotations=write)
     def approve_script(project_id: Id, script_revision: Revision, expected_revision: Revision,

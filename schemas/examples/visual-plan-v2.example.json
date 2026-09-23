@@ -1,0 +1,422 @@
+{
+  "contract_version": "2.0.0",
+  "plan_id": "plan-rich",
+  "project_id": 1,
+  "project_revision": 3,
+  "narrative_authority": {
+    "mode": "recording_only",
+    "authority_id": "media-narration",
+    "timing_media_id": "media-narration",
+    "timing_media_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "cleaned_timeline_revision": 2,
+    "cleaned_timeline_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "output_profile": {
+    "profile_id": "LONG_FORM_16_9",
+    "width": 1280,
+    "height": 720,
+    "fps": 30
+  },
+  "style_system_version": "atme-style-v2",
+  "asset_registry_version": "atme-assets-v2",
+  "declared_capability_version": "visual-contracts-v2",
+  "assets": [
+    {
+      "asset_id": "asset-evidence",
+      "revision": 1,
+      "kind": "evidence",
+      "semantic_role": "Primary-source proof",
+      "managed_ref": "assets/evidence.png",
+      "checksum_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "width": 900,
+      "height": 500,
+      "duration_ms": null,
+      "provenance": {
+        "category": "external_evidence",
+        "source_uri": "https://example.com/source",
+        "checksum_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "license_status": "licensed",
+        "fabrication_prohibited": true,
+        "originality_status": "reference_only"
+      },
+      "style_family": null,
+      "style_version": null,
+      "allowed_transformations": [
+        "crop",
+        "scale",
+        "annotate",
+        "color_treatment"
+      ],
+      "fallback_id": "fallback-3"
+    }
+  ],
+  "objects": [
+    {
+      "object_id": "object-system",
+      "object_type": "rounded_rectangle",
+      "board_id": "board-main",
+      "beat_id": "beat-001",
+      "semantic_role": "System boundary",
+      "description": "Main system",
+      "asset_id": null,
+      "initial_state": "hidden",
+      "coverage_ids": [
+        "coverage-1"
+      ]
+    },
+    {
+      "object_id": "object-label",
+      "object_type": "text",
+      "board_id": "board-main",
+      "beat_id": "beat-001",
+      "semantic_role": "System label",
+      "description": "Short label",
+      "asset_id": null,
+      "initial_state": "hidden",
+      "coverage_ids": [
+        "coverage-2"
+      ]
+    },
+    {
+      "object_id": "object-evidence",
+      "object_type": "evidence",
+      "board_id": "board-main",
+      "beat_id": "beat-002",
+      "semantic_role": "Proof",
+      "description": "Cropped source evidence",
+      "asset_id": "asset-evidence",
+      "initial_state": "hidden",
+      "coverage_ids": [
+        "coverage-3"
+      ]
+    }
+  ],
+  "boards": [
+    {
+      "board_id": "board-main",
+      "template": "evidence_annotation",
+      "object_ids": [
+        "object-system",
+        "object-label",
+        "object-evidence"
+      ],
+      "persistence_policy": "returnable",
+      "density_limit": 6,
+      "creation_reason": "Establish and develop one persistent mental model",
+      "departure_reason": null,
+      "return_reason": "Return with evidence",
+      "expected_prior_state": null,
+      "activation_policy": "returnable",
+      "aspect_composition": {
+        "LONG_FORM_16_9": "left model, right evidence",
+        "SHORT_FORM_9_16": "stack model above evidence"
+      }
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "action-1",
+      "source_instruction_id": "instruction-1",
+      "board_id": "board-main",
+      "semantic_reason": "Explain the narrated concept",
+      "trigger": {
+        "kind": "phrase",
+        "phrase": "system begins",
+        "occurrence": 1,
+        "offset_ms": 0,
+        "minimum_confidence": 0.75
+      },
+      "easing": "ease_out",
+      "expected_state": "hidden",
+      "post_state": "visible",
+      "fallback": {
+        "fallback_id": "fallback-1",
+        "on_failure": "block"
+      },
+      "coverage_id": "coverage-1",
+      "verb": "draw",
+      "target_ids": [
+        "object-system"
+      ],
+      "annotation": null
+    },
+    {
+      "action_id": "action-2",
+      "source_instruction_id": "instruction-2",
+      "board_id": "board-main",
+      "semantic_reason": "Explain the narrated concept",
+      "trigger": {
+        "kind": "phrase",
+        "phrase": "system begins",
+        "occurrence": 1,
+        "offset_ms": 0,
+        "minimum_confidence": 0.75
+      },
+      "easing": "ease_out",
+      "expected_state": "hidden",
+      "post_state": "visible",
+      "fallback": {
+        "fallback_id": "fallback-2",
+        "on_failure": "block"
+      },
+      "coverage_id": "coverage-2",
+      "verb": "write",
+      "target_ids": [
+        "object-label"
+      ],
+      "annotation": null
+    },
+    {
+      "action_id": "action-3",
+      "source_instruction_id": "instruction-3",
+      "board_id": "board-main",
+      "semantic_reason": "Explain the narrated concept",
+      "trigger": {
+        "kind": "phrase",
+        "phrase": "system begins",
+        "occurrence": 1,
+        "offset_ms": 0,
+        "minimum_confidence": 0.75
+      },
+      "easing": "ease_out",
+      "expected_state": "hidden",
+      "post_state": "visible",
+      "fallback": {
+        "fallback_id": "fallback-3",
+        "on_failure": "block"
+      },
+      "coverage_id": "coverage-3",
+      "verb": "insert_evidence",
+      "evidence_asset_id": "asset-evidence",
+      "destination_board_id": "board-main",
+      "destination_state": "evidence_visible"
+    }
+  ],
+  "beats": [
+    {
+      "beat_id": "beat-001",
+      "narration_summary": "The system begins with one boundary.",
+      "rhetorical_role": "hook",
+      "visual_purpose": "containment",
+      "board_id": "board-main",
+      "object_ids": [
+        "object-system",
+        "object-label"
+      ],
+      "action_ids": [
+        "action-1",
+        "action-2"
+      ],
+      "attention": {
+        "primary_targets": [
+          "object-system"
+        ],
+        "secondary_context": [
+          "object-label"
+        ],
+        "dimmed_targets": [],
+        "priority": "listen",
+        "progressive_state": "system_established"
+      },
+      "continuity": {
+        "keep": [],
+        "change": [],
+        "remove": [],
+        "return_from_board_id": null,
+        "expected_state_versions": {},
+        "replacements": {},
+        "developed_return_state": null,
+        "hook_resolution_role": "opens_hook"
+      },
+      "camera_intent": {
+        "mode": "hold",
+        "target_ids": [
+          "object-system"
+        ],
+        "reason": "Let the viewer construct the opening model",
+        "framing": "wide",
+        "movement_purpose": "orient",
+        "duration_ms": 0,
+        "easing": "step"
+      },
+      "sound_intent": {
+        "role": "none",
+        "asset_id": null,
+        "reason": "Narration carries the hook",
+        "gain_db": 0
+      },
+      "evidence": null,
+      "fallback_ids": [
+        "fallback-1",
+        "fallback-2"
+      ],
+      "coverage_ids": [
+        "coverage-1",
+        "coverage-2"
+      ]
+    },
+    {
+      "beat_id": "beat-002",
+      "narration_summary": "The evidence resolves the opening claim.",
+      "rhetorical_role": "conclusion",
+      "visual_purpose": "proof",
+      "board_id": "board-main",
+      "object_ids": [
+        "object-evidence"
+      ],
+      "action_ids": [
+        "action-3"
+      ],
+      "attention": {
+        "primary_targets": [
+          "object-evidence"
+        ],
+        "secondary_context": [
+          "object-system"
+        ],
+        "dimmed_targets": [
+          "object-label"
+        ],
+        "priority": "inspect",
+        "progressive_state": "evidence_resolves_hook"
+      },
+      "continuity": {
+        "keep": [
+          "object-system"
+        ],
+        "change": [],
+        "remove": [],
+        "return_from_board_id": "board-main",
+        "expected_state_versions": {
+          "object-system": 1
+        },
+        "replacements": {},
+        "developed_return_state": "evidence_visible",
+        "hook_resolution_role": "resolves_hook"
+      },
+      "camera_intent": {
+        "mode": "cut",
+        "target_ids": [
+          "object-evidence"
+        ],
+        "reason": "Evidence requires immediate readable framing",
+        "framing": "detail",
+        "movement_purpose": "return",
+        "duration_ms": 0,
+        "easing": "step"
+      },
+      "sound_intent": {
+        "role": "purposeful_silence",
+        "asset_id": null,
+        "reason": "Leave room to inspect evidence",
+        "gain_db": 0
+      },
+      "evidence": {
+        "claim_id": "claim-1",
+        "claim": "The source confirms the mechanism",
+        "evidence_asset_id": "asset-evidence",
+        "crop": {
+          "x": 0,
+          "y": 0,
+          "width": 900,
+          "height": 500
+        },
+        "focus_region": {
+          "x": 100,
+          "y": 100,
+          "width": 500,
+          "height": 200
+        },
+        "mask_object_id": null,
+        "darkening": 0.2,
+        "source_label": "Example Source",
+        "annotation": "Key mechanism",
+        "annotation_target_id": "object-evidence",
+        "annotation_omission_reason": null,
+        "readable_hold_intent_ms": 2500,
+        "destination_board_id": "board-main",
+        "destination_state": "evidence_visible",
+        "provenance_verified": true,
+        "checksum_verified": true
+      },
+      "fallback_ids": [
+        "fallback-3"
+      ],
+      "coverage_ids": [
+        "coverage-3"
+      ]
+    }
+  ],
+  "fallbacks": [
+    {
+      "fallback_id": "fallback-1",
+      "affected_ids": [
+        "instruction-1"
+      ],
+      "reason_code": "asset_or_timing_failure",
+      "degradation_class": "none",
+      "substitute": "No substitute; preserve meaning and block",
+      "recoverable": true,
+      "production_blocking": true,
+      "user_exception_required": false,
+      "status": "unused"
+    },
+    {
+      "fallback_id": "fallback-2",
+      "affected_ids": [
+        "instruction-2"
+      ],
+      "reason_code": "asset_or_timing_failure",
+      "degradation_class": "none",
+      "substitute": "No substitute; preserve meaning and block",
+      "recoverable": true,
+      "production_blocking": true,
+      "user_exception_required": false,
+      "status": "unused"
+    },
+    {
+      "fallback_id": "fallback-3",
+      "affected_ids": [
+        "instruction-3"
+      ],
+      "reason_code": "asset_or_timing_failure",
+      "degradation_class": "none",
+      "substitute": "No substitute; preserve meaning and block",
+      "recoverable": true,
+      "production_blocking": true,
+      "user_exception_required": false,
+      "status": "unused"
+    }
+  ],
+  "coverage": [
+    {
+      "coverage_id": "coverage-1",
+      "instruction_id": "instruction-1",
+      "status": "executed",
+      "action_ids": [
+        "action-1"
+      ],
+      "fallback_id": null
+    },
+    {
+      "coverage_id": "coverage-2",
+      "instruction_id": "instruction-2",
+      "status": "executed",
+      "action_ids": [
+        "action-2"
+      ],
+      "fallback_id": null
+    },
+    {
+      "coverage_id": "coverage-3",
+      "instruction_id": "instruction-3",
+      "status": "executed",
+      "action_ids": [
+        "action-3"
+      ],
+      "fallback_id": null
+    }
+  ],
+  "opening_beat_id": "beat-001",
+  "conclusion_beat_id": "beat-002"
+}

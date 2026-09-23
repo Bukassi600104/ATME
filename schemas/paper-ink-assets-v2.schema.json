@@ -1,0 +1,184 @@
+{
+  "$defs": {
+    "AssetEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "family": {
+          "enum": [
+            "people",
+            "gestures",
+            "devices",
+            "documents",
+            "networks",
+            "charts",
+            "technical-frames",
+            "abstract-metaphors"
+          ],
+          "title": "Family",
+          "type": "string"
+        },
+        "file": {
+          "pattern": "^assets/[a-z0-9-]+\\.svg$",
+          "title": "File",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "view_box": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "View Box",
+          "type": "array"
+        },
+        "keywords": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "minItems": 2,
+          "title": "Keywords",
+          "type": "array"
+        },
+        "anchors": {
+          "additionalProperties": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Anchors",
+          "type": "object"
+        },
+        "provenance": {
+          "$ref": "#/$defs/AssetProvenance"
+        }
+      },
+      "required": [
+        "id",
+        "family",
+        "file",
+        "sha256",
+        "view_box",
+        "keywords",
+        "anchors",
+        "provenance"
+      ],
+      "title": "AssetEntry",
+      "type": "object"
+    },
+    "AssetProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "origin": {
+          "const": "ATME-original",
+          "title": "Origin",
+          "type": "string"
+        },
+        "author": {
+          "const": "ATME project",
+          "title": "Author",
+          "type": "string"
+        },
+        "created_for": {
+          "const": "ATME Paper & Ink v2",
+          "title": "Created For",
+          "type": "string"
+        },
+        "derivative_of_reference_art": {
+          "const": false,
+          "title": "Derivative Of Reference Art",
+          "type": "boolean"
+        },
+        "license": {
+          "const": "ATME-project",
+          "title": "License",
+          "type": "string"
+        }
+      },
+      "required": [
+        "origin",
+        "author",
+        "created_for",
+        "derivative_of_reference_art",
+        "license"
+      ],
+      "title": "AssetProvenance",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract": {
+      "const": "atme.paper-ink-assets",
+      "title": "Contract",
+      "type": "string"
+    },
+    "version": {
+      "const": "2.0.0",
+      "title": "Version",
+      "type": "string"
+    },
+    "registry_id": {
+      "const": "atme-assets-v2",
+      "title": "Registry Id",
+      "type": "string"
+    },
+    "style_version": {
+      "const": "2.0.0",
+      "title": "Style Version",
+      "type": "string"
+    },
+    "style_system_id": {
+      "const": "atme-style-v2",
+      "title": "Style System Id",
+      "type": "string"
+    },
+    "assets": {
+      "items": {
+        "$ref": "#/$defs/AssetEntry"
+      },
+      "minItems": 16,
+      "title": "Assets",
+      "type": "array"
+    }
+  },
+  "required": [
+    "contract",
+    "version",
+    "registry_id",
+    "style_version",
+    "style_system_id",
+    "assets"
+  ],
+  "title": "AssetRegistry",
+  "type": "object"
+}

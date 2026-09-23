@@ -1,0 +1,228 @@
+{
+  "contract_version": "2.0.0",
+  "layout_id": "layout-rich",
+  "project_id": 1,
+  "project_revision": 4,
+  "plan_id": "plan-rich",
+  "plan_revision": 4,
+  "plan_sha256": "ca5d463c3ff429b712529197742a2337d40e7f935ce03ca7d6e8b1ec20aa31c8",
+  "output_profile": {
+    "profile_id": "LONG_FORM_16_9",
+    "width": 1280,
+    "height": 720,
+    "fps": 30
+  },
+  "style_system_version": "atme-style-v2",
+  "asset_registry_version": "atme-assets-v2",
+  "canvas": {
+    "x": 0,
+    "y": 0,
+    "width": 1280,
+    "height": 720
+  },
+  "boards": [
+    {
+      "board_id": "board-main",
+      "template": "evidence_annotation",
+      "object_ids": [
+        "object-system",
+        "object-label",
+        "object-evidence"
+      ],
+      "persistence_policy": "returnable",
+      "density_limit": 6,
+      "creation_reason": "Establish and develop one persistent mental model",
+      "departure_reason": null,
+      "return_reason": "Return with evidence",
+      "expected_prior_state": null,
+      "activation_policy": "returnable",
+      "aspect_composition": {
+        "LONG_FORM_16_9": "left model, right evidence",
+        "SHORT_FORM_9_16": "stack model above evidence"
+      }
+    }
+  ],
+  "objects": [
+    {
+      "board_id": "board-main",
+      "z_index": 1,
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "scale_x": 1,
+        "scale_y": 1,
+        "rotation_degrees": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "opacity": 1,
+      "visible": false,
+      "style": {
+        "stroke": "ink.primary",
+        "fill": "surface.raised",
+        "text": null,
+        "effect": null
+      },
+      "anchors": [
+        {
+          "anchor_id": "center",
+          "point": {
+            "x": 0.5,
+            "y": 0.5
+          }
+        }
+      ],
+      "parent_id": null,
+      "clip_id": null,
+      "initial_state": "hidden",
+      "asset_id": null,
+      "object_id": "object-system",
+      "beat_id": "beat-001",
+      "semantic_role": "System boundary",
+      "object_type": "rounded_rectangle",
+      "geometry": {
+        "bounds": {
+          "x": 80,
+          "y": 160,
+          "width": 480,
+          "height": 340
+        },
+        "points": [],
+        "corner_radius": 24
+      },
+      "description": "Main system",
+      "coverage_ids": [
+        "coverage-1"
+      ],
+      "path_data": null
+    },
+    {
+      "board_id": "board-main",
+      "z_index": 2,
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "scale_x": 1,
+        "scale_y": 1,
+        "rotation_degrees": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "opacity": 1,
+      "visible": false,
+      "style": {
+        "stroke": null,
+        "fill": null,
+        "text": "text.heading",
+        "effect": null
+      },
+      "anchors": [
+        {
+          "anchor_id": "center",
+          "point": {
+            "x": 0.5,
+            "y": 0.5
+          }
+        }
+      ],
+      "parent_id": null,
+      "clip_id": null,
+      "initial_state": "hidden",
+      "asset_id": null,
+      "object_id": "object-label",
+      "beat_id": "beat-001",
+      "semantic_role": "System label",
+      "object_type": "text",
+      "geometry": {
+        "bounds": {
+          "x": 140,
+          "y": 210,
+          "width": 320,
+          "height": 80
+        },
+        "points": [],
+        "corner_radius": null
+      },
+      "description": "Short label",
+      "coverage_ids": [
+        "coverage-2"
+      ],
+      "text": "THE SYSTEM",
+      "items": []
+    },
+    {
+      "board_id": "board-main",
+      "z_index": 3,
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "scale_x": 1,
+        "scale_y": 1,
+        "rotation_degrees": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "opacity": 1,
+      "visible": false,
+      "style": {
+        "stroke": "ink.primary",
+        "fill": "surface.raised",
+        "text": null,
+        "effect": null
+      },
+      "anchors": [
+        {
+          "anchor_id": "center",
+          "point": {
+            "x": 0.5,
+            "y": 0.5
+          }
+        }
+      ],
+      "parent_id": null,
+      "clip_id": null,
+      "initial_state": "hidden",
+      "asset_id": "asset-evidence",
+      "object_id": "object-evidence",
+      "beat_id": "beat-002",
+      "semantic_role": "Proof",
+      "object_type": "evidence",
+      "geometry": {
+        "bounds": {
+          "x": 680,
+          "y": 130,
+          "width": 500,
+          "height": 420
+        },
+        "points": [],
+        "corner_radius": 12
+      },
+      "description": "Cropped source evidence",
+      "coverage_ids": [
+        "coverage-3"
+      ],
+      "variant": "annotated_crop"
+    }
+  ],
+  "activations": [
+    {
+      "activation_id": "activation-1",
+      "board_id": "board-main",
+      "start_ms": 0,
+      "end_ms": 10000,
+      "reason": "Persistent board for the full explanation"
+    }
+  ]
+}
