@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A and 3B independent PASS; Phase 3 remains incomplete
+Status: Slices 3A, 3B, and 3C independent PASS; Phase 3 remains incomplete
 
 Date: 2026-09-23
 
@@ -27,6 +27,12 @@ Date: 2026-09-23
   objects, ignored fields, and the distinct draw/write/progressive-reveal effects. The PNG API
   loads verified packaged font files and disables system-font fallback. This is a
   limited compositor path, not the project's preview/export implementation.
+- Slice 3C adds pinned original-registry artwork for explicitly selected icon, pictogram,
+  character, device, document, chart, and terminal illustrations. All sixteen bundled assets
+  are independently composited and raster-tested inside authored bounds. The bundle checksum
+  is rechecked at composition; invalid family/type selection and overridden illustration
+  styling fail. Arbitrary project images, video, evidence, and data-driven charts remain
+  unsupported.
 - No audio events are produced by the kernel. The full 35-type primitive/container
   compositor, asset/media resolution, remaining canonical action verbs, camera/board composition,
   and real project preview/export dispatcher are still required.
@@ -43,6 +49,10 @@ Date: 2026-09-23
 - Full sidecar regression: passed after Slice 3B (2026-09-23).
 - Slice 3B focused SVG/raster tests: 21 passed; 51 combined frame-state/compositor tests passed.
 - Independent Slice 3B decision: PASS for the declared primitive subset; not full Phase 3.
+- Slice 3C focused illustration tests: 38 passed; 119 combined Phase 2/3 renderer tests passed.
+- Independent Slice 3C decision: PASS for verified bundled illustrations and the strict SVG subset;
+  not full Phase 3. The auditor separately rechecked the nested-viewport hardening. The full
+  sidecar regression passed against the finalized Slice 3C files (2026-09-23).
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import html
+import math
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -68,26 +70,78 @@ def contrast_ratio(a: str, b: str) -> float:
     return (max(left, right) + 0.05) / (min(left, right) + 0.05)
 
 
-def _validate_svg(path: Path, expected_view_box: tuple[int, int, int, int]) -> None:
+_SVG_NS = "http://www.w3.org/2000/svg"
+_SVG_ATTRIBUTES = {
+    "svg": {"viewBox"},
+    "g": {"fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin"},
+    "path": {"d", "fill", "stroke", "stroke-width"},
+    "circle": {"cx", "cy", "r", "fill", "stroke"},
+    "rect": {"x", "y", "width", "height", "rx", "fill", "stroke"},
+}
+_PAINT_TOKENS = {"paper", "ink", "muted", "accent", "accent-soft"}
+_PATH_DATA = re.compile(r"^[MmLlHhVvCcSsQqTtAaZz0-9+.,\-eE\s]+$")
+
+
+def _validate_svg(path: Path, expected_view_box: tuple[int, int, int, int]) -> ET.Element:
+    """Parse only the static SVG subset used by pinned ATME originals."""
+    if path.stat().st_size > 256 * 1024:
+        raise StyleBundleError(f"oversized SVG resource: {path.name}")
     text = path.read_text(encoding="utf-8")
-    lowered = text.lower()
-    if any(token in lowered for token in ("<script", "<image", "<foreignobject", "javascript:")):
-        raise StyleBundleError(f"unsafe SVG content: {path.name}")
-    if re.search(r"(?:href|src)\s*=\s*['\"](?:https?:|//)", lowered):
-        raise StyleBundleError(f"external SVG reference: {path.name}")
+    if "<!doctype" in text.casefold() or "<!entity" in text.casefold():
+        raise StyleBundleError(f"DTD or entity in SVG resource: {path.name}")
     try:
         root = ET.fromstring(text)
     except ET.ParseError as exc:
         raise StyleBundleError(f"invalid SVG: {path.name}") from exc
-    if root.tag != "{http://www.w3.org/2000/svg}svg":
+    if root.tag != f"{{{_SVG_NS}}}svg":
         raise StyleBundleError(f"resource is not SVG: {path.name}")
-    actual_view_box = root.attrib.get("viewBox")
-    if actual_view_box != " ".join(str(value) for value in expected_view_box):
+    if root.attrib.get("viewBox") != " ".join(str(value) for value in expected_view_box):
         raise StyleBundleError(f"asset viewBox does not match registry: {path.name}")
-    allowed_vars = {"var(--paper)", "var(--ink)", "var(--muted)", "var(--accent)", "var(--accent-soft)"}
-    found = set(re.findall(r"var\(--[a-z-]+\)", text))
-    if not found.issubset(allowed_vars):
-        raise StyleBundleError(f"unknown SVG style token in {path.name}: {sorted(found - allowed_vars)}")
+    stack = [(root, 0)]
+    node_count = 0
+    while stack:
+        element, depth = stack.pop()
+        node_count += 1
+        if depth > 32 or node_count > 4096:
+            raise StyleBundleError(f"SVG resource exceeds structural limits: {path.name}")
+        if element is not root and element.tag == f"{{{_SVG_NS}}}svg":
+            raise StyleBundleError(f"nested SVG viewport is not allowed: {path.name}")
+        stack.extend((child, depth + 1) for child in element)
+    for element in root.iter():
+        if not isinstance(element.tag, str) or not element.tag.startswith(f"{{{_SVG_NS}}}"):
+            raise StyleBundleError(f"foreign or unsupported SVG element: {path.name}")
+        tag = element.tag.removeprefix(f"{{{_SVG_NS}}}")
+        allowed = _SVG_ATTRIBUTES.get(tag)
+        if allowed is None or set(element.attrib) - allowed:
+            raise StyleBundleError(f"unsafe SVG element or attribute: {path.name}")
+        if (element.text and element.text.strip()) or (element.tail and element.tail.strip()):
+            raise StyleBundleError(f"text content is not allowed in asset SVG: {path.name}")
+        for name, value in element.attrib.items():
+            if name in ("fill", "stroke"):
+                if value != "none" and not (
+                    value.startswith("var(--") and value.endswith(")")
+                    and value[6:-1] in _PAINT_TOKENS
+                ):
+                    raise StyleBundleError(f"unapproved SVG paint: {path.name}")
+            elif name in ("stroke-linecap", "stroke-linejoin"):
+                values = {"round", "butt", "square"} if name == "stroke-linecap" else {"round", "bevel", "miter"}
+                if value not in values:
+                    raise StyleBundleError(f"unapproved SVG stroke setting: {path.name}")
+            elif name == "d":
+                if not value or len(value) > 100_000 or not _PATH_DATA.fullmatch(value):
+                    raise StyleBundleError(f"unapproved SVG path data: {path.name}")
+            elif name != "viewBox":
+                try:
+                    numeric = float(value)
+                except ValueError as exc:
+                    raise StyleBundleError(f"non-numeric SVG geometry: {path.name}") from exc
+                if not math.isfinite(numeric) or abs(numeric) > 100_000:
+                    raise StyleBundleError(f"out-of-range SVG geometry: {path.name}")
+                if name in ("width", "height", "r", "stroke-width") and numeric <= 0:
+                    raise StyleBundleError(f"non-positive SVG geometry: {path.name}")
+                if name == "rx" and numeric < 0:
+                    raise StyleBundleError(f"negative SVG radius: {path.name}")
+    return root
 
 
 @lru_cache(maxsize=1)
@@ -141,13 +195,30 @@ def _font_css(style: PaperInkStyle, root: Path) -> str:
     return "".join(rules)
 
 
-def _asset_inner(path: Path, colors: dict[str, str]) -> str:
-    text = path.read_text(encoding="utf-8")
-    inner = re.sub(r"^\s*<svg[^>]*>", "", text, count=1)
-    inner = re.sub(r"</svg>\s*$", "", inner, count=1)
-    for token in ("paper", "ink", "muted", "accent", "accent-soft"):
-        inner = inner.replace(f"var(--{token})", colors[token])
-    return inner
+def _asset_inner(path: Path, colors: dict[str, str], view_box: tuple[int, int, int, int]) -> str:
+    root = _validate_svg(path, view_box)
+
+    def emit(element: ET.Element) -> str:
+        tag = element.tag.removeprefix(f"{{{_SVG_NS}}}")
+        attributes = []
+        for key, value in element.attrib.items():
+            if key in ("fill", "stroke") and value != "none":
+                value = colors[value[6:-1]]
+            attributes.append(f' {key}="{html.escape(value, quote=True)}"')
+        children = "".join(emit(child) for child in element)
+        return f'<{tag}{"".join(attributes)}>{children}</{tag}>'
+
+    return "".join(emit(child) for child in root)
+
+
+def verified_asset_svg(asset_id: str):
+    """Return a pinned original illustration for v2 composition, rechecking its bytes."""
+    style, registry, root = load_bundle()
+    asset = next((item for item in registry.assets if item.id == asset_id), None)
+    if asset is None:
+        raise StyleBundleError(f"unknown Paper & Ink asset: {asset_id}")
+    path = _verified_file(root, asset.file, asset.sha256)
+    return asset, _asset_inner(path, style.colors, asset.view_box)
 
 
 def asset_matrix_svg(profile: str = "landscape-16:9") -> str:
@@ -172,7 +243,7 @@ def asset_matrix_svg(profile: str = "landscape-16:9") -> str:
         ty = y + 4
         path = _verified_file(root, asset.file, asset.sha256)
         body.append(f'<g transform="translate({tx:.2f} {ty:.2f}) scale({scale:.5f})">'
-                    f'{_asset_inner(path, style.colors)}</g>')
+                    f'{_asset_inner(path, style.colors, asset.view_box)}</g>')
         body.append(f'<text x="{x + cell_w / 2:.2f}" y="{y + cell_h - 6:.2f}" '
                     f'text-anchor="middle" font-family="{display_family}" font-weight="700" '
                     f'font-size="{style.typography.label.size_px}" fill="{style.colors["ink"]}">{asset.id}</text>')

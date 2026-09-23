@@ -16,9 +16,18 @@ from pathlib import Path
 
 from PIL import ImageFont
 
-from atme.render.style_bundle import _font_css, resolve_contract_bundle
+from atme.render.style_bundle import (
+    _font_css,
+    resolve_contract_bundle,
+    verified_asset_svg,
+)
 from atme.render.v2_state import FrameObject, evaluate_frame
-from atme.store.contracts_v2 import ExecutableLayoutV2, MarkObject, TextObject
+from atme.store.contracts_v2 import (
+    ExecutableLayoutV2,
+    MarkObject,
+    TextObject,
+    VisualObject,
+)
 
 
 class UnsupportedVisualObject(ValueError):
@@ -27,6 +36,17 @@ class UnsupportedVisualObject(ValueError):
 
 SUPPORTED_MARKS = frozenset({"line", "rectangle", "rounded_rectangle", "ellipse", "polygon"})
 SUPPORTED_TEXT = frozenset({"text", "list"})
+SUPPORTED_REGISTRY_VISUALS = {
+    "icon": frozenset({"people", "gestures", "devices", "documents", "networks",
+                       "charts", "technical-frames", "abstract-metaphors"}),
+    "pictogram": frozenset({"people", "gestures", "devices", "documents", "networks",
+                            "charts", "technical-frames", "abstract-metaphors"}),
+    "character": frozenset({"people"}),
+    "device": frozenset({"devices"}),
+    "document": frozenset({"documents"}),
+    "chart": frozenset({"charts"}),
+    "terminal": frozenset({"technical-frames"}),
+}
 
 
 @dataclass(frozen=True)
@@ -169,7 +189,24 @@ def _text_role(obj: TextObject, style):
     return roles[token]
 
 
-def _object_markup(obj: MarkObject | TextObject, state: FrameObject, style,
+def _registry_visual(obj: VisualObject) -> str:
+    if not obj.variant:
+        raise UnsupportedVisualObject(f"v2 visual {obj.object_id} must select an original registry variant")
+    asset, inner = verified_asset_svg(obj.variant)
+    allowed = SUPPORTED_REGISTRY_VISUALS[obj.object_type]
+    if asset.family not in allowed:
+        raise UnsupportedVisualObject(
+            f"v2 {obj.object_type} {obj.object_id} cannot use {asset.family} asset {asset.id}"
+        )
+    bounds = obj.geometry.bounds
+    view_width, view_height = asset.view_box[2:4]
+    return (f'<svg x="{_n(bounds.x)}" y="{_n(bounds.y)}" '
+            f'width="{_n(bounds.width)}" height="{_n(bounds.height)}" '
+            f'viewBox="0 0 {view_width} {view_height}" preserveAspectRatio="xMidYMid meet">'
+            f'{inner}</svg>')
+
+
+def _object_markup(obj: MarkObject | TextObject | VisualObject, state: FrameObject, style,
                    root: Path, scale: float) -> str:
     if not state.visible or state.opacity <= 0 or state.reveal_fraction <= 0:
         return ""
@@ -185,12 +222,14 @@ def _object_markup(obj: MarkObject | TextObject, state: FrameObject, style,
         stroke = _color(obj.style.stroke, style.colors, default=style.colors["ink"])
         fill = _color(obj.style.fill, style.colors, default="none")
         inner = _shape(obj, stroke, fill, style.strokes.regular_px * scale)
-    else:
+    elif isinstance(obj, TextObject):
         color = _color(obj.style.text, style.colors, default=style.colors["ink"])
         role = _text_role(obj, style)
         font = next(font for font in style.fonts if font.id == role.font_id)
         inner = _text(obj, color, font.family, font.weight, role.size_px * scale, role.line_height,
                       role.max_characters_per_line, root / font.file)
+    else:
+        inner = _registry_visual(obj)
     # Reveal is clipped in canvas coordinates inside the transformed local group.
     clip = ""
     if state.reveal_fraction < 1:
@@ -199,7 +238,8 @@ def _object_markup(obj: MarkObject | TextObject, state: FrameObject, style,
             f'transform="{transform}" opacity="{_n(state.opacity)}"{clip}>{inner}</g>')
 
 
-def _preflight_object(obj: MarkObject | TextObject, style, root: Path, scale: float) -> None:
+def _preflight_object(obj: MarkObject | TextObject | VisualObject,
+                      style, root: Path, scale: float) -> None:
     _xml_escape(obj.object_id)
     if obj.parent_id or obj.clip_id or obj.style.effect or obj.asset_id:
         raise UnsupportedVisualObject(
@@ -211,7 +251,7 @@ def _preflight_object(obj: MarkObject | TextObject, style, root: Path, scale: fl
         stroke = _color(obj.style.stroke, style.colors, default=style.colors["ink"])
         fill = _color(obj.style.fill, style.colors, default="none")
         _shape(obj, stroke, fill, style.strokes.regular_px * scale)
-    else:
+    elif isinstance(obj, TextObject):
         if (obj.style.stroke or obj.style.fill or obj.geometry.points
                 or obj.geometry.corner_radius is not None
                 or obj.items and obj.object_type != "list"):
@@ -221,6 +261,13 @@ def _preflight_object(obj: MarkObject | TextObject, style, root: Path, scale: fl
         font = next(font for font in style.fonts if font.id == role.font_id)
         _text(obj, color, font.family, font.weight, role.size_px * scale, role.line_height,
               role.max_characters_per_line, root / font.file)
+    else:
+        if (obj.style.stroke or obj.style.fill or obj.style.text
+                or obj.geometry.points or obj.geometry.corner_radius is not None):
+            raise UnsupportedVisualObject(
+                f"v2 visual {obj.object_id} cannot override pinned illustration style or geometry"
+            )
+        _registry_visual(obj)
 
 
 def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int) -> SVGFrame:
@@ -235,7 +282,9 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
             )
     unsupported = [obj for obj in layout.objects
                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_MARKS
-                           or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_TEXT)]
+                           or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_TEXT
+                           or isinstance(obj, VisualObject)
+                           and obj.object_type in SUPPORTED_REGISTRY_VISUALS)]
     if unsupported:
         first = unsupported[0]
         raise UnsupportedVisualObject(

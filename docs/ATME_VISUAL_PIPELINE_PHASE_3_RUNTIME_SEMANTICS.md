@@ -43,6 +43,20 @@ Phase 3 slices. Until then, the desktop and MCP capability must continue reporti
 - Easing is exact and deterministic: linear `p`, ease-in `p²`, ease-out `1-(1-p)²`, ease-in-out
   `p²(3-2p)`, and step `0` until completion then `1`, where `p` is clamped interval progress.
 
+## Bundled original-illustration slice
+
+The bounded Slice 3C compositor may select an ATME-original Paper & Ink illustration by the
+executable visual object's `variant`, matching an ID in the pinned v2 asset registry. It is not a
+project-imported `asset_id`; arbitrary images, video, evidence, data charts, and generated art
+remain unsupported. The exact registry bytes are checksum-verified again before composition,
+parsed into a narrow static SVG subset, and serialized from the validated tree. The authored
+geometry bounds the illustration, preserving its aspect ratio. Type/family matching is explicit:
+characters use people; devices use devices; documents use documents; static chart illustrations
+use charts; terminal illustrations use technical frames. Icon and pictogram may use any original
+registry family. Project-asset substitution, style overrides, and unsupported types block the
+entire layout even when the object is hidden at the sampled frame. This does not make the
+illustrations a director-selected, data-driven, or complete production asset system.
+
 ## Still to define and implement before Phase 3 exit
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be
