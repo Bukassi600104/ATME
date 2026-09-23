@@ -928,7 +928,9 @@ class ResolvedVisualTimelineV2(StrictModel):
                     raise ValueError(f"action {action.action_id} targets an object without initial state")
                 if states[target] == "removed" and action.verb not in ("return_board",):
                     raise ValueError(f"action {action.action_id} resurrects removed object {target}")
-            state_targets = ([action.connector_id] if isinstance(action, ConnectionAction)
+            # A camera observes objects; it does not mutate their semantic state.
+            state_targets = ([] if isinstance(action, CameraAction)
+                             else [action.connector_id] if isinstance(action, ConnectionAction)
                              else targets)
             for target in state_targets:
                 if action.expected_state is not None and states[target] != action.expected_state:

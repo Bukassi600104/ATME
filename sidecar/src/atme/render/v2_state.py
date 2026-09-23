@@ -11,6 +11,12 @@ import hashlib
 import json
 from dataclasses import dataclass, replace
 
+from atme.render.v2_camera import (
+    CameraViewport,
+    UnsupportedCamera,
+    camera_segments,
+    evaluate_camera,
+)
 from atme.render.v2_connector import UnsupportedConnector, validate_static_arrow
 from atme.render.v2_emphasis import (
     SUPPORTED_HIGHLIGHT_MARKS,
@@ -21,6 +27,7 @@ from atme.render.v2_emphasis import (
 )
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.store.contracts_v2 import (
+    CameraAction,
     ConnectionAction,
     ConnectorObject,
     ExecutableLayoutV2,
@@ -98,6 +105,7 @@ class FrameSnapshot:
     at_ms: int
     active_board_id: str | None
     objects: tuple[FrameObject, ...]
+    camera: CameraViewport
 
     def object(self, object_id: str) -> FrameObject:
         for item in self.objects:
@@ -448,6 +456,10 @@ def evaluate_frame(
     layout = ExecutableLayoutV2.model_validate(layout_document)
     timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
     _validate_pair(layout, timeline, layout_sha256)
+    try:
+        camera_plan = camera_segments(layout, timeline)
+    except UnsupportedCamera as exc:
+        raise V2FrameError(str(exc)) from exc
     if type(at_ms) is not int or not 0 <= at_ms < timeline.duration_ms:
         raise V2FrameError("frame time must be an integer within the resolved timeline")
 
@@ -470,7 +482,7 @@ def evaluate_frame(
     for resolved in timeline.actions:
         action = resolved.action
         supported = (
-            isinstance(action, (TransformAction, ConnectionAction))
+            isinstance(action, (TransformAction, ConnectionAction, CameraAction))
             or isinstance(action, TargetAction) and action.verb in {
                 "reveal", "write", "draw", "enter", "exit", "progressive_reveal", "highlight",
                 "cross_out",
@@ -482,6 +494,8 @@ def evaluate_frame(
             raise UnsupportedVisualAction(
                 f"v2 action {action.action_id} uses {action.verb}, which has no frame implementation"
             )
+        if isinstance(action, CameraAction):
+            continue
         if at_ms < resolved.start_ms:
             continue
         progress = _ease(
@@ -553,11 +567,15 @@ def evaluate_frame(
                 )
             current[object_id] = after
 
-    active_board = next((item.board_id for item in layout.activations
-                         if item.start_ms <= at_ms < item.end_ms), None)
+    activation = next((item for item in layout.activations
+                       if item.start_ms <= at_ms < item.end_ms), None)
+    active_board = activation.board_id if activation else None
+    camera = evaluate_camera(layout, camera_plan, at_ms,
+                             activation.activation_id if activation else None, _ease)
     ordered = tuple(
         replace(current[obj.object_id],
                 visible=current[obj.object_id].visible and obj.board_id == active_board)
         for obj in sorted(layout.objects, key=lambda item: (item.z_index, item.object_id))
     )
-    return FrameSnapshot(at_ms=at_ms, active_board_id=active_board, objects=ordered)
+    return FrameSnapshot(at_ms=at_ms, active_board_id=active_board,
+                         objects=ordered, camera=camera)

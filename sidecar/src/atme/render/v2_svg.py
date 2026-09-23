@@ -616,8 +616,10 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
         body.append(_object_markup(obj, state, style, root, scale_x,
                                    active_verbs.get(state.object_id), objects, states))
     width, height = layout.output_profile.width, layout.output_profile.height
+    viewport = snapshot.camera
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
-           f'viewBox="{_n(layout.canvas.x)} {_n(layout.canvas.y)} {width} {height}">'
+           f'viewBox="{_n(viewport.x)} {_n(viewport.y)} '
+           f'{_n(viewport.width)} {_n(viewport.height)}">'
            f'<defs><style>{_font_css(style, root)}</style>'
            f'{"".join(definitions)}</defs>'
            f'{"".join(body)}</svg>')

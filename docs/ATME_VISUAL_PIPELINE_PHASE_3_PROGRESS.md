@@ -1,6 +1,7 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3M independent PASS; Phase 3 remains incomplete
+Status: Slices 3A–3N independent PASS;
+Phase 3 remains incomplete
 
 Date: 2026-09-23
 
@@ -20,6 +21,14 @@ Date: 2026-09-23
   malformed pairings, non-finite input, overlap, and unsupported actions.
 
 ## Incomplete Phase 3 gates
+
+- Slice 3N adds bounded purposeful-camera mechanics for all five canonical camera verbs.
+  Target geometry and completed transforms define a canvas-bounded, aspect-preserving viewport;
+  cut/hold are immediate, while pan/zoom/reframe use deterministic eased interpolation.
+  Camera actions do not mutate target semantic state, and SVG/PNG use the same viewport.
+  Invalid target visibility, incompatible geometry, overlapping camera windows or focus edits,
+  and impossible framing fail closed. This is not an automatic director or a production
+  preview/export integration.
 
 - Slice 3B now emits SVG and a tested resvg PNG frame for five geometric mark types and
   text/list objects. It measures text against the pinned font, scales style tokens to the
@@ -163,6 +172,11 @@ Date: 2026-09-23
   Ruff, and targeted v1/offline-render regressions passed. The full sidecar regression passed
   with exit code 0 against finalized Slice 3M files (2026-09-23). This is not full Phase 3
   or installed-app acceptance.
+- Slice 3N: independent bounded audit PASS after all five camera verbs, transformed and
+  portrait target geometry, random seeks, SVG/PNG parity, framing mismatch, safe-area,
+  overlap and invalid-target guards were verified. The auditor's focused state/compositor
+  set passed 73 tests, Ruff passed, and 14 targeted v1 render/checkpoint/offline tests
+  passed. This is not full Phase 3 or installed-app acceptance.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.

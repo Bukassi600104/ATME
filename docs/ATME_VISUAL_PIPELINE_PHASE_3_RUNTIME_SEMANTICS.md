@@ -184,12 +184,48 @@ registry family. Project-asset substitution, style overrides, and unsupported ty
 entire layout even when the object is hidden at the sampled frame. This does not make the
 illustrations a director-selected, data-driven, or complete production asset system.
 
+## Bounded deterministic camera framing
+
+Slice 3N executes `camera_hold`, `camera_cut`, `camera_pan`, `camera_zoom`, and
+`camera_reframe` for fully revealed, visible, nonzero-opacity, supported objects
+on one active board. Camera actions observe their targets; they do not change
+object semantic state. Authored target geometry, including completed position,
+scale, and rotation, is evaluated at the camera action boundary. The union of
+target bounds determines a 16:9 or 9:16 aspect-preserving viewport. Pinned
+framing occupancy is wide 42%, medium 60%, close 78%, detail 90%, and safe-area
+52% preferred. Large targets may force a wider shot, and an edge-constrained
+safe-area shot may tighten only while its required inset remains intact. The viewport
+must remain within the output canvas and contain its focus at the destination.
+The viewport is never narrower than 30% of the canvas, preventing tiny marks
+from becoming oversized full-screen graphics. `safe_area` additionally requires
+the entire focus to remain inside an 8%-of-viewport inset on all four sides;
+edge-constrained focus that cannot meet it fails.
+
+`hold` preserves the current viewport and `cut` switches instantly at its start;
+both require step easing. `pan` changes center while keeping zoom fixed, `zoom`
+changes size around a fixed center, and `reframe` changes center and size; these
+require continuous easing and visible movement. The camera retains its final
+viewport after an action, resets at a new board activation, and is reconstructed
+from the immutable timeline on every random seek. Camera actions must be
+non-overlapping and wholly contained within one board activation. Concurrent
+transform, visibility, or reveal changes of a focus object are rejected rather
+than guessed. A hold or pan whose declared framing implies a different scale
+from the current viewport fails rather than silently ignoring that field.
+Unsupported targets or impossible framing fail closed. The SVG
+viewBox and PNG raster share this exact viewport.
+
+This implements camera mechanics for the bounded compositor, not automatic
+camera direction, final project preview/export wiring, or a complete safe-area
+quality gate. `movement_purpose` is preserved in the frame but does not by itself
+choose a shot; the external visual director remains responsible for authored
+camera decisions.
+
 ## Still to define and implement before Phase 3 exit
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be
 fixed before their first runtime implementation: `replace`, `morph`, `annotate`,
 `group`, `ungroup`, `split`, `count`,
-`insert_evidence`, `return_board`, all five camera verbs, and sound state/events. In particular,
+`insert_evidence`, `return_board`, and sound state/events. In particular,
 the contract needs explicit rules for morph compatibility, dynamic group ownership, split result
 mapping, isolate restoration, and ordered progressive disclosure. Audible mixing remains Phase 7;
 Phase 3 must at least expose deterministic sound events at the correct resolved times.
