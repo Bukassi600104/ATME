@@ -12,11 +12,18 @@ import json
 from dataclasses import dataclass, replace
 
 from atme.render.v2_connector import UnsupportedConnector, validate_static_arrow
+from atme.render.v2_emphasis import (
+    SUPPORTED_HIGHLIGHT_MARKS,
+    SUPPORTED_HIGHLIGHT_TEXT,
+    UnsupportedEmphasis,
+    emphasis_path,
+)
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.store.contracts_v2 import (
     ConnectionAction,
     ConnectorObject,
     ExecutableLayoutV2,
+    MarkObject,
     ResolvedVisualTimelineV2,
     TargetAction,
     TextObject,
@@ -67,6 +74,7 @@ class FrameObject:
     opacity: float
     reveal_fraction: float
     transform: FrameTransform
+    emphasis_fraction: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -147,6 +155,7 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                 f"managed connector {connector_id} has inconsistent initial relationship visibility"
             )
     last_target_end: dict[str, int] = {}
+    highlighted_targets: set[str] = set()
     completed_transform = {
         object_id: FrameTransform.from_contract(obj.transform)
         for object_id, obj in layout_objects.items()
@@ -187,7 +196,36 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             if any(layout_objects[target].board_id != item.action.board_id
                    for target in item.action.target_ids):
                 raise V2FrameError(f"action {item.action.action_id} crosses board ownership")
+            if (isinstance(item.action, TargetAction) and item.action.verb == "highlight"
+                    and not any(activation.board_id == item.action.board_id
+                                and activation.start_ms <= item.start_ms
+                                and item.end_ms <= activation.end_ms
+                                for activation in layout.activations)):
+                raise V2FrameError(f"highlight {item.action.action_id} needs an active board")
             for target in item.action.target_ids:
+                if target in highlighted_targets:
+                    raise V2FrameError(f"highlighted target {target} cannot receive another action")
+                if isinstance(item.action, TargetAction) and item.action.verb == "highlight":
+                    obj = layout_objects[target]
+                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
+                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT):
+                        raise V2FrameError(
+                            f"highlight {item.action.action_id} needs a supported mark or text target"
+                        )
+                    if (not initial[target].visible or initial[target].state != "visible"
+                            or obj.opacity <= 0 or target in last_target_end):
+                        raise V2FrameError(
+                            f"highlight {item.action.action_id} needs an untouched visible target"
+                        )
+                    if (item.action.expected_state, item.action.post_state) != ("visible", "highlighted"):
+                        raise V2FrameError(
+                            f"highlight {item.action.action_id} needs canonical visible-to-highlighted states"
+                        )
+                    try:
+                        emphasis_path(obj.geometry.bounds, "highlight")
+                    except UnsupportedEmphasis as exc:
+                        raise V2FrameError(str(exc)) from exc
+                    highlighted_targets.add(target)
                 if isinstance(item.action, TargetAction) and item.action.verb == "progressive_reveal":
                     obj = layout_objects[target]
                     if not isinstance(obj, TextObject):
@@ -288,7 +326,7 @@ def evaluate_frame(
         supported = (
             isinstance(action, (TransformAction, ConnectionAction))
             or isinstance(action, TargetAction) and action.verb in {
-                "reveal", "write", "draw", "enter", "exit", "progressive_reveal",
+                "reveal", "write", "draw", "enter", "exit", "progressive_reveal", "highlight",
             }
         )
         if not supported:
@@ -320,6 +358,10 @@ def evaluate_frame(
                     after = replace(before, state=state, visible=True,
                                     opacity=_mix(0.0, 1.0, progress) * before.opacity,
                                     reveal_fraction=1.0)
+                elif action.verb == "highlight":
+                    if not before.visible or before.opacity <= 0 or before.reveal_fraction < 1:
+                        raise V2FrameError(f"highlight {action.action_id} has no visible target")
+                    after = replace(before, state=state, emphasis_fraction=progress)
                 else:
                     after = replace(before, state=state, visible=True,
                                     reveal_fraction=progress)

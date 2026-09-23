@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3I independent PASS; Phase 3 remains incomplete
+Status: Slices 3A–3J independent PASS; Phase 3 remains incomplete
 
 Date: 2026-09-23
 
@@ -62,8 +62,8 @@ Date: 2026-09-23
   curved accent stroke; the latter is a slightly asymmetric attention-color emphasis ring.
   Both use exact authored bounds, pinned style tokens, and stroke-progressive `draw` timing,
   with fill, injected path data, ignored points, and unknown color tokens rejected. These are
-  explicit visual objects, not execution of the still-unsupported `highlight` action or an
-  automatic attention director.
+  explicit visual objects, not by themselves execution of a `highlight` action or an
+  automatic attention director. A bounded target action follows in Slice 3J.
 - Slice 3I implements `progressive_reveal` only for an authored, initially hidden `list`
   text object with stored ordered items. The heading appears after progression begins; complete
   items arrive at eased equal fractions of the action window, without cropped glyphs or a
@@ -72,6 +72,13 @@ Date: 2026-09-23
   including Unicode line separators. Reusing a previously touched list or targeting a
   non-list object fails closed. The action requires canonical hidden→visible states. General
   ordered-child/group reveal is still unavailable.
+- Slice 3J implements a bounded `highlight` target action on an already-visible, untouched
+  supported mark or text object. It draws a deterministic attention ring over the target during
+  the action and leaves the underlying content visible and unchanged. The target must be on the
+  active board and declare the canonical visible→highlighted state transition. The completed
+  ring follows the target's existing transform and persists. Connectors, illustrations, hidden
+  or previously acted-on targets, and subsequent actions on that target fail closed. This is
+  one explicit attention cue, not dimming, isolation, or an automatic attention director.
 - No audio events are produced by the kernel. The full 35-type primitive/container
   compositor, asset/media resolution, remaining canonical action verbs, camera/board composition,
   and real project preview/export dispatcher are still required.
@@ -121,6 +128,10 @@ Date: 2026-09-23
   run, Ruff, and 13 targeted v1/offline-render regressions passed. The full sidecar regression
   passed with exit code 0 against the final state guard (2026-09-23). This is not a full Phase 3
   gate completion claim.
+- Slice 3J: independent bounded audit PASS after 79 focused highlight/emphasis/SVG/state
+  tests, Ruff, and 13 targeted v1/offline-render regressions. The full sidecar regression
+  passed with exit code 0 against finalized Slice 3J files (2026-09-23). No full Phase 3 or
+  installed-app claim follows.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.

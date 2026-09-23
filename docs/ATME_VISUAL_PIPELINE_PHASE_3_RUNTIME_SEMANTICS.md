@@ -1,6 +1,6 @@
 # Phase 3 v2 runtime semantics — kernel contract
 
-Status: Slices 3A–3I independent PASS; not a production-renderer capability declaration
+Status: Slices 3A–3J independent PASS; not a production-renderer capability declaration
 
 This document fixes the meanings implemented by the first deterministic frame-state kernel. It
 does not replace the v2 JSON contracts or authorize the v1 renderer to consume them. Real pixels,
@@ -91,8 +91,8 @@ Slice 3H supports two additional static mark object types in the bounded composi
 `underline` is a single curved accent stroke, and `highlight` is a slightly asymmetric
 attention-color ring. Their paths are constructed only from the authored object bounds and
 versioned Paper & Ink style tokens; both support the same path-length-based deterministic
-`draw` progression as other marks. They do not imply target linking or execute the separate
-`highlight` action. Extra points, injected path data, fill, text/effect styling, or unknown
+`draw` progression as other marks. They do not imply target linking or, by themselves, execute
+the separate `highlight` action added in Slice 3J. Extra points, injected path data, fill, text/effect styling, or unknown
 color tokens block the layout even when the mark is hidden.
 
 ## Ordered list disclosure
@@ -108,6 +108,19 @@ composited. No glyph cropping or generic clip is used. Non-list targets, empty o
 heading/items, line separators including Unicode, already visible or previously touched lists
 fail closed in both state evaluation and composition. This does not
 implement arbitrary ordered children, groups, camera reveal, or an automatic director.
+
+## Bounded target highlight
+
+Slice 3J gives `highlight` one explicit target-action meaning for the bounded compositor. It
+targets an already-visible, nonzero-opacity, previously untouched supported geometric/emphasis
+mark or text/list object on the active board, with `expected_state=visible` and
+`post_state=highlighted`. The authored action window must fit inside that board activation.
+The target's original content remains visible; a slightly asymmetric attention-color ring is
+drawn over its bounds by deterministic path-length progression and follows the target's
+existing transform. After completion the ring persists and the semantic state is `highlighted`.
+The target cannot receive later target or transform actions in this bounded slice. Connectors,
+registry illustrations, hidden targets, and unsupported geometry fail closed. This does not
+implement dimming, isolation, secondary-context choreography, or automatic direction.
 
 ## Bundled original-illustration slice
 
@@ -126,7 +139,7 @@ illustrations a director-selected, data-driven, or complete production asset sys
 ## Still to define and implement before Phase 3 exit
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be
-fixed before their first runtime implementation: `highlight`, `dim`, `isolate`,
+fixed before their first runtime implementation: `dim`, `isolate`,
 `replace`, `morph`, `cross_out`, `annotate`, `group`, `ungroup`, `split`, `count`,
 `insert_evidence`, `return_board`, all five camera verbs, and sound state/events. In particular,
 the contract needs explicit rules for morph compatibility, dynamic group ownership, split result

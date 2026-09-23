@@ -24,6 +24,12 @@ from atme.render.style_bundle import (
     verified_asset_svg,
 )
 from atme.render.v2_connector import UnsupportedConnector, validate_static_arrow
+from atme.render.v2_emphasis import (
+    SUPPORTED_HIGHLIGHT_MARKS,
+    SUPPORTED_HIGHLIGHT_TEXT,
+    UnsupportedEmphasis,
+    emphasis_path,
+)
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.render.v2_path import (
     MAX_COORDINATE,
@@ -48,11 +54,8 @@ class UnsupportedVisualObject(ValueError):
     """A scene object has no faithful v2 drawing implementation."""
 
 
-SUPPORTED_MARKS = frozenset({
-    "freehand", "line", "rectangle", "rounded_rectangle", "ellipse", "polygon",
-    "underline", "highlight",
-})
-SUPPORTED_TEXT = frozenset({"text", "list"})
+SUPPORTED_MARKS = SUPPORTED_HIGHLIGHT_MARKS
+SUPPORTED_TEXT = SUPPORTED_HIGHLIGHT_TEXT
 SUPPORTED_REGISTRY_VISUALS = {
     "icon": frozenset({"people", "gestures", "devices", "documents", "networks",
                        "charts", "technical-frames", "abstract-metaphors"}),
@@ -120,26 +123,9 @@ def _color(token: str | None, colors: dict[str, str], *, default: str) -> str:
 
 
 def _emphasis_path(obj: MarkObject):
-    bounds = obj.geometry.bounds
-    x, y, w, h = bounds.x, bounds.y, bounds.width, bounds.height
-
-    def point(x_fraction: float, y_fraction: float) -> str:
-        return f"{_n(x + w * x_fraction)} {_n(y + h * y_fraction)}"
-
-    if obj.object_type == "underline":
-        path = (f"M {point(0.04, 0.35)} Q {point(0.48, 0.82)} "
-                f"{point(0.96, 0.42)}")
-    else:
-        path = (
-            f"M {point(0.52, 0.04)} "
-            f"C {point(0.82, 0.02)} {point(0.96, 0.20)} {point(0.96, 0.51)} "
-            f"C {point(0.97, 0.78)} {point(0.73, 0.96)} {point(0.49, 0.95)} "
-            f"C {point(0.18, 0.97)} {point(0.04, 0.77)} {point(0.04, 0.48)} "
-            f"C {point(0.04, 0.20)} {point(0.25, 0.04)} {point(0.52, 0.04)}"
-        )
     try:
-        return parse_freehand_path(path, bounds)
-    except InvalidFreehandPath as exc:
+        return emphasis_path(obj.geometry.bounds, obj.object_type)
+    except UnsupportedEmphasis as exc:
         raise UnsupportedVisualObject(
             f"{obj.object_type} {obj.object_id} exceeds supported authored bounds"
         ) from exc
@@ -463,6 +449,21 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
                                  } else None)
     else:
         inner = _registry_visual(obj)
+    if state.emphasis_fraction > 0:
+        try:
+            emphasis = emphasis_path(bounds, "highlight")
+        except UnsupportedEmphasis as exc:
+            raise UnsupportedVisualObject(
+                f"highlight target {obj.object_id} exceeds supported authored bounds"
+            ) from exc
+        dash = ""
+        if state.emphasis_fraction < 1:
+            dash = (f' stroke-dasharray="{_n(emphasis.length)} {_n(emphasis.length)}" '
+                    f'stroke-dashoffset="{_n(emphasis.length * (1 - state.emphasis_fraction))}"')
+        inner += (f'<path data-attention-action="highlight" d="{emphasis.svg_d}" '
+                  f'fill="none" stroke="{style.colors["attention"]}" '
+                  f'stroke-width="{_n(style.strokes.emphasis_px * scale)}" '
+                  f'stroke-linecap="round" stroke-linejoin="round"{dash}/>')
     # Reveal is clipped in canvas coordinates inside the transformed local group.
     clip = ""
     if state.reveal_fraction < 1 and active_verb not in {
