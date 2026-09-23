@@ -203,6 +203,10 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                         raise V2FrameError(
                             f"action {item.action.action_id} requires a previously untouched hidden list"
                         )
+                    if (item.action.expected_state, item.action.post_state) != ("hidden", "visible"):
+                        raise V2FrameError(
+                            f"action {item.action.action_id} requires canonical hidden-to-visible list states"
+                        )
                 if item.start_ms < last_target_end.get(target, 0):
                     raise V2FrameError(f"overlapping actions on {target} need an explicit composition rule")
                 last_target_end[target] = item.end_ms

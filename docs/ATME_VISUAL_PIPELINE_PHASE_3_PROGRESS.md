@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3H independent PASS; Slice 3I under audit; Phase 3 remains incomplete
+Status: Slices 3A–3I independent PASS; Phase 3 remains incomplete
 
 Date: 2026-09-23
 
@@ -70,7 +70,8 @@ Date: 2026-09-23
   generic reveal rectangle. The full list is measured against the pinned font and authored
   bounds before the compositor returns a frame. State and SVG share one nonblank/single-line item gate,
   including Unicode line separators. Reusing a previously touched list or targeting a
-  non-list object fails closed. General ordered-child/group reveal is still unavailable.
+  non-list object fails closed. The action requires canonical hidden→visible states. General
+  ordered-child/group reveal is still unavailable.
 - No audio events are produced by the kernel. The full 35-type primitive/container
   compositor, asset/media resolution, remaining canonical action verbs, camera/board composition,
   and real project preview/export dispatcher are still required.
@@ -115,11 +116,11 @@ Date: 2026-09-23
   audit. The auditor also passed 13 targeted v1/offline-render regressions and found no bounded
   blocker. The full sidecar regression passed with exit code 0 against finalized Slice 3H
   files (2026-09-23); no installed-app or full Phase 3 claim follows.
-- Slice 3I: focused state/SVG/raster and malformed-list negative tests plus Ruff passed. The
-  auditor identified the blank/Unicode-line-break input gap, which is fixed through a shared
-  validator and retested; the re-audit could not complete because the auditor's usage limit
-  was reached. The full sidecar regression passed with exit code 0 (2026-09-23). Independent
-  PASS remains pending, so this is not a Phase 3 gate completion claim.
+- Slice 3I: the independent auditor passed the bounded gate after the blank/Unicode-line-break
+  and noncanonical completed-state gaps were fixed. Its final 82-test focused state/SVG/list
+  run, Ruff, and 13 targeted v1/offline-render regressions passed. The full sidecar regression
+  passed with exit code 0 against the final state guard (2026-09-23). This is not a full Phase 3
+  gate completion claim.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.

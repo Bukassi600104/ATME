@@ -96,6 +96,18 @@ def test_progressive_list_cannot_restart_after_an_earlier_action():
         evaluate_frame(layout, timeline, 0)
 
 
+@pytest.mark.parametrize("change", [
+    {"expected_state": None},
+    {"post_state": "hidden"},
+    {"post_state": "removed"},
+])
+def test_progressive_list_requires_canonical_hidden_to_visible_states(change):
+    layout, timeline = list_documents()
+    timeline["actions"][2]["action"].update(change)
+    with pytest.raises(V2FrameError, match="canonical hidden-to-visible list states"):
+        evaluate_frame(layout, timeline, 4900)
+
+
 @pytest.mark.parametrize("text,items", [
     ("Two\nheadings", ["One", "Two"]),
     ("Heading", ["One\ncontinued", "Two"]),

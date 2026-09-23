@@ -1,6 +1,6 @@
 # Phase 3 v2 runtime semantics — kernel contract
 
-Status: Slices 3A–3H independent PASS; Slice 3I under audit; not a production-renderer capability declaration
+Status: Slices 3A–3I independent PASS; not a production-renderer capability declaration
 
 This document fixes the meanings implemented by the first deterministic frame-state kernel. It
 does not replace the v2 JSON contracts or authorize the v1 renderer to consume them. Real pixels,
@@ -98,7 +98,9 @@ color tokens block the layout even when the mark is hidden.
 ## Ordered list disclosure
 
 Slice 3I gives `progressive_reveal` one bounded meaning: a hidden, previously untouched
-`list` text object with an authored heading and nonempty ordered `items`. The heading appears
+`list` text object with an authored heading and nonempty ordered `items`. Its action must declare
+`expected_state=hidden` and `post_state=visible`, so completed visibility and semantic state
+cannot disagree. The heading appears
 once action progress is positive. At eased fraction `p`, exactly `floor(p × item_count)` complete
 items are shown; the completed action shows all items. Each heading/item must be one line and
 the entire list must fit the authored bounds in the pinned body font before any frame is
