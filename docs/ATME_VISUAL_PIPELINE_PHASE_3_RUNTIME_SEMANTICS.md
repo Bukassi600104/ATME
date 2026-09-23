@@ -47,6 +47,17 @@ Phase 3 slices. Until then, the desktop and MCP capability must continue reporti
 - Easing is exact and deterministic: linear `p`, ease-in `p²`, ease-out `1-(1-p)²`, ease-in-out
   `p²(3-2p)`, and step `0` until completion then `1`, where `p` is clamped interval progress.
 
+## Bounded freehand geometry
+
+Slice 3E accepts a `freehand` mark as either a polyline with two or more authored geometry
+points or one continuous absolute M/L/Q/C path in `path_data`, never both. The M/L/Q/C grammar
+does not allow arbitrary SVG tags, attributes, relative commands, arcs, closures, or compound
+subpaths. Both forms are capped at 256 stroke segments. Quadratic/cubic strokes use
+fixed-segment deterministic length approximation for
+`draw` timing. Every authored point/control point must remain inside the object's bounds;
+unsupported/degenerate geometry blocks the entire layout even when hidden. This is a bounded
+hand-drawn shape, not a general vector import or a full path editor.
+
 ## Bundled original-illustration slice
 
 The bounded Slice 3C compositor may select an ATME-original Paper & Ink illustration by the

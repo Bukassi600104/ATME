@@ -12,6 +12,7 @@ import html
 import math
 from dataclasses import dataclass
 from functools import lru_cache
+from itertools import pairwise
 from pathlib import Path
 
 import regex
@@ -21,6 +22,12 @@ from atme.render.style_bundle import (
     _font_css,
     resolve_contract_bundle,
     verified_asset_svg,
+)
+from atme.render.v2_path import (
+    MAX_COORDINATE,
+    MAX_STROKE_LENGTH,
+    InvalidFreehandPath,
+    parse_freehand_path,
 )
 from atme.render.v2_state import FrameObject, evaluate_frame
 from atme.store.contracts_v2 import (
@@ -37,7 +44,7 @@ class UnsupportedVisualObject(ValueError):
     """A scene object has no faithful v2 drawing implementation."""
 
 
-SUPPORTED_MARKS = frozenset({"line", "rectangle", "rounded_rectangle", "ellipse", "polygon"})
+SUPPORTED_MARKS = frozenset({"freehand", "line", "rectangle", "rounded_rectangle", "ellipse", "polygon"})
 SUPPORTED_TEXT = frozenset({"text", "list"})
 SUPPORTED_REGISTRY_VISUALS = {
     "icon": frozenset({"people", "gestures", "devices", "documents", "networks",
@@ -108,7 +115,7 @@ def _color(token: str | None, colors: dict[str, str], *, default: str) -> str:
 def _shape(obj: MarkObject, stroke: str, fill: str, weight: float,
            draw_fraction: float | None = None) -> str:
     bounds = obj.geometry.bounds
-    if obj.object_type != "line" and obj.object_type != "polygon" and obj.geometry.points:
+    if obj.object_type not in {"freehand", "line", "polygon"} and obj.geometry.points:
         raise UnsupportedVisualObject(f"{obj.object_type} {obj.object_id} has ignored geometry points")
     if obj.object_type != "rounded_rectangle" and obj.geometry.corner_radius is not None:
         raise UnsupportedVisualObject(f"{obj.object_type} {obj.object_id} has ignored corner radius")
@@ -117,16 +124,45 @@ def _shape(obj: MarkObject, stroke: str, fill: str, weight: float,
     if (obj.object_type == "rounded_rectangle"
             and obj.geometry.corner_radius > min(bounds.width, bounds.height) / 2):
         raise UnsupportedVisualObject(f"rounded rectangle {obj.object_id} radius exceeds its bounds")
-    if obj.object_type == "line" and fill != "none":
-        raise UnsupportedVisualObject(f"line {obj.object_id} cannot use a fill")
+    if obj.object_type in {"freehand", "line"} and fill != "none":
+        raise UnsupportedVisualObject(f"{obj.object_type} {obj.object_id} cannot use a fill")
     x, y, w, h = (bounds.x, bounds.y, bounds.width, bounds.height)
     if any(not (x <= point.x <= x + w and y <= point.y <= y + h)
            for point in obj.geometry.points):
         raise UnsupportedVisualObject(f"mark {obj.object_id} points exceed authored bounds")
     if obj.object_type == "polygon" and len(obj.geometry.points) < 3:
         raise UnsupportedVisualObject(f"polygon {obj.object_id} requires at least three points")
+    if obj.object_type == "line" and obj.geometry.points and len(obj.geometry.points) != 2:
+        raise UnsupportedVisualObject(f"line {obj.object_id} requires exactly two points")
+    freehand = None
+    if obj.object_type == "freehand":
+        if obj.path_data and obj.geometry.points:
+            raise UnsupportedVisualObject(f"freehand {obj.object_id} cannot mix path data and points")
+        if obj.path_data:
+            try:
+                freehand = parse_freehand_path(obj.path_data, bounds)
+            except InvalidFreehandPath as exc:
+                raise UnsupportedVisualObject(f"freehand {obj.object_id}: {exc}") from exc
+            freehand_length = freehand.length
+        else:
+            if len(obj.geometry.points) < 2:
+                raise UnsupportedVisualObject(f"freehand {obj.object_id} requires a path or two points")
+            if len(obj.geometry.points) > 257:
+                raise UnsupportedVisualObject(f"freehand {obj.object_id} exceeds 256 line segments")
+            if any(abs(value) > MAX_COORDINATE for point in obj.geometry.points
+                   for value in (point.x, point.y)):
+                raise UnsupportedVisualObject(f"freehand {obj.object_id} coordinates exceed the supported range")
+            rendered_points = [(float(_n(point.x)), float(_n(point.y)))
+                               for point in obj.geometry.points]
+            freehand_length = sum(math.dist(a, b) for a, b in pairwise(rendered_points))
+            if not math.isfinite(freehand_length) or freehand_length > MAX_STROKE_LENGTH:
+                raise UnsupportedVisualObject(f"freehand {obj.object_id} length exceeds the supported range")
+        if freehand_length <= 0:
+            raise UnsupportedVisualObject(f"freehand {obj.object_id} has zero length")
     if draw_fraction is not None and draw_fraction < 1:
-        if obj.object_type == "line":
+        if obj.object_type == "freehand":
+            length = freehand_length
+        elif obj.object_type == "line":
             if obj.geometry.points:
                 a, b = obj.geometry.points
                 length = math.hypot(b.x - a.x, b.y - a.y)
@@ -153,10 +189,13 @@ def _shape(obj: MarkObject, stroke: str, fill: str, weight: float,
         draw_attributes = ""
     attributes = (f'fill="{fill}" stroke="{stroke}" stroke-width="{_n(weight)}" '
                   f'stroke-linecap="round" stroke-linejoin="round"{draw_attributes}')
+    if obj.object_type == "freehand":
+        if freehand:
+            return f'<path d="{freehand.svg_d}" {attributes}/>'
+        points = " ".join(f"{_n(p.x)},{_n(p.y)}" for p in obj.geometry.points)
+        return f'<polyline points="{points}" {attributes}/>'
     if obj.object_type == "line":
         if obj.geometry.points:
-            if len(obj.geometry.points) != 2:
-                raise UnsupportedVisualObject(f"line {obj.object_id} requires exactly two points")
             a, b = obj.geometry.points
             x1, y1, x2, y2 = a.x, a.y, b.x, b.y
         else:
@@ -283,7 +322,7 @@ def _preflight_object(obj: MarkObject | TextObject | VisualObject,
             f"v2 object {obj.object_id} requires unimplemented hierarchy, clip, effect, or asset composition"
         )
     if isinstance(obj, MarkObject):
-        if obj.path_data or obj.style.text:
+        if (obj.path_data and obj.object_type != "freehand") or obj.style.text:
             raise UnsupportedVisualObject(f"v2 mark {obj.object_id} has unimplemented path or text styling")
         stroke = _color(obj.style.stroke, style.colors, default=style.colors["ink"])
         fill = _color(obj.style.fill, style.colors, default="none")

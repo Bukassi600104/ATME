@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3D independent PASS; Phase 3 remains incomplete
+Status: Slices 3A–3E independent PASS; Phase 3 remains incomplete
 
 Date: 2026-09-23
 
@@ -38,6 +38,11 @@ Date: 2026-09-23
   The mark's fill appears at action completion. These two verbs no longer use a generic
   rectangular reveal; `progressive_reveal` still rejects until ordered-child semantics exist.
   This is a limited frame-compositor capability, not desktop preview/export wiring.
+- Slice 3E adds bounded `freehand` point-polylines and authored absolute M/L/Q/C path strokes.
+  Its parser accepts data-only coordinates, emits sanitized path geometry, checks control points
+  against authored bounds, and rejects unsupported SVG commands and invalid/degenerate paths.
+  Existing `draw` progression now applies to these strokes. This does not add arbitrary SVG,
+  external artwork, or full-object compositor coverage.
 - No audio events are produced by the kernel. The full 35-type primitive/container
   compositor, asset/media resolution, remaining canonical action verbs, camera/board composition,
   and real project preview/export dispatcher are still required.
@@ -63,6 +68,11 @@ Date: 2026-09-23
   and combining-character text writing. The independent auditor passed the bounded gate after
   97 combined Phase 3 tests, 13 targeted v1/offline-render tests, and Ruff. The full sidecar
   regression also passed with exit code 0 against the finalized Slice 3D files (2026-09-23).
+- Slice 3E focused freehand/SVG tests and Ruff passed. The independent auditor passed the
+  bounded gate after rechecking coordinate overflow, serialized zero-length paths, malformed
+  inputs, future/hidden path rejection, and deterministic seek/raster output; 79 focused tests
+  passed in its separate run. The full sidecar regression passed against the finalized 3E files
+  with exit code 0 (2026-09-23).
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.
