@@ -11,7 +11,10 @@ import hashlib
 import json
 from dataclasses import dataclass, replace
 
+from atme.render.v2_connector import UnsupportedConnector, validate_static_arrow
 from atme.store.contracts_v2 import (
+    ConnectionAction,
+    ConnectorObject,
     ExecutableLayoutV2,
     ResolvedVisualTimelineV2,
     TargetAction,
@@ -130,13 +133,53 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
     state_objects = {item.object_id for item in timeline.initial_object_states}
     if set(layout_objects) != state_objects:
         raise V2FrameError("the resolved timeline must initialize every layout object exactly once")
+    initial = {item.object_id: item for item in timeline.initial_object_states}
+    managed_connectors = {item.action.connector_id for item in timeline.actions
+                          if isinstance(item.action, ConnectionAction)}
+    for connector_id in managed_connectors:
+        relationship = initial[connector_id]
+        if (relationship.state not in {"connected", "disconnected"}
+                or relationship.visible != (relationship.state == "connected")
+                or layout_objects[connector_id].visible != relationship.visible):
+            raise V2FrameError(
+                f"managed connector {connector_id} has inconsistent initial relationship visibility"
+            )
     last_target_end: dict[str, int] = {}
     completed_transform = {
         object_id: FrameTransform.from_contract(obj.transform)
         for object_id, obj in layout_objects.items()
     }
     for item in timeline.actions:
+        if isinstance(item.action, ConnectionAction):
+            action = item.action
+            connector = layout_objects.get(action.connector_id)
+            if not isinstance(connector, ConnectorObject):
+                raise V2FrameError(f"connection {action.action_id} needs a rendered arrow connector")
+            try:
+                validate_static_arrow(connector, layout_objects)
+            except UnsupportedConnector as exc:
+                raise V2FrameError(str(exc)) from exc
+            if connector.opacity <= 0:
+                raise V2FrameError(f"connection {action.action_id} needs a visible semantic connector")
+            if (action.board_id != connector.board_id
+                    or action.source_object_id != connector.source_object_id
+                    or action.source_anchor_id != connector.source_anchor_id
+                    or action.destination_object_id != connector.destination_object_id
+                    or action.destination_anchor_id != connector.destination_anchor_id):
+                raise V2FrameError(f"connection {action.action_id} disagrees with the authored connector")
+            if (action.expected_state, action.post_state) != (
+                ("disconnected", "connected") if action.verb == "connect"
+                else ("connected", "disconnected")
+            ):
+                raise V2FrameError(f"connection {action.action_id} needs canonical relationship states")
+            if item.start_ms < last_target_end.get(action.connector_id, 0):
+                raise V2FrameError(f"overlapping actions on {action.connector_id} need composition rules")
+            last_target_end[action.connector_id] = item.end_ms
         if isinstance(item.action, (TargetAction, TransformAction)):
+            if set(item.action.target_ids) & managed_connectors:
+                raise V2FrameError(
+                    f"action {item.action.action_id} mutates a connection-managed connector"
+                )
             if set(item.action.target_ids) - set(layout_objects):
                 raise V2FrameError(f"action {item.action.action_id} targets an unknown layout object")
             if any(layout_objects[target].board_id != item.action.board_id
@@ -222,7 +265,7 @@ def evaluate_frame(
     for resolved in timeline.actions:
         action = resolved.action
         supported = (
-            isinstance(action, TransformAction)
+            isinstance(action, (TransformAction, ConnectionAction))
             or isinstance(action, TargetAction) and action.verb in {
                 "reveal", "write", "draw", "enter", "exit", "progressive_reveal",
             }
@@ -238,10 +281,17 @@ def evaluate_frame(
             action.easing,
         )
         completed = at_ms >= resolved.end_ms
-        for object_id in action.target_ids:
+        targets = (action.connector_id,) if isinstance(action, ConnectionAction) else action.target_ids
+        for object_id in targets:
             before = current[object_id]
             state = action.post_state if completed else before.state
-            if isinstance(action, TargetAction):
+            if isinstance(action, ConnectionAction):
+                if before.opacity <= 0:
+                    raise V2FrameError(f"connection {action.action_id} has an invisible connector")
+                fraction = progress if action.verb == "connect" else 1.0 - progress
+                after = replace(before, state=state, visible=not completed or action.verb == "connect",
+                                reveal_fraction=fraction)
+            elif isinstance(action, TargetAction):
                 if action.verb == "exit":
                     after = replace(before, state=state, visible=not completed,
                                     opacity=_mix(before.opacity, 0.0, progress))

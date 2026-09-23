@@ -23,6 +23,7 @@ from atme.render.style_bundle import (
     resolve_contract_bundle,
     verified_asset_svg,
 )
+from atme.render.v2_connector import UnsupportedConnector, validate_static_arrow
 from atme.render.v2_path import (
     MAX_COORDINATE,
     MAX_STROKE_LENGTH,
@@ -31,6 +32,7 @@ from atme.render.v2_path import (
 )
 from atme.render.v2_state import FrameObject, evaluate_frame
 from atme.store.contracts_v2 import (
+    ConnectionAction,
     ConnectorObject,
     ExecutableLayoutV2,
     MarkObject,
@@ -281,35 +283,6 @@ def _registry_visual(obj: VisualObject) -> str:
             f'{inner}</svg>')
 
 
-def _connector_preflight(obj: ConnectorObject, objects: dict) -> None:
-    if obj.object_type != "arrow" or obj.role != "semantic_connector":
-        raise UnsupportedVisualObject(f"v2 connector {obj.object_id} has unsupported network/pointer semantics")
-    if not obj.source_object_id or not obj.source_anchor_id:
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} needs a named source anchor")
-    if obj.source_object_id == obj.destination_object_id:
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} cannot loop back to itself")
-    if obj.source_object_id == obj.object_id or obj.destination_object_id == obj.object_id:
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} cannot anchor to itself")
-    source = objects[obj.source_object_id]
-    destination = objects[obj.destination_object_id]
-    if (isinstance(source, ConnectorObject) or isinstance(destination, ConnectorObject)
-            or source.board_id != obj.board_id or destination.board_id != obj.board_id):
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} endpoints must be non-connectors on its board")
-    if (obj.geometry.points or obj.geometry.corner_radius is not None or obj.anchors
-            or obj.style.fill or obj.style.text or obj.allow_self_loop):
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has ignored geometry or styling")
-    transform = obj.transform
-    if (transform.position.x or transform.position.y or transform.scale_x != 1
-            or transform.scale_y != 1 or transform.rotation_degrees
-            or transform.origin.x != 0.5 or transform.origin.y != 0.5):
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has unsupported independent transform")
-    for endpoint, anchor_id in ((source, obj.source_anchor_id),
-                                (destination, obj.destination_anchor_id)):
-        anchor = next(anchor for anchor in endpoint.anchors if anchor.anchor_id == anchor_id)
-        if not 0 <= anchor.point.x <= 1 or not 0 <= anchor.point.y <= 1:
-            raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} needs normalized endpoint anchors")
-
-
 def _anchor_canvas_point(obj, state: FrameObject, anchor_id: str) -> tuple[float, float]:
     anchor = next(anchor for anchor in obj.anchors if anchor.anchor_id == anchor_id)
     bounds = obj.geometry.bounds
@@ -436,12 +409,16 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
         stroke = _color(obj.style.stroke, style.colors, default=style.colors["ink"])
         inner = _connector_shape(obj, objects, states, stroke,
                                  style.strokes.regular_px * scale,
-                                 state.reveal_fraction if active_verb == "draw" else None)
+                                 state.reveal_fraction if active_verb in {
+                                     "draw", "connect", "disconnect"
+                                 } else None)
     else:
         inner = _registry_visual(obj)
     # Reveal is clipped in canvas coordinates inside the transformed local group.
     clip = ""
-    if state.reveal_fraction < 1 and active_verb not in {"draw", "write"}:
+    if state.reveal_fraction < 1 and active_verb not in {
+        "draw", "write", "connect", "disconnect"
+    }:
         clip = f' clip-path="url(#{_clip_id(obj.object_id)})"'
     return (f'<g data-object-id="{_xml_escape(obj.object_id)}" '
             f'transform="{transform}" opacity="{_n(state.opacity)}"{clip}>{inner}</g>')
@@ -462,7 +439,10 @@ def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObj
         _shape(obj, stroke, fill, style.strokes.regular_px * scale)
     elif isinstance(obj, ConnectorObject):
         _color(obj.style.stroke, style.colors, default=style.colors["ink"])
-        _connector_preflight(obj, objects)
+        try:
+            validate_static_arrow(obj, objects)
+        except UnsupportedConnector as exc:
+            raise UnsupportedVisualObject(str(exc)) from exc
     elif isinstance(obj, TextObject):
         if (obj.style.stroke or obj.style.fill or obj.geometry.points
                 or obj.geometry.corner_radius is not None
@@ -529,10 +509,14 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     active_verbs = {
         target: resolved.action.verb
         for resolved in timeline.actions
-        if isinstance(resolved.action, TargetAction)
-        and resolved.action.verb in {"draw", "write"}
-        and resolved.start_ms <= at_ms < resolved.end_ms
-        for target in resolved.action.target_ids
+        if resolved.start_ms <= at_ms < resolved.end_ms
+        for target in (
+            resolved.action.target_ids
+            if isinstance(resolved.action, TargetAction)
+            and resolved.action.verb in {"draw", "write"}
+            else (resolved.action.connector_id,)
+            if isinstance(resolved.action, ConnectionAction) else ()
+        )
     }
     definitions = []
     body = [(f'<rect x="{_n(layout.canvas.x)}" y="{_n(layout.canvas.y)}" '
@@ -541,7 +525,9 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     states = {state.object_id: state for state in snapshot.objects}
     for state in snapshot.objects:
         obj = objects[state.object_id]
-        if 0 < state.reveal_fraction < 1 and active_verbs.get(state.object_id) not in {"draw", "write"}:
+        if 0 < state.reveal_fraction < 1 and active_verbs.get(state.object_id) not in {
+            "draw", "write", "connect", "disconnect"
+        }:
             bounds = obj.geometry.bounds
             definitions.append(
                 f'<clipPath id="{_clip_id(obj.object_id)}">'

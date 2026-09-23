@@ -928,9 +928,12 @@ class ResolvedVisualTimelineV2(StrictModel):
                     raise ValueError(f"action {action.action_id} targets an object without initial state")
                 if states[target] == "removed" and action.verb not in ("return_board",):
                     raise ValueError(f"action {action.action_id} resurrects removed object {target}")
+            state_targets = ([action.connector_id] if isinstance(action, ConnectionAction)
+                             else targets)
+            for target in state_targets:
                 if action.expected_state is not None and states[target] != action.expected_state:
                     raise ValueError(f"action {action.action_id} precondition failed for {target}")
-            for target in targets:
+            for target in state_targets:
                 states[target] = "removed" if action.verb == "exit" else action.post_state
             resolved_actions[action.action_id] = resolved
         if len(action_ids) != len(set(action_ids)):

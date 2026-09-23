@@ -68,8 +68,22 @@ fill/text/effect styling, and independent motion that could detach it are reject
 right-angle elbow, and
 quadratic curve routes are deterministic. `draw` progressively exposes the shaft, then places
 the arrowhead at completion. A visible arrow with a hidden endpoint blocks the frame rather
-than floating unbound. Unsupported free-source pointers, network objects, self-loops, and the
-canonical `connect`/`disconnect` actions remain unavailable.
+than floating unbound. Unsupported free-source pointers, network objects, and self-loops remain
+unavailable.
+
+Slice 3G accepts `connect` only on that exact authored arrow binding, with `expected_state`
+`disconnected` and `post_state` `connected`; `disconnect` requires the inverse. Source and
+destination object IDs/anchors are integrity-checked references, not state transition targets.
+Connection actions transition only the connector, must not overlap another connector action,
+and preserve endpoint movement. A managed connector begins either connected and visible or
+disconnected and hidden; no other action may mutate that connector. Connect progresses the
+shaft from source to destination and
+places the arrowhead at completion. Disconnect withdraws the shaft toward the source and removes
+the arrowhead during withdrawal; at completion the connector is hidden. Every frame is rebuilt
+from the initial state and ordered actions, so reverse/random seeking restores the relationship
+exactly. This is not general connector rebinding or a network graph runtime.
+The state evaluator and SVG compositor use the same static arrow support gate; a connection
+cannot be accepted as state while its connector form is unsupported by the bounded compositor.
 
 ## Bundled original-illustration slice
 
@@ -88,8 +102,8 @@ illustrations a director-selected, data-driven, or complete production asset sys
 ## Still to define and implement before Phase 3 exit
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be
-fixed before their first runtime implementation: `highlight`, `dim`, `isolate`, `connect`,
-`disconnect`, `replace`, `morph`, `cross_out`, `annotate`, `group`, `ungroup`, `split`, `count`,
+fixed before their first runtime implementation: `highlight`, `dim`, `isolate`,
+`replace`, `morph`, `cross_out`, `annotate`, `group`, `ungroup`, `split`, `count`,
 `insert_evidence`, `return_board`, all five camera verbs, and sound state/events. In particular,
 the contract needs explicit rules for morph compatibility, dynamic group ownership, split result
 mapping, isolate restoration, and ordered progressive disclosure. Audible mixing remains Phase 7;

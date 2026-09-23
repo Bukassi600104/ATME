@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3F independent PASS; Phase 3 remains incomplete
+Status: Slices 3A–3G independent PASS; Phase 3 remains incomplete
 
 Date: 2026-09-23
 
@@ -48,7 +48,16 @@ Date: 2026-09-23
   frames; authored `draw` progresses the shaft and places the arrowhead only at completion.
   Free-source pointers, network objects, independent connector transforms, hidden endpoints,
   cross-board bindings, and out-of-bounds routes remain rejected. This does not implement the
-  canonical `connect`/`disconnect` actions or a general network-layout engine.
+  full network-layout engine.
+- Slice 3G adds canonical `connect`/`disconnect` actions for that arrow subset. The resolved
+  timeline now treats source/destination as checked references, not objects mutated by a
+  connection. Exact static binding and canonical disconnected→connected→disconnected state
+  transitions are required; connect draws the shaft/arrowhead and disconnect retracts it.
+  Managed connector initial visibility must match its relationship state, and unrelated
+  target/transform actions cannot move or redraw it independently. Neither verb broadens
+  support to free-source pointers or general networks. State evaluation and SVG composition
+  share one static arrow support gate, so unsupported self-loops, connector endpoints, and
+  ignored connector styling cannot pass state evaluation but fail at rendering.
 - No audio events are produced by the kernel. The full 35-type primitive/container
   compositor, asset/media resolution, remaining canonical action verbs, camera/board composition,
   and real project preview/export dispatcher are still required.
@@ -84,6 +93,11 @@ Date: 2026-09-23
   and checks for effective endpoint visibility, fractional transform parity, bounds, routing,
   and deterministic seeking. The full sidecar regression passed against finalized 3F files
   with exit code 0 (2026-09-23).
+- Slice 3G: 85 focused connection/connector/state/contract tests and Ruff passed. The
+  independent auditor passed the bounded gate, including shared fail-closed validation,
+  random-access deterministic seeking, and 13 targeted v1/offline-render regressions.
+  The full sidecar regression passed with exit code 0 against finalized Slice 3G files
+  (2026-09-23). No full Phase 3 or installed-app claim follows.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.
