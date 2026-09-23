@@ -78,12 +78,95 @@ def test_unknown_token_and_unhandled_effect_reject():
         compose_svg_frame(layout, timeline, 1000)
 
 
-@pytest.mark.parametrize("verb", ["draw", "write", "progressive_reveal"])
-def test_unsupported_reveal_semantics_fail_instead_of_using_wipe(verb):
+def test_progressive_reveal_requires_ordered_children():
     layout, timeline = primitive_documents()
-    timeline["actions"][0]["action"]["verb"] = verb
-    with pytest.raises(UnsupportedVisualObject, match="rectangular wipe would change its meaning"):
+    timeline["actions"][0]["action"]["verb"] = "progressive_reveal"
+    with pytest.raises(UnsupportedVisualObject, match="ordered-child reveal"):
         compose_svg_frame(layout, timeline, 100)
+
+
+@pytest.mark.parametrize("action_index,verb", [(0, "write"), (1, "draw")])
+def test_draw_and_write_reject_incompatible_object_types(action_index, verb):
+    layout, timeline = primitive_documents()
+    timeline["actions"][action_index]["action"]["verb"] = verb
+    with pytest.raises(UnsupportedVisualObject, match="incompatible object type"):
+        compose_svg_frame(layout, timeline, 100)
+
+
+def test_draw_raster_constructs_real_stroke_without_rectangular_wipe():
+    layout, timeline = primitive_documents()
+    timeline["actions"][0]["action"]["verb"] = "draw"
+    mid = compose_png_frame(layout, timeline, 450)
+    end = compose_png_frame(layout, timeline, 900)
+
+    def stroke_count(frame):
+        image = Image.open(io.BytesIO(frame.png)).convert("RGB")
+        return sum(pixel == (36, 87, 214)
+                   for pixel in image.crop((78, 158, 562, 502)).get_flattened_data())
+
+    assert 0 < stroke_count(mid) < stroke_count(end)
+    mid_svg = compose_svg_frame(layout, timeline, 450).svg
+    assert "stroke-dasharray=" in mid_svg
+    assert 'clip-path="url(#' not in mid_svg
+
+
+def test_write_reveals_whole_graphemes_not_clipped_letter_fragments():
+    layout, timeline = primitive_documents()
+    timeline["actions"][1]["action"]["verb"] = "write"
+    partial = compose_svg_frame(layout, timeline, 2450).svg
+    assert "THE SYS" in partial
+    assert "THE SYSTEM" not in partial
+    assert "stroke-dasharray=" not in partial
+    assert 'clip-path="url(#' not in partial
+    partial_png = compose_png_frame(layout, timeline, 2450).png
+    full_png = compose_png_frame(layout, timeline, 2900).png
+    assert partial_png != full_png
+    assert compose_png_frame(layout, timeline, 2450).png == partial_png
+    layout["objects"][1]["text"] = "A\u0301B"
+    timeline["layout_sha256"] = digest(layout)
+    combined = compose_svg_frame(layout, timeline, 2450).svg
+    assert "A\u0301" in combined
+    assert "A\u0301B" not in combined
+
+
+@pytest.mark.parametrize("kind", ["line", "rectangle", "rounded_rectangle", "ellipse", "polygon"])
+def test_draw_each_supported_path_at_random_access_time(kind):
+    layout, timeline = primitive_documents()
+    mark = layout["objects"][0]
+    mark["object_type"] = kind
+    mark["geometry"]["corner_radius"] = 24 if kind == "rounded_rectangle" else None
+    mark["geometry"]["points"] = (
+        [{"x": 80, "y": 160}, {"x": 400, "y": 160}, {"x": 400, "y": 400}]
+        if kind == "polygon" else []
+    )
+    mark["style"]["fill"] = None if kind == "line" else "surface.raised"
+    timeline["actions"][0]["action"]["verb"] = "draw"
+    timeline["layout_sha256"] = digest(layout)
+    first = compose_png_frame(layout, timeline, 450).png
+    compose_png_frame(layout, timeline, 899)
+    complete = compose_png_frame(layout, timeline, 900).png
+    assert compose_png_frame(layout, timeline, 450).png == first
+    assert b"PNG" in first[:8]
+    def blue_pixels(png):
+        image = Image.open(io.BytesIO(png)).convert("RGB")
+        return sum(pixel == (36, 87, 214)
+                   for pixel in image.crop((78, 158, 562, 502)).get_flattened_data())
+
+    assert 0 < blue_pixels(first) < blue_pixels(complete)
+    assert "stroke-dasharray=" in compose_svg_frame(layout, timeline, 450).svg
+
+
+def test_draw_rejects_future_zero_length_path_before_first_frame():
+    layout, timeline = primitive_documents()
+    mark = layout["objects"][0]
+    mark["object_type"] = "line"
+    mark["geometry"]["corner_radius"] = None
+    mark["geometry"]["points"] = [{"x": 80, "y": 160}, {"x": 80, "y": 160}]
+    mark["style"]["fill"] = None
+    timeline["actions"][0]["action"]["verb"] = "draw"
+    timeline["layout_sha256"] = digest(layout)
+    with pytest.raises(UnsupportedVisualObject, match="zero length"):
+        compose_svg_frame(layout, timeline, 0)
 
 
 @pytest.mark.parametrize("kind,tag", [

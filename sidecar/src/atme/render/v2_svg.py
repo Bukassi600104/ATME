@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+import regex
 from PIL import ImageFont
 
 from atme.render.style_bundle import (
@@ -25,6 +26,8 @@ from atme.render.v2_state import FrameObject, evaluate_frame
 from atme.store.contracts_v2 import (
     ExecutableLayoutV2,
     MarkObject,
+    ResolvedVisualTimelineV2,
+    TargetAction,
     TextObject,
     VisualObject,
 )
@@ -102,7 +105,8 @@ def _color(token: str | None, colors: dict[str, str], *, default: str) -> str:
     return colors[key]
 
 
-def _shape(obj: MarkObject, stroke: str, fill: str, weight: float) -> str:
+def _shape(obj: MarkObject, stroke: str, fill: str, weight: float,
+           draw_fraction: float | None = None) -> str:
     bounds = obj.geometry.bounds
     if obj.object_type != "line" and obj.object_type != "polygon" and obj.geometry.points:
         raise UnsupportedVisualObject(f"{obj.object_type} {obj.object_id} has ignored geometry points")
@@ -119,8 +123,36 @@ def _shape(obj: MarkObject, stroke: str, fill: str, weight: float) -> str:
     if any(not (x <= point.x <= x + w and y <= point.y <= y + h)
            for point in obj.geometry.points):
         raise UnsupportedVisualObject(f"mark {obj.object_id} points exceed authored bounds")
+    if obj.object_type == "polygon" and len(obj.geometry.points) < 3:
+        raise UnsupportedVisualObject(f"polygon {obj.object_id} requires at least three points")
+    if draw_fraction is not None and draw_fraction < 1:
+        if obj.object_type == "line":
+            if obj.geometry.points:
+                a, b = obj.geometry.points
+                length = math.hypot(b.x - a.x, b.y - a.y)
+            else:
+                length = math.hypot(w, h)
+        elif obj.object_type == "rectangle":
+            length = 2 * (w + h)
+        elif obj.object_type == "rounded_rectangle":
+            radius = obj.geometry.corner_radius
+            length = 2 * (w + h - 4 * radius) + 2 * math.pi * radius
+        elif obj.object_type == "ellipse":
+            a, b = w / 2, h / 2
+            length = math.pi * (3 * (a + b) - math.sqrt((3 * a + b) * (a + 3 * b)))
+        else:
+            points = obj.geometry.points
+            length = sum(math.hypot(b.x - a.x, b.y - a.y)
+                         for a, b in zip(points, [*points[1:], points[0]]))
+        if length <= 0:
+            raise UnsupportedVisualObject(f"draw path {obj.object_id} has zero length")
+        fill = "none"
+        draw_attributes = (f' stroke-dasharray="{_n(length)} {_n(length)}" '
+                           f'stroke-dashoffset="{_n(length * (1 - draw_fraction))}"')
+    else:
+        draw_attributes = ""
     attributes = (f'fill="{fill}" stroke="{stroke}" stroke-width="{_n(weight)}" '
-                  'stroke-linecap="round" stroke-linejoin="round"')
+                  f'stroke-linecap="round" stroke-linejoin="round"{draw_attributes}')
     if obj.object_type == "line":
         if obj.geometry.points:
             if len(obj.geometry.points) != 2:
@@ -139,15 +171,14 @@ def _shape(obj: MarkObject, stroke: str, fill: str, weight: float) -> str:
         return (f'<ellipse cx="{_n(x + w / 2)}" cy="{_n(y + h / 2)}" '
                 f'rx="{_n(w / 2)}" ry="{_n(h / 2)}" {attributes}/>')
     if obj.object_type == "polygon":
-        if len(obj.geometry.points) < 3:
-            raise UnsupportedVisualObject(f"polygon {obj.object_id} requires at least three points")
         points = " ".join(f"{_n(p.x)},{_n(p.y)}" for p in obj.geometry.points)
         return f'<polygon points="{points}" {attributes}/>'
     raise UnsupportedVisualObject(f"unimplemented mark type: {obj.object_type}")
 
 
 def _text(obj: TextObject, color: str, font_family: str, font_weight: int, font_size: float,
-          line_height: float, max_characters: int, font_path: Path) -> str:
+          line_height: float, max_characters: int, font_path: Path,
+          write_fraction: float | None = None) -> str:
     bounds = obj.geometry.bounds
     lines = obj.text.splitlines()
     if obj.object_type == "list":
@@ -161,6 +192,10 @@ def _text(obj: TextObject, color: str, font_family: str, font_weight: int, font_
     measuring_font = _font(str(font_path), max(1, math.ceil(font_size)))
     if any(measuring_font.getlength(line) > bounds.width for line in lines):
         raise UnsupportedVisualObject(f"text {obj.object_id} exceeds authored width")
+    if write_fraction is not None and write_fraction < 1:
+        graphemes = regex.findall(r"\X", "\n".join(lines))
+        visible = math.floor(len(graphemes) * write_fraction)
+        lines = "".join(graphemes[:visible]).split("\n")
     x = _n(bounds.x)
     y = _n(bounds.y + font_size)
     spans = "".join(
@@ -207,7 +242,7 @@ def _registry_visual(obj: VisualObject) -> str:
 
 
 def _object_markup(obj: MarkObject | TextObject | VisualObject, state: FrameObject, style,
-                   root: Path, scale: float) -> str:
+                   root: Path, scale: float, active_verb: str | None) -> str:
     if not state.visible or state.opacity <= 0 or state.reveal_fraction <= 0:
         return ""
     t = state.transform
@@ -221,18 +256,20 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject, state: FrameObje
     if isinstance(obj, MarkObject):
         stroke = _color(obj.style.stroke, style.colors, default=style.colors["ink"])
         fill = _color(obj.style.fill, style.colors, default="none")
-        inner = _shape(obj, stroke, fill, style.strokes.regular_px * scale)
+        inner = _shape(obj, stroke, fill, style.strokes.regular_px * scale,
+                       state.reveal_fraction if active_verb == "draw" else None)
     elif isinstance(obj, TextObject):
         color = _color(obj.style.text, style.colors, default=style.colors["ink"])
         role = _text_role(obj, style)
         font = next(font for font in style.fonts if font.id == role.font_id)
         inner = _text(obj, color, font.family, font.weight, role.size_px * scale, role.line_height,
-                      role.max_characters_per_line, root / font.file)
+                      role.max_characters_per_line, root / font.file,
+                      state.reveal_fraction if active_verb == "write" else None)
     else:
         inner = _registry_visual(obj)
     # Reveal is clipped in canvas coordinates inside the transformed local group.
     clip = ""
-    if state.reveal_fraction < 1:
+    if state.reveal_fraction < 1 and active_verb not in {"draw", "write"}:
         clip = f' clip-path="url(#{_clip_id(obj.object_id)})"'
     return (f'<g data-object-id="{_xml_escape(obj.object_id)}" '
             f'transform="{transform}" opacity="{_n(state.opacity)}"{clip}>{inner}</g>')
@@ -274,12 +311,24 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     """Draw supported objects in deterministic z order; never substitute boxes."""
     snapshot = evaluate_frame(layout_document, timeline_document, at_ms)
     layout = ExecutableLayoutV2.model_validate(layout_document)
-    for resolved in timeline_document["actions"]:
-        if resolved["action"]["verb"] in {"draw", "write", "progressive_reveal"}:
+    timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
+    objects = {obj.object_id: obj for obj in layout.objects}
+    for resolved in timeline.actions:
+        action = resolved.action
+        if action.verb == "progressive_reveal":
             raise UnsupportedVisualObject(
-                f"v2 action {resolved['action']['action_id']} requires authored stroke, glyph, "
-                "or ordered-child reveal; a rectangular wipe would change its meaning"
+                f"v2 action {action.action_id} requires an authored ordered-child reveal"
             )
+        if isinstance(action, TargetAction) and action.verb in {"draw", "write"}:
+            compatible = MarkObject if action.verb == "draw" else TextObject
+            if any(not isinstance(objects[target], compatible) for target in action.target_ids):
+                raise UnsupportedVisualObject(
+                    f"v2 {action.verb} action {action.action_id} targets an incompatible object type"
+                )
+            if action.verb == "draw":
+                for target in action.target_ids:
+                    mark = objects[target]
+                    _shape(mark, "#000000", "none", 1, draw_fraction=0.5)
     unsupported = [obj for obj in layout.objects
                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_MARKS
                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_TEXT
@@ -298,16 +347,23 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     scale_y = layout.output_profile.height / design.height
     if abs(scale_x - scale_y) > 1e-6:
         raise UnsupportedVisualObject("output profile cannot uniformly scale Paper & Ink design tokens")
-    objects = {obj.object_id: obj for obj in layout.objects}
     for obj in layout.objects:
         _preflight_object(obj, style, root, scale_x)
+    active_verbs = {
+        target: resolved.action.verb
+        for resolved in timeline.actions
+        if isinstance(resolved.action, TargetAction)
+        and resolved.action.verb in {"draw", "write"}
+        and resolved.start_ms <= at_ms < resolved.end_ms
+        for target in resolved.action.target_ids
+    }
     definitions = []
     body = [(f'<rect x="{_n(layout.canvas.x)}" y="{_n(layout.canvas.y)}" '
              f'width="{_n(layout.canvas.width)}" height="{_n(layout.canvas.height)}" '
              f'fill="{style.colors["paper"]}"/>')]
     for state in snapshot.objects:
         obj = objects[state.object_id]
-        if 0 < state.reveal_fraction < 1:
+        if 0 < state.reveal_fraction < 1 and active_verbs.get(state.object_id) not in {"draw", "write"}:
             bounds = obj.geometry.bounds
             definitions.append(
                 f'<clipPath id="{_clip_id(obj.object_id)}">'
@@ -315,7 +371,8 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                 f'width="{_n(bounds.width * state.reveal_fraction)}" '
                 f'height="{_n(bounds.height)}"/></clipPath>'
             )
-        body.append(_object_markup(obj, state, style, root, scale_x))
+        body.append(_object_markup(obj, state, style, root, scale_x,
+                                   active_verbs.get(state.object_id)))
     width, height = layout.output_profile.width, layout.output_profile.height
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
            f'viewBox="{_n(layout.canvas.x)} {_n(layout.canvas.y)} {width} {height}">'

@@ -30,8 +30,12 @@ Phase 3 slices. Until then, the desktop and MCP capability must continue reporti
   gap hides objects without resetting their underlying state; returning to a board restores its
   developed state.
 - `reveal`, `write`, `draw`, and `progressive_reveal` expose a scalar reveal fraction from 0 to 1.
-  This fraction is a timing instruction, not yet a rendered stroke, text-glyph, or ordered-child
-  effect. The compositor must implement those distinct effects before claiming verb coverage.
+  In Slice 3D, the limited compositor consumes that fraction for `draw` on the five supported
+  mark paths by progressively exposing the stroke, with authored fill appearing at completion.
+  `write` on supported text/list objects reveals complete Unicode grapheme clusters while
+  retaining authored line breaks and measured font bounds. `progressive_reveal` still lacks
+  ordered-child semantics and fails closed; generic `reveal` remains a clipped reveal. Other
+  object and action combinations must not silently substitute one of these effects.
 - `enter` fades from zero to the authored object opacity; it does not invent a slide direction.
   `exit` fades to zero, ends invisible, and has the canonical permanent `removed` post-state.
   Re-entry after removal is invalid in the v2 timeline; a returning board should retain its
