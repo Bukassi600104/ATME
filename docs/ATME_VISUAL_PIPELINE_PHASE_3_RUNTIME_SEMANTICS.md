@@ -1,6 +1,6 @@
 # Phase 3 v2 runtime semantics — kernel contract
 
-Status: Slice 3A in progress; not a production-renderer capability declaration
+Status: Slices 3A–3H independent PASS; not a production-renderer capability declaration
 
 This document fixes the meanings implemented by the first deterministic frame-state kernel. It
 does not replace the v2 JSON contracts or authorize the v1 renderer to consume them. Real pixels,
@@ -84,6 +84,16 @@ from the initial state and ordered actions, so reverse/random seeking restores t
 exactly. This is not general connector rebinding or a network graph runtime.
 The state evaluator and SVG compositor use the same static arrow support gate; a connection
 cannot be accepted as state while its connector form is unsupported by the bounded compositor.
+
+## Authored emphasis marks
+
+Slice 3H supports two additional static mark object types in the bounded compositor:
+`underline` is a single curved accent stroke, and `highlight` is a slightly asymmetric
+attention-color ring. Their paths are constructed only from the authored object bounds and
+versioned Paper & Ink style tokens; both support the same path-length-based deterministic
+`draw` progression as other marks. They do not imply target linking or execute the separate
+`highlight` action. Extra points, injected path data, fill, text/effect styling, or unknown
+color tokens block the layout even when the mark is hidden.
 
 ## Bundled original-illustration slice
 

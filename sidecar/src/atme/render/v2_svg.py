@@ -47,7 +47,10 @@ class UnsupportedVisualObject(ValueError):
     """A scene object has no faithful v2 drawing implementation."""
 
 
-SUPPORTED_MARKS = frozenset({"freehand", "line", "rectangle", "rounded_rectangle", "ellipse", "polygon"})
+SUPPORTED_MARKS = frozenset({
+    "freehand", "line", "rectangle", "rounded_rectangle", "ellipse", "polygon",
+    "underline", "highlight",
+})
 SUPPORTED_TEXT = frozenset({"text", "list"})
 SUPPORTED_REGISTRY_VISUALS = {
     "icon": frozenset({"people", "gestures", "devices", "documents", "networks",
@@ -115,6 +118,32 @@ def _color(token: str | None, colors: dict[str, str], *, default: str) -> str:
     return colors[key]
 
 
+def _emphasis_path(obj: MarkObject):
+    bounds = obj.geometry.bounds
+    x, y, w, h = bounds.x, bounds.y, bounds.width, bounds.height
+
+    def point(x_fraction: float, y_fraction: float) -> str:
+        return f"{_n(x + w * x_fraction)} {_n(y + h * y_fraction)}"
+
+    if obj.object_type == "underline":
+        path = (f"M {point(0.04, 0.35)} Q {point(0.48, 0.82)} "
+                f"{point(0.96, 0.42)}")
+    else:
+        path = (
+            f"M {point(0.52, 0.04)} "
+            f"C {point(0.82, 0.02)} {point(0.96, 0.20)} {point(0.96, 0.51)} "
+            f"C {point(0.97, 0.78)} {point(0.73, 0.96)} {point(0.49, 0.95)} "
+            f"C {point(0.18, 0.97)} {point(0.04, 0.77)} {point(0.04, 0.48)} "
+            f"C {point(0.04, 0.20)} {point(0.25, 0.04)} {point(0.52, 0.04)}"
+        )
+    try:
+        return parse_freehand_path(path, bounds)
+    except InvalidFreehandPath as exc:
+        raise UnsupportedVisualObject(
+            f"{obj.object_type} {obj.object_id} exceeds supported authored bounds"
+        ) from exc
+
+
 def _shape(obj: MarkObject, stroke: str, fill: str, weight: float,
            draw_fraction: float | None = None) -> str:
     bounds = obj.geometry.bounds
@@ -127,7 +156,7 @@ def _shape(obj: MarkObject, stroke: str, fill: str, weight: float,
     if (obj.object_type == "rounded_rectangle"
             and obj.geometry.corner_radius > min(bounds.width, bounds.height) / 2):
         raise UnsupportedVisualObject(f"rounded rectangle {obj.object_id} radius exceeds its bounds")
-    if obj.object_type in {"freehand", "line"} and fill != "none":
+    if obj.object_type in {"freehand", "line", "underline", "highlight"} and fill != "none":
         raise UnsupportedVisualObject(f"{obj.object_type} {obj.object_id} cannot use a fill")
     x, y, w, h = (bounds.x, bounds.y, bounds.width, bounds.height)
     if any(not (x <= point.x <= x + w and y <= point.y <= y + h)
@@ -138,6 +167,7 @@ def _shape(obj: MarkObject, stroke: str, fill: str, weight: float,
     if obj.object_type == "line" and obj.geometry.points and len(obj.geometry.points) != 2:
         raise UnsupportedVisualObject(f"line {obj.object_id} requires exactly two points")
     freehand = None
+    emphasis = _emphasis_path(obj) if obj.object_type in {"underline", "highlight"} else None
     if obj.object_type == "freehand":
         if obj.path_data and obj.geometry.points:
             raise UnsupportedVisualObject(f"freehand {obj.object_id} cannot mix path data and points")
@@ -163,7 +193,9 @@ def _shape(obj: MarkObject, stroke: str, fill: str, weight: float,
         if freehand_length <= 0:
             raise UnsupportedVisualObject(f"freehand {obj.object_id} has zero length")
     if draw_fraction is not None and draw_fraction < 1:
-        if obj.object_type == "freehand":
+        if emphasis:
+            length = emphasis.length
+        elif obj.object_type == "freehand":
             length = freehand_length
         elif obj.object_type == "line":
             if obj.geometry.points:
@@ -197,6 +229,8 @@ def _shape(obj: MarkObject, stroke: str, fill: str, weight: float,
             return f'<path d="{freehand.svg_d}" {attributes}/>'
         points = " ".join(f"{_n(p.x)},{_n(p.y)}" for p in obj.geometry.points)
         return f'<polyline points="{points}" {attributes}/>'
+    if emphasis:
+        return f'<path d="{emphasis.svg_d}" {attributes}/>'
     if obj.object_type == "line":
         if obj.geometry.points:
             a, b = obj.geometry.points
@@ -394,9 +428,14 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
                  f'rotate({_n(t.rotation_degrees)}) scale({_n(t.scale_x)} {_n(t.scale_y)}) '
                  f'translate({_n(-origin_x)} {_n(-origin_y)})')
     if isinstance(obj, MarkObject):
-        stroke = _color(obj.style.stroke, style.colors, default=style.colors["ink"])
+        stroke = _color(obj.style.stroke, style.colors, default=style.colors[
+            "attention" if obj.object_type == "highlight" else
+            "accent" if obj.object_type == "underline" else "ink"
+        ])
         fill = _color(obj.style.fill, style.colors, default="none")
-        inner = _shape(obj, stroke, fill, style.strokes.regular_px * scale,
+        weight = (style.strokes.emphasis_px if obj.object_type == "highlight"
+                  else style.strokes.regular_px) * scale
+        inner = _shape(obj, stroke, fill, weight,
                        state.reveal_fraction if active_verb == "draw" else None)
     elif isinstance(obj, TextObject):
         color = _color(obj.style.text, style.colors, default=style.colors["ink"])
@@ -434,9 +473,14 @@ def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObj
     if isinstance(obj, MarkObject):
         if (obj.path_data and obj.object_type != "freehand") or obj.style.text:
             raise UnsupportedVisualObject(f"v2 mark {obj.object_id} has unimplemented path or text styling")
-        stroke = _color(obj.style.stroke, style.colors, default=style.colors["ink"])
+        stroke = _color(obj.style.stroke, style.colors, default=style.colors[
+            "attention" if obj.object_type == "highlight" else
+            "accent" if obj.object_type == "underline" else "ink"
+        ])
         fill = _color(obj.style.fill, style.colors, default="none")
-        _shape(obj, stroke, fill, style.strokes.regular_px * scale)
+        weight = (style.strokes.emphasis_px if obj.object_type == "highlight"
+                  else style.strokes.regular_px) * scale
+        _shape(obj, stroke, fill, weight)
     elif isinstance(obj, ConnectorObject):
         _color(obj.style.stroke, style.colors, default=style.colors["ink"])
         try:

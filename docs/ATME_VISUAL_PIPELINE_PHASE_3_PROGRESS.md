@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3G independent PASS; Phase 3 remains incomplete
+Status: Slices 3A–3H independent PASS; Phase 3 remains incomplete
 
 Date: 2026-09-23
 
@@ -58,6 +58,12 @@ Date: 2026-09-23
   support to free-source pointers or general networks. State evaluation and SVG composition
   share one static arrow support gate, so unsupported self-loops, connector endpoints, and
   ignored connector styling cannot pass state evaluation but fail at rendering.
+- Slice 3H adds bounded authored `underline` and `highlight` mark objects. The former is one
+  curved accent stroke; the latter is a slightly asymmetric attention-color emphasis ring.
+  Both use exact authored bounds, pinned style tokens, and stroke-progressive `draw` timing,
+  with fill, injected path data, ignored points, and unknown color tokens rejected. These are
+  explicit visual objects, not execution of the still-unsupported `highlight` action or an
+  automatic attention director.
 - No audio events are produced by the kernel. The full 35-type primitive/container
   compositor, asset/media resolution, remaining canonical action verbs, camera/board composition,
   and real project preview/export dispatcher are still required.
@@ -98,6 +104,10 @@ Date: 2026-09-23
   random-access deterministic seeking, and 13 targeted v1/offline-render regressions.
   The full sidecar regression passed with exit code 0 against finalized Slice 3G files
   (2026-09-23). No full Phase 3 or installed-app claim follows.
+- Slice 3H: 89 focused emphasis/SVG/state/freehand tests and Ruff passed in the independent
+  audit. The auditor also passed 13 targeted v1/offline-render regressions and found no bounded
+  blocker. The full sidecar regression passed with exit code 0 against finalized Slice 3H
+  files (2026-09-23); no installed-app or full Phase 3 claim follows.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.
