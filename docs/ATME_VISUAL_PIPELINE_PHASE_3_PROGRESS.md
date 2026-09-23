@@ -1,0 +1,40 @@
+# Phase 3 — renderer and action runtime progress
+
+Status: Slice 3A independent PASS; Phase 3 remains incomplete
+
+Date: 2026-09-23
+
+## Delivered in Slice 3A
+
+- `sidecar/src/atme/render/v2_state.py` reconstructs immutable object state from exact stored v2
+  layout and resolved-timeline JSON at an arbitrary millisecond. It checks the canonical layout
+  hash, plan/layout/profile/style/registry identity, initial state inventory, board ownership,
+  non-overlapping same-object action windows, and unsupported verbs before returning a frame.
+- Supported state operations are reveal, write, draw, progressive reveal, enter, permanent exit,
+  move, scale, rotate, and fade. All other canonical actions fail explicitly. The semantic kernel
+  contract is in `ATME_VISUAL_PIPELINE_PHASE_3_RUNTIME_SEMANTICS.md`.
+- V2 contracts now reject NaN and Infinity. An exit declares `removed`; the v1-to-v2 migration
+  records this canonical mapping for legacy remove actions.
+- Focused tests exercise random/backward seeking, half-open boundaries, all five easing functions,
+  channel-specific and chained transforms, board gaps and returns, immutable frame/caller state,
+  malformed pairings, non-finite input, overlap, and unsupported actions.
+
+## Incomplete Phase 3 gates
+
+- No pixels or audio events are produced by the kernel. The full 35-type primitive/container
+  compositor, asset/media resolution, remaining canonical action verbs, camera/board composition,
+  and real project preview/export dispatcher are still required.
+- The current application continues to report renderer v1 and rejects v2 layouts for project
+  preview/export. No installed desktop rebuild is claimed.
+- Real-project preview/export parity, frozen/offline execution, and representative production
+  acceptance remain outstanding; proof-render parity from Phase 2 is not a substitute.
+
+## Verification
+
+- Slice 3A focused tests: 30 passed.
+- Combined v2 contract/frame-state tests: pass.
+- Ruff on touched Python: pass.
+- Full sidecar regression: passed (2026-09-23).
+- Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
+  Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
+  production capability is falsely advertised.

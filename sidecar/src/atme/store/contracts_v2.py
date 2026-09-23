@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
 
 class StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 ObjectType = Literal[
@@ -245,6 +245,12 @@ class TargetAction(ActionBase):
     ]
     target_ids: list[str] = Field(min_length=1)
     annotation: str | None = None
+
+    @model_validator(mode="after")
+    def exit_is_permanent_removal(self):
+        if self.verb == "exit" and self.post_state != "removed":
+            raise ValueError("exit must declare the canonical removed post-state")
+        return self
 
 
 class TransformAction(ActionBase):

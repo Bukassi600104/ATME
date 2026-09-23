@@ -139,12 +139,18 @@ def migrate_visual_bundle_v1(
             if mapped and targets:
                 changes["inferred_values"].append({"path": f"/actions/{action_id}/target_ids",
                     "value": ",".join(targets), "reason": "selected from v1 objects owned by the same scene"})
+                if mapped == "exit":
+                    changes["inferred_values"].append({
+                        "path": f"/actions/{action_id}/post_state", "value": "removed",
+                        "reason": "v1 remove becomes canonical permanent v2 exit",
+                    })
                 plan_actions.append({
                     "action_id": action_id, "source_instruction_id": instruction_id,
                     "board_id": element_board[targets[0]], "semantic_reason": beat["purpose"],
                     "trigger": {"kind": "phrase", "phrase": beat["trigger_phrase"],
                                 "occurrence": 1, "offset_ms": 0, "minimum_confidence": 0.75},
-                    "easing": "ease_out", "expected_state": "hidden", "post_state": "visible",
+                    "easing": "ease_out", "expected_state": "visible" if mapped == "exit" else "hidden",
+                    "post_state": "removed" if mapped == "exit" else "visible",
                     "fallback": {"fallback_id": fallback_id, "on_failure": "degrade"},
                     "coverage_id": coverage_id, "verb": mapped, "target_ids": targets,
                     "annotation": None,
