@@ -1,6 +1,6 @@
 # Phase 3 v2 runtime semantics — kernel contract
 
-Status: Slices 3A–3L independent PASS; not a production-renderer capability declaration
+Status: Slices 3A–3M independent PASS; not a production-renderer capability declaration
 
 This document fixes the meanings implemented by the first deterministic frame-state kernel. It
 does not replace the v2 JSON contracts or authorize the v1 renderer to consume them. Real pixels,
@@ -149,6 +149,27 @@ compounding; later non-overlapping edits remain possible. This is a versioned bo
 meaning, not an authored opacity edit, isolation, automatic target selection, or a general
 attention director. Unsupported or hidden targets and board-crossing windows fail closed.
 
+## Explicit focus isolation
+
+Slice 3M gives `isolate` a transient board-wide meaning. `target_ids` names one or more visible
+focus objects; other currently visible objects on the same active board become secondary context
+and use the same 35%-minimum, 20%-ramp dim envelope as Slice 3L. Focus objects keep their
+content, opacity, and transform unchanged. At the action end, context returns exactly to its
+pre-isolation opacity, with no persistent isolation state. The action must declare
+`expected_state=visible` and `post_state=visible`, use non-step easing, have unique focus IDs,
+and fit wholly inside one board activation. A focus may have been revealed by an earlier
+completed action; it must be effectively visible, fully revealed, and nonzero-opacity at
+isolation start. At least one visible, fully revealed, positive-opacity non-focus object must
+exist on the board, so an all-focused or empty-context action cannot silently do nothing.
+The bounded compositor accepts supported marks, text/lists, and pinned-registry illustrations
+as focus. To avoid ambiguous ownership, no other visual action on that board may overlap the
+isolation window, even if it names a different object. Sound actions are excluded from this
+visual-conflict rule but remain unsupported by the current frame kernel.
+Hidden or unrevealed context stays unaffected. Repeated non-overlapping isolations do not
+compound opacity.
+This is an executable primitive, not automatic focus selection, a reading/listening policy,
+or the complete attention choreography validator.
+
 ## Bundled original-illustration slice
 
 The bounded Slice 3C compositor may select an ATME-original Paper & Ink illustration by the
@@ -166,8 +187,8 @@ illustrations a director-selected, data-driven, or complete production asset sys
 ## Still to define and implement before Phase 3 exit
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be
-fixed before their first runtime implementation: `isolate`,
-`replace`, `morph`, `annotate`, `group`, `ungroup`, `split`, `count`,
+fixed before their first runtime implementation: `replace`, `morph`, `annotate`,
+`group`, `ungroup`, `split`, `count`,
 `insert_evidence`, `return_board`, all five camera verbs, and sound state/events. In particular,
 the contract needs explicit rules for morph compatibility, dynamic group ownership, split result
 mapping, isolate restoration, and ordered progressive disclosure. Audible mixing remains Phase 7;

@@ -26,10 +26,12 @@ from atme.store.contracts_v2 import (
     ExecutableLayoutV2,
     MarkObject,
     ResolvedVisualTimelineV2,
+    SoundAction,
     TargetAction,
     TextObject,
     Transform,
     TransformAction,
+    VisualObject,
 )
 
 
@@ -158,6 +160,24 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
     if set(layout_objects) != state_objects:
         raise V2FrameError("the resolved timeline must initialize every layout object exactly once")
     initial = {item.object_id: item for item in timeline.initial_object_states}
+    # Isolation affects every visible object on its board, not only target_ids.
+    # Reject overlapping visual actions anywhere on that board before sampling.
+    board_windows: dict[str, list] = {}
+    for item in timeline.actions:
+        if not isinstance(item.action, SoundAction):
+            board_windows.setdefault(item.action.board_id, []).append(item)
+    for board_id, windows in board_windows.items():
+        latest_end = 0
+        latest_isolate_end = 0
+        for item in windows:
+            isolate = isinstance(item.action, TargetAction) and item.action.verb == "isolate"
+            if (isolate and latest_end > item.start_ms) or (
+                not isolate and latest_isolate_end > item.start_ms
+            ):
+                raise V2FrameError(f"isolate on {board_id} overlaps another visual action")
+            latest_end = max(latest_end, item.end_ms)
+            if isolate:
+                latest_isolate_end = max(latest_isolate_end, item.end_ms)
     managed_connectors = {item.action.connector_id for item in timeline.actions
                           if isinstance(item.action, ConnectionAction)}
     for connector_id in managed_connectors:
@@ -172,6 +192,10 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
     last_target_verb: dict[str, str] = {}
     highlighted_targets: set[str] = set()
     crossed_out_targets: set[str] = set()
+    completed_visible = {object_id: state.visible for object_id, state in initial.items()}
+    completed_opacity = {object_id: obj.opacity for object_id, obj in layout_objects.items()}
+    completed_reveal = {object_id: 1.0 if state.visible else 0.0
+                        for object_id, state in initial.items()}
     completed_transform = {
         object_id: FrameTransform.from_contract(obj.transform)
         for object_id, obj in layout_objects.items()
@@ -202,6 +226,8 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             if item.start_ms < last_target_end.get(action.connector_id, 0):
                 raise V2FrameError(f"overlapping actions on {action.connector_id} need composition rules")
             last_target_end[action.connector_id] = item.end_ms
+            completed_visible[action.connector_id] = action.verb == "connect"
+            completed_reveal[action.connector_id] = 1.0 if action.verb == "connect" else 0.0
         if isinstance(item.action, (TargetAction, TransformAction)):
             if set(item.action.target_ids) & managed_connectors:
                 raise V2FrameError(
@@ -218,11 +244,49 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                                 and item.end_ms <= activation.end_ms
                                 for activation in layout.activations)):
                 raise V2FrameError(f"highlight {item.action.action_id} needs an active board")
+            if isinstance(item.action, TargetAction) and item.action.verb == "isolate":
+                action = item.action
+                if (action.expected_state, action.post_state) != ("visible", "visible"):
+                    raise V2FrameError(
+                        f"isolate {action.action_id} needs canonical visible-to-visible states"
+                    )
+                if action.easing == "step":
+                    raise V2FrameError(f"isolate {action.action_id} cannot use step easing")
+                if len(set(action.target_ids)) != len(action.target_ids):
+                    raise V2FrameError(f"isolate {action.action_id} has duplicate focus targets")
+                if not any(activation.board_id == action.board_id
+                           and activation.start_ms <= item.start_ms
+                           and item.end_ms <= activation.end_ms
+                           for activation in layout.activations):
+                    raise V2FrameError(f"isolate {action.action_id} needs an active board")
+                focus_ids = set(action.target_ids)
+                if not any(
+                    obj.board_id == action.board_id and object_id not in focus_ids
+                    and completed_visible[object_id] and completed_opacity[object_id] > 0
+                    and completed_reveal[object_id] == 1.0
+                    for object_id, obj in layout_objects.items()
+                ):
+                    raise V2FrameError(f"isolate {action.action_id} needs visible secondary context")
             for target in item.action.target_ids:
                 if target in highlighted_targets:
                     raise V2FrameError(f"highlighted target {target} cannot receive another action")
                 if target in crossed_out_targets:
                     raise V2FrameError(f"crossed-out target {target} cannot receive another action")
+                if isinstance(item.action, TargetAction) and item.action.verb == "isolate":
+                    obj = layout_objects[target]
+                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
+                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT
+                            or isinstance(obj, VisualObject) and obj.object_type in {
+                                "icon", "pictogram", "character", "device", "document", "chart", "terminal",
+                            }):
+                        raise V2FrameError(
+                            f"isolate {item.action.action_id} needs a supported focus object"
+                        )
+                    if (not completed_visible[target] or completed_opacity[target] <= 0
+                            or completed_reveal[target] < 1):
+                        raise V2FrameError(
+                            f"isolate {item.action.action_id} needs visible focus content"
+                        )
                 if isinstance(item.action, TargetAction) and item.action.verb == "highlight":
                     obj = layout_objects[target]
                     if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
@@ -318,11 +382,23 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                     raise V2FrameError(f"overlapping actions on {target} need an explicit composition rule")
                 last_target_end[target] = item.end_ms
                 last_target_verb[target] = item.action.verb
+                if isinstance(item.action, TargetAction):
+                    if item.action.verb == "exit":
+                        completed_visible[target] = False
+                        completed_opacity[target] = 0.0
+                        completed_reveal[target] = 0.0
+                    elif item.action.verb in {
+                        "reveal", "write", "draw", "progressive_reveal", "enter"
+                    }:
+                        completed_visible[target] = True
+                        completed_reveal[target] = 1.0
                 if isinstance(item.action, TransformAction):
                     action = item.action
                     if action.verb == "fade":
                         if action.destination is not None:
                             raise V2FrameError("fade cannot carry an ignored transform destination")
+                        completed_opacity[target] = action.opacity
+                        completed_visible[target] = completed_visible[target] or action.opacity > 0
                         continue
                     before = completed_transform[target]
                     after = action.destination
@@ -399,6 +475,7 @@ def evaluate_frame(
                 "reveal", "write", "draw", "enter", "exit", "progressive_reveal", "highlight",
                 "cross_out",
                 "dim",
+                "isolate",
             }
         )
         if not supported:
@@ -412,6 +489,24 @@ def evaluate_frame(
             action.easing,
         )
         completed = at_ms >= resolved.end_ms
+        if isinstance(action, TargetAction) and action.verb == "isolate":
+            for object_id in action.target_ids:
+                focus = current[object_id]
+                if not focus.visible or focus.opacity <= 0 or focus.reveal_fraction < 1:
+                    raise V2FrameError(f"isolate {action.action_id} has no visible focus")
+            if not completed:
+                focus_ids = set(action.target_ids)
+                ratio = _dim_ratio(progress)
+                eligible_context = 0
+                for object_id, context in current.items():
+                    if (context.board_id == action.board_id and object_id not in focus_ids
+                            and context.visible and context.opacity > 0
+                            and context.reveal_fraction >= 1):
+                        eligible_context += 1
+                        current[object_id] = replace(context, opacity=context.opacity * ratio)
+                if not eligible_context:
+                    raise V2FrameError(f"isolate {action.action_id} has no visible secondary context")
+            continue
         targets = (action.connector_id,) if isinstance(action, ConnectionAction) else action.target_ids
         for object_id in targets:
             before = current[object_id]
