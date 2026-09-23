@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3K independent PASS; Phase 3 remains incomplete
+Status: Slices 3A–3L independent PASS; Phase 3 remains incomplete
 
 Date: 2026-09-23
 
@@ -84,6 +84,12 @@ Date: 2026-09-23
   the strokes persist and follow the target's existing transform. Exact visible→crossed_out
   states, an active board window, and terminal target ownership are required. This is a
   correction cue, not automatic semantic revision or removal.
+- Slice 3L implements `dim` as a temporary, deterministic attention cue for visible supported
+  marks/text. It lowers opacity to 35% of the authored value, holds, then restores the exact
+  value at the action end. It does not leave a dimmed state behind. Multiple unique targets
+  and repeated non-overlapping dim windows are supported; hidden targets, prior edits, step
+  easing, and board-crossing windows fail closed. This does not implement isolation or an
+  automatic attention director.
 - No audio events are produced by the kernel. The full 35-type primitive/container
   compositor, asset/media resolution, remaining canonical action verbs, camera/board composition,
   and real project preview/export dispatcher are still required.
@@ -141,6 +147,10 @@ Date: 2026-09-23
   tests, Ruff, and 13 targeted v1/offline-render regressions. The full sidecar regression
   passed with exit code 0 against finalized Slice 3K files (2026-09-23). This is not full
   Phase 3 or installed-app acceptance.
+- Slice 3L: independent bounded audit PASS after its 90-test focused state/SVG/attention run,
+  Ruff, and 12 targeted v1/offline-render regressions. The main focused set passed 100 tests.
+  The full sidecar regression passed with exit code 0 against finalized Slice 3L files
+  (2026-09-23). This is not full Phase 3 or installed-app acceptance.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.

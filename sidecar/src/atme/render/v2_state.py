@@ -41,6 +41,18 @@ class UnsupportedVisualAction(V2FrameError):
     """An authored action has no v2 visual runtime implementation yet."""
 
 
+# Versioned bounded meaning of a transient dim attention cue. The authored
+# opacity is restored after the action; this is not a persistent opacity edit.
+_DIM_MIN_RATIO = 0.35
+_DIM_RAMP_FRACTION = 0.2
+
+
+def _dim_ratio(progress: float) -> float:
+    envelope = min(1.0, progress / _DIM_RAMP_FRACTION,
+                   (1.0 - progress) / _DIM_RAMP_FRACTION)
+    return 1.0 - (1.0 - _DIM_MIN_RATIO) * max(0.0, envelope)
+
+
 @dataclass(frozen=True)
 class FramePoint:
     x: float
@@ -157,6 +169,7 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                 f"managed connector {connector_id} has inconsistent initial relationship visibility"
             )
     last_target_end: dict[str, int] = {}
+    last_target_verb: dict[str, str] = {}
     highlighted_targets: set[str] = set()
     crossed_out_targets: set[str] = set()
     completed_transform = {
@@ -257,6 +270,31 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                     except UnsupportedEmphasis as exc:
                         raise V2FrameError(str(exc)) from exc
                     crossed_out_targets.add(target)
+                if isinstance(item.action, TargetAction) and item.action.verb == "dim":
+                    obj = layout_objects[target]
+                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
+                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT):
+                        raise V2FrameError(
+                            f"dim {item.action.action_id} needs a supported mark or text target"
+                        )
+                    if (not initial[target].visible or initial[target].state != "visible"
+                            or obj.opacity <= 0 or last_target_verb.get(target) not in (None, "dim")):
+                        raise V2FrameError(
+                            f"dim {item.action.action_id} needs visible context without prior edits"
+                        )
+                    if (item.action.expected_state, item.action.post_state) != ("visible", "visible"):
+                        raise V2FrameError(
+                            f"dim {item.action.action_id} needs canonical visible-to-visible states"
+                        )
+                    if item.action.easing == "step":
+                        raise V2FrameError(f"dim {item.action.action_id} cannot use step easing")
+                    if len(set(item.action.target_ids)) != len(item.action.target_ids):
+                        raise V2FrameError(f"dim {item.action.action_id} has duplicate targets")
+                    if not any(activation.board_id == item.action.board_id
+                               and activation.start_ms <= item.start_ms
+                               and item.end_ms <= activation.end_ms
+                               for activation in layout.activations):
+                        raise V2FrameError(f"dim {item.action.action_id} needs an active board")
                 if isinstance(item.action, TargetAction) and item.action.verb == "progressive_reveal":
                     obj = layout_objects[target]
                     if not isinstance(obj, TextObject):
@@ -279,6 +317,7 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                 if item.start_ms < last_target_end.get(target, 0):
                     raise V2FrameError(f"overlapping actions on {target} need an explicit composition rule")
                 last_target_end[target] = item.end_ms
+                last_target_verb[target] = item.action.verb
                 if isinstance(item.action, TransformAction):
                     action = item.action
                     if action.verb == "fade":
@@ -359,6 +398,7 @@ def evaluate_frame(
             or isinstance(action, TargetAction) and action.verb in {
                 "reveal", "write", "draw", "enter", "exit", "progressive_reveal", "highlight",
                 "cross_out",
+                "dim",
             }
         )
         if not supported:
@@ -398,6 +438,11 @@ def evaluate_frame(
                     if not before.visible or before.opacity <= 0 or before.reveal_fraction < 1:
                         raise V2FrameError(f"cross_out {action.action_id} has no visible target")
                     after = replace(before, state=state, cross_out_fraction=progress)
+                elif action.verb == "dim":
+                    if not before.visible or before.opacity <= 0 or before.reveal_fraction < 1:
+                        raise V2FrameError(f"dim {action.action_id} has no visible context")
+                    after = replace(before, state=state,
+                                    opacity=before.opacity * (1.0 if completed else _dim_ratio(progress)))
                 else:
                     after = replace(before, state=state, visible=True,
                                     reveal_fraction=progress)

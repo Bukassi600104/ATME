@@ -1,6 +1,6 @@
 # Phase 3 v2 runtime semantics — kernel contract
 
-Status: Slices 3A–3K independent PASS; not a production-renderer capability declaration
+Status: Slices 3A–3L independent PASS; not a production-renderer capability declaration
 
 This document fixes the meanings implemented by the first deterministic frame-state kernel. It
 does not replace the v2 JSON contracts or authorize the v1 renderer to consume them. Real pixels,
@@ -135,6 +135,20 @@ cannot receive later target or transform actions in this bounded slice. Unsuppor
 hidden targets, ignored annotation payloads, and unsupported geometry fail closed. Cross-out
 does not erase content, rewrite narrative facts, or automatically select what to correct.
 
+## Bounded transient dim
+
+Slice 3L gives `dim` a temporary secondary-context meaning for initially visible,
+nonzero-opacity supported mark and text/list objects. An action must declare
+`expected_state=visible` and `post_state=visible`, have unique targets, use non-step easing,
+and fit wholly within one activation of its target board. The object may have had only prior
+non-overlapping `dim` actions, not content or transform edits. At the action start, the object
+keeps its authored opacity. During the first 20% of eased progress it descends to 35% of that
+opacity, holds through the middle, and restores over the last 20%. At `end_ms`, original opacity
+is restored exactly and no dim state persists. Multiple targets use the same envelope without
+compounding; later non-overlapping edits remain possible. This is a versioned bounded action
+meaning, not an authored opacity edit, isolation, automatic target selection, or a general
+attention director. Unsupported or hidden targets and board-crossing windows fail closed.
+
 ## Bundled original-illustration slice
 
 The bounded Slice 3C compositor may select an ATME-original Paper & Ink illustration by the
@@ -152,7 +166,7 @@ illustrations a director-selected, data-driven, or complete production asset sys
 ## Still to define and implement before Phase 3 exit
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be
-fixed before their first runtime implementation: `dim`, `isolate`,
+fixed before their first runtime implementation: `isolate`,
 `replace`, `morph`, `annotate`, `group`, `ungroup`, `split`, `count`,
 `insert_evidence`, `return_board`, all five camera verbs, and sound state/events. In particular,
 the contract needs explicit rules for morph compatibility, dynamic group ownership, split result
