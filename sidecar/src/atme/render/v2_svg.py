@@ -31,6 +31,7 @@ from atme.render.v2_path import (
 )
 from atme.render.v2_state import FrameObject, evaluate_frame
 from atme.store.contracts_v2 import (
+    ConnectorObject,
     ExecutableLayoutV2,
     MarkObject,
     ResolvedVisualTimelineV2,
@@ -280,8 +281,135 @@ def _registry_visual(obj: VisualObject) -> str:
             f'{inner}</svg>')
 
 
-def _object_markup(obj: MarkObject | TextObject | VisualObject, state: FrameObject, style,
-                   root: Path, scale: float, active_verb: str | None) -> str:
+def _connector_preflight(obj: ConnectorObject, objects: dict) -> None:
+    if obj.object_type != "arrow" or obj.role != "semantic_connector":
+        raise UnsupportedVisualObject(f"v2 connector {obj.object_id} has unsupported network/pointer semantics")
+    if not obj.source_object_id or not obj.source_anchor_id:
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} needs a named source anchor")
+    if obj.source_object_id == obj.destination_object_id:
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} cannot loop back to itself")
+    if obj.source_object_id == obj.object_id or obj.destination_object_id == obj.object_id:
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} cannot anchor to itself")
+    source = objects[obj.source_object_id]
+    destination = objects[obj.destination_object_id]
+    if (isinstance(source, ConnectorObject) or isinstance(destination, ConnectorObject)
+            or source.board_id != obj.board_id or destination.board_id != obj.board_id):
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} endpoints must be non-connectors on its board")
+    if (obj.geometry.points or obj.geometry.corner_radius is not None or obj.anchors
+            or obj.style.fill or obj.style.text or obj.allow_self_loop):
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has ignored geometry or styling")
+    transform = obj.transform
+    if (transform.position.x or transform.position.y or transform.scale_x != 1
+            or transform.scale_y != 1 or transform.rotation_degrees
+            or transform.origin.x != 0.5 or transform.origin.y != 0.5):
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has unsupported independent transform")
+    for endpoint, anchor_id in ((source, obj.source_anchor_id),
+                                (destination, obj.destination_anchor_id)):
+        anchor = next(anchor for anchor in endpoint.anchors if anchor.anchor_id == anchor_id)
+        if not 0 <= anchor.point.x <= 1 or not 0 <= anchor.point.y <= 1:
+            raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} needs normalized endpoint anchors")
+
+
+def _anchor_canvas_point(obj, state: FrameObject, anchor_id: str) -> tuple[float, float]:
+    anchor = next(anchor for anchor in obj.anchors if anchor.anchor_id == anchor_id)
+    bounds = obj.geometry.bounds
+    # Match the serialized geometry and transform, not higher-precision inputs
+    # that the rasterizer never sees.
+    x = float(_n(bounds.x)) + float(_n(bounds.width)) * anchor.point.x
+    y = float(_n(bounds.y)) + float(_n(bounds.height)) * anchor.point.y
+    transform = state.transform
+    if abs(transform.rotation_degrees) > 1_000_000:
+        raise UnsupportedVisualObject(f"v2 connector endpoint {obj.object_id} rotation is out of range")
+    origin_x = float(_n(bounds.x + bounds.width * transform.origin.x))
+    origin_y = float(_n(bounds.y + bounds.height * transform.origin.y))
+    scale_x = float(_n(transform.scale_x))
+    scale_y = float(_n(transform.scale_y))
+    if scale_x <= 0 or scale_y <= 0:
+        raise UnsupportedVisualObject(f"v2 connector endpoint {obj.object_id} has collapsed scale")
+    delta_x = (x - origin_x) * scale_x
+    delta_y = (y - origin_y) * scale_y
+    radians = math.radians(float(_n(transform.rotation_degrees)))
+    return (origin_x + delta_x * math.cos(radians) - delta_y * math.sin(radians)
+            + float(_n(transform.position.x)),
+            origin_y + delta_x * math.sin(radians) + delta_y * math.cos(radians)
+            + float(_n(transform.position.y)))
+
+
+def _connector_shape(obj: ConnectorObject, objects: dict, states: dict,
+                     stroke: str, weight: float, draw_fraction: float | None) -> str:
+    source = objects[obj.source_object_id]
+    destination = objects[obj.destination_object_id]
+    source_state = states[source.object_id]
+    destination_state = states[destination.object_id]
+    if any(not endpoint.visible or endpoint.opacity <= 0 or endpoint.reveal_fraction <= 0
+           for endpoint in (source_state, destination_state)):
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has a hidden endpoint")
+    start = _anchor_canvas_point(source, source_state, obj.source_anchor_id)
+    end = _anchor_canvas_point(destination, destination_state, obj.destination_anchor_id)
+    if not all(math.isfinite(value) and abs(value) <= 1_000_000 for point in (start, end)
+               for value in point):
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} endpoint is outside supported range")
+    start = (float(_n(start[0])), float(_n(start[1])))
+    end = (float(_n(end[0])), float(_n(end[1])))
+    bounds = obj.geometry.bounds
+    if any(not (bounds.x <= x <= bounds.x + bounds.width
+                and bounds.y <= y <= bounds.y + bounds.height) for x, y in (start, end)):
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} exceeds authored bounds")
+    if obj.routing == "straight":
+        route = [start, end]
+        tangent = (end[0] - start[0], end[1] - start[1])
+        path = f'M {_n(start[0])} {_n(start[1])} L {_n(end[0])} {_n(end[1])}'
+        length = math.dist(start, end)
+    elif obj.routing == "elbow":
+        bend = (end[0], start[1])
+        route = [start, bend, end]
+        tangent = (end[0] - bend[0], end[1] - bend[1])
+        if tangent == (0, 0):
+            tangent = (bend[0] - start[0], bend[1] - start[1])
+        path = (f'M {_n(start[0])} {_n(start[1])} L {_n(bend[0])} {_n(bend[1])} '
+                f'L {_n(end[0])} {_n(end[1])}')
+        length = math.dist(start, bend) + math.dist(bend, end)
+    else:
+        bend = (float(_n((start[0] + end[0]) / 2)), start[1])
+        route = [start, bend, end]
+        tangent = (end[0] - bend[0], end[1] - bend[1])
+        path = (f'M {_n(start[0])} {_n(start[1])} Q {_n(bend[0])} {_n(bend[1])} '
+                f'{_n(end[0])} {_n(end[1])}')
+        length = sum(math.dist(previous, current) for previous, current in pairwise(
+            ((1 - t) ** 2 * start[0] + 2 * (1 - t) * t * bend[0] + t ** 2 * end[0],
+             (1 - t) ** 2 * start[1] + 2 * (1 - t) * t * bend[1] + t ** 2 * end[1])
+            for t in (step / 64 for step in range(65))
+        ))
+    if any(not (bounds.x <= x <= bounds.x + bounds.width
+                and bounds.y <= y <= bounds.y + bounds.height) for x, y in route):
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} route exceeds authored bounds")
+    if not math.isfinite(length) or not 0.0001 <= length <= 10_000_000:
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has degenerate/oversized route")
+    tangent_length = math.hypot(*tangent)
+    if tangent_length <= 0:
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has no endpoint direction")
+    unit_x, unit_y = tangent[0] / tangent_length, tangent[1] / tangent_length
+    wing = 6 * weight / 2.6667
+    depth = 14 * weight / 2.6667
+    base_x, base_y = end[0] - depth * unit_x, end[1] - depth * unit_y
+    left = (float(_n(base_x - wing * unit_y)), float(_n(base_y + wing * unit_x)))
+    right = (float(_n(base_x + wing * unit_y)), float(_n(base_y - wing * unit_x)))
+    if any(not (bounds.x <= x <= bounds.x + bounds.width
+                and bounds.y <= y <= bounds.y + bounds.height) for x, y in (left, right)):
+        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} head exceeds authored bounds")
+    dash = (f' stroke-dasharray="{_n(length)} {_n(length)}" '
+            f'stroke-dashoffset="{_n(length * (1 - draw_fraction))}"'
+            if draw_fraction is not None and draw_fraction < 1 else "")
+    arrowhead = "" if draw_fraction is not None and draw_fraction < 1 else (
+        f'<polygon points="{_n(end[0])},{_n(end[1])} '
+        f'{_n(left[0])},{_n(left[1])} {_n(right[0])},{_n(right[1])}" fill="{stroke}"/>')
+    return (f'<path d="{path}" fill="none" stroke="{stroke}" stroke-width="{_n(weight)}" '
+            f'stroke-linecap="round" stroke-linejoin="round"{dash}/>{arrowhead}')
+
+
+def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject,
+                   state: FrameObject, style, root: Path, scale: float,
+                   active_verb: str | None, objects: dict, states: dict) -> str:
     if not state.visible or state.opacity <= 0 or state.reveal_fraction <= 0:
         return ""
     t = state.transform
@@ -304,6 +432,11 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject, state: FrameObje
         inner = _text(obj, color, font.family, font.weight, role.size_px * scale, role.line_height,
                       role.max_characters_per_line, root / font.file,
                       state.reveal_fraction if active_verb == "write" else None)
+    elif isinstance(obj, ConnectorObject):
+        stroke = _color(obj.style.stroke, style.colors, default=style.colors["ink"])
+        inner = _connector_shape(obj, objects, states, stroke,
+                                 style.strokes.regular_px * scale,
+                                 state.reveal_fraction if active_verb == "draw" else None)
     else:
         inner = _registry_visual(obj)
     # Reveal is clipped in canvas coordinates inside the transformed local group.
@@ -314,8 +447,8 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject, state: FrameObje
             f'transform="{transform}" opacity="{_n(state.opacity)}"{clip}>{inner}</g>')
 
 
-def _preflight_object(obj: MarkObject | TextObject | VisualObject,
-                      style, root: Path, scale: float) -> None:
+def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObject,
+                      style, root: Path, scale: float, objects: dict) -> None:
     _xml_escape(obj.object_id)
     if obj.parent_id or obj.clip_id or obj.style.effect or obj.asset_id:
         raise UnsupportedVisualObject(
@@ -327,6 +460,9 @@ def _preflight_object(obj: MarkObject | TextObject | VisualObject,
         stroke = _color(obj.style.stroke, style.colors, default=style.colors["ink"])
         fill = _color(obj.style.fill, style.colors, default="none")
         _shape(obj, stroke, fill, style.strokes.regular_px * scale)
+    elif isinstance(obj, ConnectorObject):
+        _color(obj.style.stroke, style.colors, default=style.colors["ink"])
+        _connector_preflight(obj, objects)
     elif isinstance(obj, TextObject):
         if (obj.style.stroke or obj.style.fill or obj.geometry.points
                 or obj.geometry.corner_radius is not None
@@ -359,7 +495,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                 f"v2 action {action.action_id} requires an authored ordered-child reveal"
             )
         if isinstance(action, TargetAction) and action.verb in {"draw", "write"}:
-            compatible = MarkObject if action.verb == "draw" else TextObject
+            compatible = (MarkObject, ConnectorObject) if action.verb == "draw" else TextObject
             if any(not isinstance(objects[target], compatible) for target in action.target_ids):
                 raise UnsupportedVisualObject(
                     f"v2 {action.verb} action {action.action_id} targets an incompatible object type"
@@ -367,10 +503,12 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
             if action.verb == "draw":
                 for target in action.target_ids:
                     mark = objects[target]
-                    _shape(mark, "#000000", "none", 1, draw_fraction=0.5)
+                    if isinstance(mark, MarkObject):
+                        _shape(mark, "#000000", "none", 1, draw_fraction=0.5)
     unsupported = [obj for obj in layout.objects
                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_MARKS
                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_TEXT
+                           or isinstance(obj, ConnectorObject) and obj.object_type == "arrow"
                            or isinstance(obj, VisualObject)
                            and obj.object_type in SUPPORTED_REGISTRY_VISUALS)]
     if unsupported:
@@ -387,7 +525,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     if abs(scale_x - scale_y) > 1e-6:
         raise UnsupportedVisualObject("output profile cannot uniformly scale Paper & Ink design tokens")
     for obj in layout.objects:
-        _preflight_object(obj, style, root, scale_x)
+        _preflight_object(obj, style, root, scale_x, objects)
     active_verbs = {
         target: resolved.action.verb
         for resolved in timeline.actions
@@ -400,6 +538,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     body = [(f'<rect x="{_n(layout.canvas.x)}" y="{_n(layout.canvas.y)}" '
              f'width="{_n(layout.canvas.width)}" height="{_n(layout.canvas.height)}" '
              f'fill="{style.colors["paper"]}"/>')]
+    states = {state.object_id: state for state in snapshot.objects}
     for state in snapshot.objects:
         obj = objects[state.object_id]
         if 0 < state.reveal_fraction < 1 and active_verbs.get(state.object_id) not in {"draw", "write"}:
@@ -411,7 +550,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                 f'height="{_n(bounds.height)}"/></clipPath>'
             )
         body.append(_object_markup(obj, state, style, root, scale_x,
-                                   active_verbs.get(state.object_id)))
+                                   active_verbs.get(state.object_id), objects, states))
     width, height = layout.output_profile.width, layout.output_profile.height
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
            f'viewBox="{_n(layout.canvas.x)} {_n(layout.canvas.y)} {width} {height}">'

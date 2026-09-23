@@ -58,6 +58,19 @@ fixed-segment deterministic length approximation for
 unsupported/degenerate geometry blocks the entire layout even when hidden. This is a bounded
 hand-drawn shape, not a general vector import or a full path editor.
 
+## Bounded relationship arrows
+
+Slice 3F represents one authored semantic relationship with an `arrow` connector. Both source
+and destination must be existing non-connector objects on the same board with named normalized
+anchors; their current frame transforms determine connector endpoints. Its own authored bounds
+must contain the route and arrowhead. Its stroke token is consumed, while separate points,
+fill/text/effect styling, and independent motion that could detach it are rejected. Straight,
+right-angle elbow, and
+quadratic curve routes are deterministic. `draw` progressively exposes the shaft, then places
+the arrowhead at completion. A visible arrow with a hidden endpoint blocks the frame rather
+than floating unbound. Unsupported free-source pointers, network objects, self-loops, and the
+canonical `connect`/`disconnect` actions remain unavailable.
+
 ## Bundled original-illustration slice
 
 The bounded Slice 3C compositor may select an ATME-original Paper & Ink illustration by the

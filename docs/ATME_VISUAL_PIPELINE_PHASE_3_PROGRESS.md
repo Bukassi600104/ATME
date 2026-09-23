@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3E independent PASS; Phase 3 remains incomplete
+Status: Slices 3A–3F independent PASS; Phase 3 remains incomplete
 
 Date: 2026-09-23
 
@@ -43,6 +43,12 @@ Date: 2026-09-23
   against authored bounds, and rejects unsupported SVG commands and invalid/degenerate paths.
   Existing `draw` progression now applies to these strokes. This does not add arbitrary SVG,
   external artwork, or full-object compositor coverage.
+- Slice 3F adds bounded semantic arrows between named anchors on two same-board objects. Straight,
+  elbow, and quadratic-curve routes follow endpoint movement, scale, and rotation in random-access
+  frames; authored `draw` progresses the shaft and places the arrowhead only at completion.
+  Free-source pointers, network objects, independent connector transforms, hidden endpoints,
+  cross-board bindings, and out-of-bounds routes remain rejected. This does not implement the
+  canonical `connect`/`disconnect` actions or a general network-layout engine.
 - No audio events are produced by the kernel. The full 35-type primitive/container
   compositor, asset/media resolution, remaining canonical action verbs, camera/board composition,
   and real project preview/export dispatcher are still required.
@@ -72,6 +78,11 @@ Date: 2026-09-23
   bounded gate after rechecking coordinate overflow, serialized zero-length paths, malformed
   inputs, future/hidden path rejection, and deterministic seek/raster output; 79 focused tests
   passed in its separate run. The full sidecar regression passed against the finalized 3E files
+  with exit code 0 (2026-09-23).
+- Slice 3F focused connector/SVG tests and Ruff passed. The independent auditor passed the
+  bounded gate after 72 connector/SVG/frame-state tests, 12 targeted v1/offline-render tests,
+  and checks for effective endpoint visibility, fractional transform parity, bounds, routing,
+  and deterministic seeking. The full sidecar regression passed against finalized 3F files
   with exit code 0 (2026-09-23).
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
