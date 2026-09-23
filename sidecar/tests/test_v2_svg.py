@@ -7,6 +7,7 @@ import io
 import xml.etree.ElementTree as ET
 
 import pytest
+from atme.render.v2_state import V2FrameError
 from atme.render.v2_svg import (
     UnsupportedVisualObject,
     compose_png_frame,
@@ -78,10 +79,10 @@ def test_unknown_token_and_unhandled_effect_reject():
         compose_svg_frame(layout, timeline, 1000)
 
 
-def test_progressive_reveal_requires_ordered_children():
+def test_progressive_reveal_requires_ordered_list_items():
     layout, timeline = primitive_documents()
     timeline["actions"][0]["action"]["verb"] = "progressive_reveal"
-    with pytest.raises(UnsupportedVisualObject, match="ordered-child reveal"):
+    with pytest.raises(V2FrameError, match="ordered-child list"):
         compose_svg_frame(layout, timeline, 100)
 
 

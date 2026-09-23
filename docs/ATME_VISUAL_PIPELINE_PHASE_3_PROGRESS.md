@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3H independent PASS; Phase 3 remains incomplete
+Status: Slices 3A–3H independent PASS; Slice 3I under audit; Phase 3 remains incomplete
 
 Date: 2026-09-23
 
@@ -36,7 +36,7 @@ Date: 2026-09-23
 - Slice 3D implements `draw` as progressive SVG path stroke for the five supported mark types,
   and `write` as whole-grapheme text/list progression using the authored font and line breaks.
   The mark's fill appears at action completion. These two verbs no longer use a generic
-  rectangular reveal; `progressive_reveal` still rejects until ordered-child semantics exist.
+  rectangular reveal. Ordered list disclosure is added in the later bounded Slice 3I.
   This is a limited frame-compositor capability, not desktop preview/export wiring.
 - Slice 3E adds bounded `freehand` point-polylines and authored absolute M/L/Q/C path strokes.
   Its parser accepts data-only coordinates, emits sanitized path geometry, checks control points
@@ -64,6 +64,13 @@ Date: 2026-09-23
   with fill, injected path data, ignored points, and unknown color tokens rejected. These are
   explicit visual objects, not execution of the still-unsupported `highlight` action or an
   automatic attention director.
+- Slice 3I implements `progressive_reveal` only for an authored, initially hidden `list`
+  text object with stored ordered items. The heading appears after progression begins; complete
+  items arrive at eased equal fractions of the action window, without cropped glyphs or a
+  generic reveal rectangle. The full list is measured against the pinned font and authored
+  bounds before the compositor returns a frame. State and SVG share one nonblank/single-line item gate,
+  including Unicode line separators. Reusing a previously touched list or targeting a
+  non-list object fails closed. General ordered-child/group reveal is still unavailable.
 - No audio events are produced by the kernel. The full 35-type primitive/container
   compositor, asset/media resolution, remaining canonical action verbs, camera/board composition,
   and real project preview/export dispatcher are still required.
@@ -108,6 +115,11 @@ Date: 2026-09-23
   audit. The auditor also passed 13 targeted v1/offline-render regressions and found no bounded
   blocker. The full sidecar regression passed with exit code 0 against finalized Slice 3H
   files (2026-09-23); no installed-app or full Phase 3 claim follows.
+- Slice 3I: focused state/SVG/raster and malformed-list negative tests plus Ruff passed. The
+  auditor identified the blank/Unicode-line-break input gap, which is fixed through a shared
+  validator and retested; the re-audit could not complete because the auditor's usage limit
+  was reached. The full sidecar regression passed with exit code 0 (2026-09-23). Independent
+  PASS remains pending, so this is not a Phase 3 gate completion claim.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.

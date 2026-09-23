@@ -12,12 +12,14 @@ import json
 from dataclasses import dataclass, replace
 
 from atme.render.v2_connector import UnsupportedConnector, validate_static_arrow
+from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.store.contracts_v2 import (
     ConnectionAction,
     ConnectorObject,
     ExecutableLayoutV2,
     ResolvedVisualTimelineV2,
     TargetAction,
+    TextObject,
     Transform,
     TransformAction,
 )
@@ -186,6 +188,21 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                    for target in item.action.target_ids):
                 raise V2FrameError(f"action {item.action.action_id} crosses board ownership")
             for target in item.action.target_ids:
+                if isinstance(item.action, TargetAction) and item.action.verb == "progressive_reveal":
+                    obj = layout_objects[target]
+                    if not isinstance(obj, TextObject):
+                        raise V2FrameError(
+                            f"action {item.action.action_id} requires an authored ordered-child list"
+                        )
+                    try:
+                        validate_ordered_list(obj)
+                    except UnsupportedOrderedList as exc:
+                        raise V2FrameError(str(exc)) from exc
+                    if (initial[target].visible or initial[target].state != "hidden"
+                            or target in last_target_end):
+                        raise V2FrameError(
+                            f"action {item.action.action_id} requires a previously untouched hidden list"
+                        )
                 if item.start_ms < last_target_end.get(target, 0):
                     raise V2FrameError(f"overlapping actions on {target} need an explicit composition rule")
                 last_target_end[target] = item.end_ms

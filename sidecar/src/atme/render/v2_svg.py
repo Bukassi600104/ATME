@@ -24,6 +24,7 @@ from atme.render.style_bundle import (
     verified_asset_svg,
 )
 from atme.render.v2_connector import UnsupportedConnector, validate_static_arrow
+from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.render.v2_path import (
     MAX_COORDINATE,
     MAX_STROKE_LENGTH,
@@ -254,12 +255,15 @@ def _shape(obj: MarkObject, stroke: str, fill: str, weight: float,
 
 def _text(obj: TextObject, color: str, font_family: str, font_weight: int, font_size: float,
           line_height: float, max_characters: int, font_path: Path,
-          write_fraction: float | None = None) -> str:
+          write_fraction: float | None = None,
+          progressive_fraction: float | None = None) -> str:
     bounds = obj.geometry.bounds
     lines = obj.text.splitlines()
     if obj.object_type == "list":
-        if not obj.items:
-            raise UnsupportedVisualObject(f"list {obj.object_id} has no items")
+        try:
+            validate_ordered_list(obj)
+        except UnsupportedOrderedList as exc:
+            raise UnsupportedVisualObject(str(exc)) from exc
         lines = [obj.text, *(f"• {item}" for item in obj.items)]
     if any(len(line) > max_characters for line in lines):
         raise UnsupportedVisualObject(f"text {obj.object_id} requires authored line breaks")
@@ -268,6 +272,11 @@ def _text(obj: TextObject, color: str, font_family: str, font_weight: int, font_
     measuring_font = _font(str(font_path), max(1, math.ceil(font_size)))
     if any(measuring_font.getlength(line) > bounds.width for line in lines):
         raise UnsupportedVisualObject(f"text {obj.object_id} exceeds authored width")
+    if progressive_fraction is not None:
+        if obj.object_type != "list" or write_fraction is not None:
+            raise UnsupportedVisualObject("ordered disclosure needs one authored list")
+        visible_items = math.floor(len(obj.items) * progressive_fraction)
+        lines = lines[:1 + visible_items]
     if write_fraction is not None and write_fraction < 1:
         graphemes = regex.findall(r"\X", "\n".join(lines))
         visible = math.floor(len(graphemes) * write_fraction)
@@ -443,7 +452,8 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
         font = next(font for font in style.fonts if font.id == role.font_id)
         inner = _text(obj, color, font.family, font.weight, role.size_px * scale, role.line_height,
                       role.max_characters_per_line, root / font.file,
-                      state.reveal_fraction if active_verb == "write" else None)
+                      state.reveal_fraction if active_verb == "write" else None,
+                      state.reveal_fraction if active_verb == "progressive_reveal" else None)
     elif isinstance(obj, ConnectorObject):
         stroke = _color(obj.style.stroke, style.colors, default=style.colors["ink"])
         inner = _connector_shape(obj, objects, states, stroke,
@@ -456,7 +466,7 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
     # Reveal is clipped in canvas coordinates inside the transformed local group.
     clip = ""
     if state.reveal_fraction < 1 and active_verb not in {
-        "draw", "write", "connect", "disconnect"
+        "draw", "write", "progressive_reveal", "connect", "disconnect"
     }:
         clip = f' clip-path="url(#{_clip_id(obj.object_id)})"'
     return (f'<g data-object-id="{_xml_escape(obj.object_id)}" '
@@ -514,9 +524,11 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     objects = {obj.object_id: obj for obj in layout.objects}
     for resolved in timeline.actions:
         action = resolved.action
-        if action.verb == "progressive_reveal":
+        if (isinstance(action, TargetAction) and action.verb == "progressive_reveal"
+                and any(not isinstance(objects[target], TextObject)
+                        or objects[target].object_type != "list" for target in action.target_ids)):
             raise UnsupportedVisualObject(
-                f"v2 action {action.action_id} requires an authored ordered-child reveal"
+                f"v2 action {action.action_id} requires an authored ordered-child list"
             )
         if isinstance(action, TargetAction) and action.verb in {"draw", "write"}:
             compatible = (MarkObject, ConnectorObject) if action.verb == "draw" else TextObject
@@ -557,7 +569,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
         for target in (
             resolved.action.target_ids
             if isinstance(resolved.action, TargetAction)
-            and resolved.action.verb in {"draw", "write"}
+            and resolved.action.verb in {"draw", "write", "progressive_reveal"}
             else (resolved.action.connector_id,)
             if isinstance(resolved.action, ConnectionAction) else ()
         )
@@ -570,7 +582,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     for state in snapshot.objects:
         obj = objects[state.object_id]
         if 0 < state.reveal_fraction < 1 and active_verbs.get(state.object_id) not in {
-            "draw", "write", "connect", "disconnect"
+            "draw", "write", "progressive_reveal", "connect", "disconnect"
         }:
             bounds = obj.geometry.bounds
             definitions.append(

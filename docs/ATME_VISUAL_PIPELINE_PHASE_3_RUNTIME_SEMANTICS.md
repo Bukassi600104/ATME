@@ -1,6 +1,6 @@
 # Phase 3 v2 runtime semantics — kernel contract
 
-Status: Slices 3A–3H independent PASS; not a production-renderer capability declaration
+Status: Slices 3A–3H independent PASS; Slice 3I under audit; not a production-renderer capability declaration
 
 This document fixes the meanings implemented by the first deterministic frame-state kernel. It
 does not replace the v2 JSON contracts or authorize the v1 renderer to consume them. Real pixels,
@@ -33,8 +33,8 @@ Phase 3 slices. Until then, the desktop and MCP capability must continue reporti
   In Slice 3D, the limited compositor consumes that fraction for `draw` on the five supported
   mark paths by progressively exposing the stroke, with authored fill appearing at completion.
   `write` on supported text/list objects reveals complete Unicode grapheme clusters while
-  retaining authored line breaks and measured font bounds. `progressive_reveal` still lacks
-  ordered-child semantics and fails closed; generic `reveal` remains a clipped reveal. Other
+  retaining authored line breaks and measured font bounds. Slice 3I consumes the fraction for
+  whole-item `progressive_reveal` on an authored list only; generic `reveal` remains a clipped reveal. Other
   object and action combinations must not silently substitute one of these effects.
 - `enter` fades from zero to the authored object opacity; it does not invent a slide direction.
   `exit` fades to zero, ends invisible, and has the canonical permanent `removed` post-state.
@@ -94,6 +94,18 @@ versioned Paper & Ink style tokens; both support the same path-length-based dete
 `draw` progression as other marks. They do not imply target linking or execute the separate
 `highlight` action. Extra points, injected path data, fill, text/effect styling, or unknown
 color tokens block the layout even when the mark is hidden.
+
+## Ordered list disclosure
+
+Slice 3I gives `progressive_reveal` one bounded meaning: a hidden, previously untouched
+`list` text object with an authored heading and nonempty ordered `items`. The heading appears
+once action progress is positive. At eased fraction `p`, exactly `floor(p × item_count)` complete
+items are shown; the completed action shows all items. Each heading/item must be one line and
+the entire list must fit the authored bounds in the pinned body font before any frame is
+composited. No glyph cropping or generic clip is used. Non-list targets, empty or blank
+heading/items, line separators including Unicode, already visible or previously touched lists
+fail closed in both state evaluation and composition. This does not
+implement arbitrary ordered children, groups, camera reveal, or an automatic director.
 
 ## Bundled original-illustration slice
 

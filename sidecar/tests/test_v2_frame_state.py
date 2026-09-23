@@ -84,7 +84,7 @@ def test_each_reveal_uses_its_own_timing_window_and_board():
     assert all(not item.visible for item in evaluate_frame(layout, timeline, 9500).objects)
 
 
-@pytest.mark.parametrize("verb", ["reveal", "write", "draw", "progressive_reveal"])
+@pytest.mark.parametrize("verb", ["reveal", "write", "draw"])
 def test_reveal_family_has_exact_start_middle_and_end(verb):
     layout, timeline = supported_documents(verb)
     assert not evaluate_frame(layout, timeline, 3999).object("object-evidence").visible
