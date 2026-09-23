@@ -16,6 +16,7 @@ from atme.render.v2_emphasis import (
     SUPPORTED_HIGHLIGHT_MARKS,
     SUPPORTED_HIGHLIGHT_TEXT,
     UnsupportedEmphasis,
+    cross_out_paths,
     emphasis_path,
 )
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
@@ -75,6 +76,7 @@ class FrameObject:
     reveal_fraction: float
     transform: FrameTransform
     emphasis_fraction: float = 0.0
+    cross_out_fraction: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -156,6 +158,7 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             )
     last_target_end: dict[str, int] = {}
     highlighted_targets: set[str] = set()
+    crossed_out_targets: set[str] = set()
     completed_transform = {
         object_id: FrameTransform.from_contract(obj.transform)
         for object_id, obj in layout_objects.items()
@@ -205,6 +208,8 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             for target in item.action.target_ids:
                 if target in highlighted_targets:
                     raise V2FrameError(f"highlighted target {target} cannot receive another action")
+                if target in crossed_out_targets:
+                    raise V2FrameError(f"crossed-out target {target} cannot receive another action")
                 if isinstance(item.action, TargetAction) and item.action.verb == "highlight":
                     obj = layout_objects[target]
                     if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
@@ -226,6 +231,32 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                     except UnsupportedEmphasis as exc:
                         raise V2FrameError(str(exc)) from exc
                     highlighted_targets.add(target)
+                if isinstance(item.action, TargetAction) and item.action.verb == "cross_out":
+                    obj = layout_objects[target]
+                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
+                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT):
+                        raise V2FrameError(
+                            f"cross_out {item.action.action_id} needs a supported mark or text target"
+                        )
+                    if (not initial[target].visible or initial[target].state != "visible"
+                            or obj.opacity <= 0 or target in last_target_end):
+                        raise V2FrameError(
+                            f"cross_out {item.action.action_id} needs an untouched visible target"
+                        )
+                    if (item.action.expected_state, item.action.post_state) != ("visible", "crossed_out"):
+                        raise V2FrameError(
+                            f"cross_out {item.action.action_id} needs canonical visible-to-crossed_out states"
+                        )
+                    if not any(activation.board_id == item.action.board_id
+                               and activation.start_ms <= item.start_ms
+                               and item.end_ms <= activation.end_ms
+                               for activation in layout.activations):
+                        raise V2FrameError(f"cross_out {item.action.action_id} needs an active board")
+                    try:
+                        cross_out_paths(obj.geometry.bounds)
+                    except UnsupportedEmphasis as exc:
+                        raise V2FrameError(str(exc)) from exc
+                    crossed_out_targets.add(target)
                 if isinstance(item.action, TargetAction) and item.action.verb == "progressive_reveal":
                     obj = layout_objects[target]
                     if not isinstance(obj, TextObject):
@@ -327,6 +358,7 @@ def evaluate_frame(
             isinstance(action, (TransformAction, ConnectionAction))
             or isinstance(action, TargetAction) and action.verb in {
                 "reveal", "write", "draw", "enter", "exit", "progressive_reveal", "highlight",
+                "cross_out",
             }
         )
         if not supported:
@@ -362,6 +394,10 @@ def evaluate_frame(
                     if not before.visible or before.opacity <= 0 or before.reveal_fraction < 1:
                         raise V2FrameError(f"highlight {action.action_id} has no visible target")
                     after = replace(before, state=state, emphasis_fraction=progress)
+                elif action.verb == "cross_out":
+                    if not before.visible or before.opacity <= 0 or before.reveal_fraction < 1:
+                        raise V2FrameError(f"cross_out {action.action_id} has no visible target")
+                    after = replace(before, state=state, cross_out_fraction=progress)
                 else:
                     after = replace(before, state=state, visible=True,
                                     reveal_fraction=progress)

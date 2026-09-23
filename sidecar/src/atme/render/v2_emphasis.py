@@ -44,3 +44,23 @@ def emphasis_path(bounds: Bounds, kind: Literal["underline", "highlight"]) -> Fr
         return parse_freehand_path(path, bounds)
     except InvalidFreehandPath as exc:
         raise UnsupportedEmphasis(f"{kind} exceeds supported authored bounds") from exc
+
+
+def cross_out_paths(bounds: Bounds) -> tuple[FreehandPath, FreehandPath]:
+    """Two separately drawn diagonals, with no hidden connecting stroke."""
+    x, y, w, h = bounds.x, bounds.y, bounds.width, bounds.height
+
+    def number(value: float) -> str:
+        return f"{value:.4f}".rstrip("0").rstrip(".") if value else "0"
+
+    def point(x_fraction: float, y_fraction: float) -> str:
+        return f"{number(x + w * x_fraction)} {number(y + h * y_fraction)}"
+
+    paths = (
+        f"M {point(0.08, 0.12)} L {point(0.92, 0.88)}",
+        f"M {point(0.90, 0.10)} L {point(0.10, 0.90)}",
+    )
+    try:
+        return tuple(parse_freehand_path(path, bounds) for path in paths)
+    except InvalidFreehandPath as exc:
+        raise UnsupportedEmphasis("cross_out exceeds supported authored bounds") from exc

@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3J independent PASS; Phase 3 remains incomplete
+Status: Slices 3A–3K independent PASS; Phase 3 remains incomplete
 
 Date: 2026-09-23
 
@@ -79,6 +79,11 @@ Date: 2026-09-23
   ring follows the target's existing transform and persists. Connectors, illustrations, hidden
   or previously acted-on targets, and subsequent actions on that target fail closed. This is
   one explicit attention cue, not dimming, isolation, or an automatic attention director.
+- Slice 3K implements `cross_out` as two sequential hand-drawn attention strokes over a
+  visible, untouched supported mark or text object. The original content remains intact, while
+  the strokes persist and follow the target's existing transform. Exact visible→crossed_out
+  states, an active board window, and terminal target ownership are required. This is a
+  correction cue, not automatic semantic revision or removal.
 - No audio events are produced by the kernel. The full 35-type primitive/container
   compositor, asset/media resolution, remaining canonical action verbs, camera/board composition,
   and real project preview/export dispatcher are still required.
@@ -132,6 +137,10 @@ Date: 2026-09-23
   tests, Ruff, and 13 targeted v1/offline-render regressions. The full sidecar regression
   passed with exit code 0 against finalized Slice 3J files (2026-09-23). No full Phase 3 or
   installed-app claim follows.
+- Slice 3K: independent bounded audit PASS after 89 focused cross-out/highlight/emphasis/SVG/state
+  tests, Ruff, and 13 targeted v1/offline-render regressions. The full sidecar regression
+  passed with exit code 0 against finalized Slice 3K files (2026-09-23). This is not full
+  Phase 3 or installed-app acceptance.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.

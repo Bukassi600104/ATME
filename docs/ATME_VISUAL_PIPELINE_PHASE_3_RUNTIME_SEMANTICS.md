@@ -1,6 +1,6 @@
 # Phase 3 v2 runtime semantics — kernel contract
 
-Status: Slices 3A–3J independent PASS; not a production-renderer capability declaration
+Status: Slices 3A–3K independent PASS; not a production-renderer capability declaration
 
 This document fixes the meanings implemented by the first deterministic frame-state kernel. It
 does not replace the v2 JSON contracts or authorize the v1 renderer to consume them. Real pixels,
@@ -122,6 +122,19 @@ The target cannot receive later target or transform actions in this bounded slic
 registry illustrations, hidden targets, and unsupported geometry fail closed. This does not
 implement dimming, isolation, secondary-context choreography, or automatic direction.
 
+## Bounded target cross-out
+
+Slice 3K gives `cross_out` one explicit, non-destructive target-action meaning. It targets an
+already-visible, nonzero-opacity, previously untouched supported mark or text/list object on
+the active board, with `expected_state=visible` and `post_state=crossed_out`. The complete
+action window must fit inside one board activation. Two separate attention-color diagonal
+strokes cross the target's authored bounds, drawn sequentially by deterministic path-length
+progression; the target's existing content, opacity, and transform remain unchanged. Both
+strokes persist after completion and move with the object's existing transform. The target
+cannot receive later target or transform actions in this bounded slice. Unsupported targets,
+hidden targets, ignored annotation payloads, and unsupported geometry fail closed. Cross-out
+does not erase content, rewrite narrative facts, or automatically select what to correct.
+
 ## Bundled original-illustration slice
 
 The bounded Slice 3C compositor may select an ATME-original Paper & Ink illustration by the
@@ -140,7 +153,7 @@ illustrations a director-selected, data-driven, or complete production asset sys
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be
 fixed before their first runtime implementation: `dim`, `isolate`,
-`replace`, `morph`, `cross_out`, `annotate`, `group`, `ungroup`, `split`, `count`,
+`replace`, `morph`, `annotate`, `group`, `ungroup`, `split`, `count`,
 `insert_evidence`, `return_board`, all five camera verbs, and sound state/events. In particular,
 the contract needs explicit rules for morph compatibility, dynamic group ownership, split result
 mapping, isolate restoration, and ordered progressive disclosure. Audible mixing remains Phase 7;

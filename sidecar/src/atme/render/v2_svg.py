@@ -28,6 +28,7 @@ from atme.render.v2_emphasis import (
     SUPPORTED_HIGHLIGHT_MARKS,
     SUPPORTED_HIGHLIGHT_TEXT,
     UnsupportedEmphasis,
+    cross_out_paths,
     emphasis_path,
 )
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
@@ -464,6 +465,26 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
                   f'fill="none" stroke="{style.colors["attention"]}" '
                   f'stroke-width="{_n(style.strokes.emphasis_px * scale)}" '
                   f'stroke-linecap="round" stroke-linejoin="round"{dash}/>')
+    if state.cross_out_fraction > 0:
+        try:
+            strokes = cross_out_paths(bounds)
+        except UnsupportedEmphasis as exc:
+            raise UnsupportedVisualObject(
+                f"cross_out target {obj.object_id} exceeds supported authored bounds"
+            ) from exc
+        for index, stroke_path in enumerate(strokes):
+            fraction = min(1.0, max(0.0, state.cross_out_fraction * 2 - index))
+            if fraction <= 0:
+                continue
+            dash = ""
+            if fraction < 1:
+                dash = (f' stroke-dasharray="{_n(stroke_path.length)} {_n(stroke_path.length)}" '
+                        f'stroke-dashoffset="{_n(stroke_path.length * (1 - fraction))}"')
+            inner += (f'<path data-attention-action="cross_out" data-stroke="{index + 1}" '
+                      f'd="{stroke_path.svg_d}" fill="none" '
+                      f'stroke="{style.colors["attention"]}" '
+                      f'stroke-width="{_n(style.strokes.emphasis_px * scale)}" '
+                      f'stroke-linecap="round" stroke-linejoin="round"{dash}/>')
     # Reveal is clipped in canvas coordinates inside the transformed local group.
     clip = ""
     if state.reveal_fraction < 1 and active_verb not in {
