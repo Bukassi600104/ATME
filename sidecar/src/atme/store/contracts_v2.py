@@ -322,6 +322,17 @@ class ReplaceAction(ActionBase):
     from_object_id: str
     to_object_id: str
 
+    @model_validator(mode="after")
+    def bounded_replace_semantics(self):
+        if self.verb == "replace":
+            if self.from_object_id == self.to_object_id:
+                raise ValueError("replace needs distinct source and destination objects")
+            if self.expected_state is None:
+                raise ValueError("replace needs a source expected_state")
+            if self.post_state != "visible":
+                raise ValueError("replace destination post_state must be visible")
+        return self
+
 
 class GroupAction(ActionBase):
     verb: Literal["group", "ungroup", "split"]
@@ -1041,6 +1052,17 @@ class ResolvedVisualTimelineV2(StrictModel):
                     raise ValueError(f"action {action.action_id} targets an object without initial state")
                 if states[target] == "removed" and action.verb not in ("return_board",):
                     raise ValueError(f"action {action.action_id} resurrects removed object {target}")
+            if isinstance(action, ReplaceAction) and action.verb == "replace":
+                if action.from_object_id == action.to_object_id:
+                    raise ValueError(f"replace {action.action_id} needs distinct objects")
+                if action.expected_state is None or states[action.from_object_id] != action.expected_state:
+                    raise ValueError(f"replace {action.action_id} source precondition failed")
+                if states[action.to_object_id] != "hidden" or action.post_state != "visible":
+                    raise ValueError(f"replace {action.action_id} needs hidden-to-visible destination")
+                states[action.from_object_id] = "removed"
+                states[action.to_object_id] = "visible"
+                resolved_actions[action.action_id] = resolved
+                continue
             # A camera observes objects; it does not mutate their semantic state.
             state_targets = ([] if isinstance(action, CameraAction)
                              else [action.connector_id] if isinstance(action, ConnectionAction)

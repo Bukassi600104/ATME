@@ -1,6 +1,6 @@
 # Phase 3 v2 runtime semantics — kernel contract
 
-Status: Slices 3A–3S independent PASS;
+Status: Slices 3A–3S independent PASS; Slice 3T bounded replacement under audit;
 not a production-renderer capability declaration
 
 This document fixes the meanings implemented by the first deterministic frame-state kernel. It
@@ -312,10 +312,35 @@ reveal actions on a mask container, dynamic membership, and external
 `clip_id` references also remain unsupported. This bounded compositor path
 is not desktop preview/export integration or a full Phase 3 capability gate.
 
+## Bounded authored-object replacement
+
+Slice 3T defines `replace` only as a deterministic crossfade between two
+distinct, already-authored, compositor-supported paintable leaves. The source
+and destination must share board, parent stacking context, z-index, bounds,
+and completed transform. The source must be fully visible, revealed, and
+non-transparent at action start, including every ancestor. The destination
+must be an untouched hidden object with positive authored opacity. Its
+`post_state` is `visible`, while the source becomes permanently `removed`.
+Both participants enter the action-conflict ledger. An overlapping edit of
+their shared ancestor also fails. Replacement requires a complete board
+activation and cannot silently rebind a connector endpoint or use a mask-only
+source.
+
+During the half-open action interval, eased progress attenuates the source
+opacity and reveals the destination at authored opacity times progress; no
+shape or geometry interpolation occurs. At the exact end only the destination
+paints. A later action may edit the destination, and a later replacement may
+use it as a new source. A replaced source cannot be revived. Camera focus on
+either replacement participant cannot overlap replacement; before/after focus
+liveness follows the replaced states. Frame evaluation, SVG, and PNG use the
+same random-access state.
+`morph`, dynamic grouping, arbitrary media substitution, and preview/export
+integration remain unsupported.
+
 ## Still to define and implement before Phase 3 exit
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be
-fixed before their first runtime implementation: `replace`, `morph`, `annotate`,
+fixed before their first runtime implementation: `morph`, `annotate`,
 `group`, `ungroup`, `split`, `count`,
 `insert_evidence`, `return_board`, and sound state/events. In particular,
 the contract needs explicit rules for morph compatibility, dynamic group ownership, split result

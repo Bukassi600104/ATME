@@ -13,6 +13,7 @@ from atme.store.contracts_v2 import (
     CameraAction,
     ContainerObject,
     ExecutableLayoutV2,
+    ReplaceAction,
     ResolvedVisualTimelineV2,
     TargetAction,
     TransformAction,
@@ -213,6 +214,12 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                         and dependency_ids.intersection(getattr(other.action, "target_ids", ()))
                         and other.start_ms < resolved.end_ms
                         and resolved.start_ms < other.end_ms)
+                       or (isinstance(other.action, ReplaceAction)
+                           and other.action.verb == "replace"
+                           and dependency_ids.intersection({other.action.from_object_id,
+                                                            other.action.to_object_id})
+                           and other.start_ms < resolved.end_ms
+                           and resolved.start_ms < other.end_ms)
                        for other in timeline.actions):
                     raise UnsupportedCamera(f"camera {action.action_id} overlaps a focus-object edit")
                 try:
@@ -244,6 +251,12 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                     opacity[target] = action.opacity
                 else:
                     transforms[target] = action.destination
+        elif isinstance(action, ReplaceAction) and action.verb == "replace":
+            visible[action.from_object_id] = False
+            revealed[action.from_object_id] = False
+            opacity[action.from_object_id] = 0.0
+            visible[action.to_object_id] = True
+            revealed[action.to_object_id] = True
     return tuple(segments)
 
 

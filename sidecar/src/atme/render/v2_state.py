@@ -37,6 +37,7 @@ from atme.store.contracts_v2 import (
     GroupAction,
     MarkObject,
     MaskContainer,
+    ReplaceAction,
     ResolvedVisualTimelineV2,
     SoundAction,
     TargetAction,
@@ -60,6 +61,9 @@ class UnsupportedVisualAction(V2FrameError):
 # opacity is restored after the action; this is not a persistent opacity edit.
 _DIM_MIN_RATIO = 0.35
 _DIM_RAMP_FRACTION = 0.2
+_REPLACE_VISUAL_TYPES = frozenset({
+    "icon", "pictogram", "character", "device", "document", "chart", "terminal",
+})
 
 
 def _dim_ratio(progress: float) -> float:
@@ -274,6 +278,11 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                 latest_isolate_end = max(latest_isolate_end, item.end_ms)
     managed_connectors = {item.action.connector_id for item in timeline.actions
                           if isinstance(item.action, ConnectionAction)}
+    connector_endpoints = {
+        endpoint_id for obj in layout.objects if isinstance(obj, ConnectorObject)
+        for endpoint_id in (obj.source_object_id, obj.destination_object_id)
+        if endpoint_id is not None
+    }
     for connector_id in managed_connectors:
         relationship = initial[connector_id]
         if (relationship.state not in {"connected", "disconnected"}
@@ -295,6 +304,68 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
         for object_id, obj in layout_objects.items()
     }
     for item in timeline.actions:
+        if isinstance(item.action, ReplaceAction) and item.action.verb == "replace":
+            action = item.action
+            source_id, destination_id = action.from_object_id, action.to_object_id
+            source, destination = layout_objects[source_id], layout_objects[destination_id]
+            if (source_id == destination_id or source_id in mask_sources
+                    or destination_id in mask_sources
+                    or source_id in connector_endpoints or destination_id in connector_endpoints):
+                raise V2FrameError(f"replace {action.action_id} needs distinct paintable objects")
+            if not all(
+                isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
+                or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT
+                or isinstance(obj, VisualObject) and obj.object_type in _REPLACE_VISUAL_TYPES
+                for obj in (source, destination)
+            ):
+                raise V2FrameError(f"replace {action.action_id} needs supported paintable leaves")
+            if (source.board_id != action.board_id or destination.board_id != action.board_id
+                    or source.parent_id != destination.parent_id
+                    or source.z_index != destination.z_index
+                    or source.geometry.bounds != destination.geometry.bounds
+                    or completed_transform[source_id] != completed_transform[destination_id]):
+                raise V2FrameError(f"replace {action.action_id} needs co-located objects")
+            ancestor_ids = set(_ancestor_ids(source, layout_objects))
+            if any(other is not item
+                   and isinstance(other.action, (TargetAction, TransformAction))
+                   and ancestor_ids.intersection(other.action.target_ids)
+                   and other.start_ms < item.end_ms
+                   and item.start_ms < other.end_ms
+                   for other in timeline.actions):
+                raise V2FrameError(f"replace {action.action_id} overlaps an ancestor edit")
+            if not any(activation.board_id == action.board_id
+                       and activation.start_ms <= item.start_ms
+                       and item.end_ms <= activation.end_ms
+                       for activation in layout.activations):
+                raise V2FrameError(f"replace {action.action_id} needs one active board")
+            if (not completed_visible[source_id] or completed_reveal[source_id] < 1
+                    or completed_opacity[source_id] <= 0 or source_id in highlighted_targets
+                    or source_id in crossed_out_targets
+                    or any(not completed_visible[ancestor_id]
+                           or completed_opacity[ancestor_id] <= 0
+                           or completed_reveal[ancestor_id] < 1
+                           for ancestor_id in ancestor_ids)):
+                raise V2FrameError(f"replace {action.action_id} needs fully visible source")
+            if (initial[destination_id].state != "hidden"
+                    or initial[destination_id].visible
+                    or completed_visible[destination_id]
+                    or completed_reveal[destination_id] != 0
+                    or destination.opacity <= 0
+                    or destination_id in last_target_end):
+                raise V2FrameError(f"replace {action.action_id} needs untouched hidden destination")
+            if (item.start_ms < last_target_end.get(source_id, 0)
+                    or item.start_ms < last_target_end.get(destination_id, 0)):
+                raise V2FrameError(f"replace {action.action_id} overlaps a participant action")
+            last_target_end[source_id] = item.end_ms
+            last_target_end[destination_id] = item.end_ms
+            last_target_verb[source_id] = "replace"
+            last_target_verb[destination_id] = "replace"
+            completed_visible[source_id] = False
+            completed_reveal[source_id] = 0.0
+            completed_opacity[source_id] = 0.0
+            completed_visible[destination_id] = True
+            completed_reveal[destination_id] = 1.0
+            continue
         if isinstance(item.action, GroupAction) and item.action.container_id is not None:
             container = layout_objects.get(item.action.container_id)
             if (not isinstance(container, ContainerObject)
@@ -587,6 +658,7 @@ def evaluate_frame(
         action = resolved.action
         supported = (
             isinstance(action, (TransformAction, ConnectionAction, CameraAction))
+            or isinstance(action, ReplaceAction) and action.verb == "replace"
             or isinstance(action, TargetAction) and action.verb in {
                 "reveal", "write", "draw", "enter", "exit", "progressive_reveal", "highlight",
                 "cross_out",
@@ -607,6 +679,24 @@ def evaluate_frame(
             action.easing,
         )
         completed = at_ms >= resolved.end_ms
+        if isinstance(action, ReplaceAction):
+            source = current[action.from_object_id]
+            destination = current[action.to_object_id]
+            current[action.from_object_id] = replace(
+                source,
+                state="removed" if completed else source.state,
+                visible=not completed,
+                opacity=source.opacity * (1.0 - progress),
+                reveal_fraction=0.0 if completed else source.reveal_fraction,
+            )
+            current[action.to_object_id] = replace(
+                destination,
+                state=action.post_state if completed else destination.state,
+                visible=progress > 0 or completed,
+                opacity=destination.opacity * progress,
+                reveal_fraction=1.0 if progress > 0 or completed else 0.0,
+            )
+            continue
         if isinstance(action, TargetAction) and action.verb == "isolate":
             for object_id in action.target_ids:
                 focus = current[object_id]

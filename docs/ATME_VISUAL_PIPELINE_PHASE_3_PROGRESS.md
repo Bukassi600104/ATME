@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3S independent PASS;
+Status: Slices 3A–3S independent PASS; Slice 3T bounded replacement under audit;
 Phase 3 remains incomplete
 
 Date: 2026-09-27
@@ -21,6 +21,17 @@ Date: 2026-09-27
   malformed pairings, non-finite input, overlap, and unsupported actions.
 
 ## Incomplete Phase 3 gates
+
+- Slice 3T adds deterministic `replace` crossfades for two co-located,
+  same-parent, same-board authored paintable leaves. The plan and resolved
+  timeline enforce distinct participants, source precondition, hidden
+  destination, and visible destination post-state. Frame state removes the
+  source and reveals the destination through a half-open eased opacity
+  transition. Ancestor visibility, action overlaps, board activation, camera
+  liveness, connector endpoints, mask-only sources, and future malformed
+  actions fail closed. No morph or geometry interpolation is implied. The
+  bounded slice remains under independent audit; preview/export and full
+  Phase 3 remain incomplete.
 
 - Slice 3S executes the bounded explicit static-alpha mask contract in v2 frame
   state and SVG/PNG. Four static filled aperture geometries (rectangle, rounded
@@ -250,6 +261,12 @@ Date: 2026-09-27
   cases passed. The full sidecar regression passed with exit code 0 against
   finalized Slice 3S files, and the final documentation re-audit passed.
   This is not full Phase 3 or installed-app acceptance.
+- Slice 3T: 28 direct authored-replacement tests passed, including PNG/SVG,
+  random seek, exact boundaries and easing, chain and board return, camera,
+  plan-level rejection, ancestor visibility/overlap, later destination edits,
+  portrait output, and connector-endpoint rejection. The v2-selected suite,
+  14 targeted legacy/offline tests, and Ruff passed after the initial slice;
+  final independent audit and full sidecar regression remain pending.
 - Slice 3R: independent bounded audit PASS for explicit static-alpha mask
   contracts, unique non-painted geometry ownership, schema/model parity,
   preserved old `2.0.0` mask loading and parse/dump/reparse, mixed-policy
