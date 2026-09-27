@@ -286,6 +286,9 @@ when future or hidden. Root connectors cannot bind to endpoints under a clip,
 and camera focus cannot target a clipped leaf: their current world geometry
 does not compute the post-clip visible region. A connector object cannot itself
 be a clip child. These cases fail closed rather than showing untrimmed geometry.
+Slice 3R separately defines the explicit static-alpha mask contract in plan/layout
+validation; old `2.0.0` masks remain loadable but ambiguous and non-executable.
+Neither mask form has frame or paint semantics yet. See the Phase 3 progress record.
 
 ## Still to define and implement before Phase 3 exit
 

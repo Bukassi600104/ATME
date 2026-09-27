@@ -207,6 +207,147 @@
       "title": "Bounds",
       "type": "object"
     },
+    "ClipContainer": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "child_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Child Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "const": "clip",
+          "title": "Object Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "child_ids",
+        "object_type"
+      ],
+      "title": "ClipContainer",
+      "type": "object"
+    },
     "ConnectorObject": {
       "additionalProperties": false,
       "properties": {
@@ -400,7 +541,40 @@
       "title": "ConnectorObject",
       "type": "object"
     },
-    "ContainerObject": {
+    "Geometry": {
+      "additionalProperties": false,
+      "properties": {
+        "bounds": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "points": {
+          "items": {
+            "$ref": "#/$defs/Point"
+          },
+          "title": "Points",
+          "type": "array"
+        },
+        "corner_radius": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corner Radius"
+        }
+      },
+      "required": [
+        "bounds"
+      ],
+      "title": "Geometry",
+      "type": "object"
+    },
+    "GroupContainer": {
       "additionalProperties": false,
       "properties": {
         "object_id": {
@@ -509,15 +683,6 @@
           "title": "Coverage Ids",
           "type": "array"
         },
-        "object_type": {
-          "enum": [
-            "group",
-            "mask",
-            "clip"
-          ],
-          "title": "Object Type",
-          "type": "string"
-        },
         "child_ids": {
           "items": {
             "type": "string"
@@ -525,6 +690,11 @@
           "minItems": 1,
           "title": "Child Ids",
           "type": "array"
+        },
+        "object_type": {
+          "const": "group",
+          "title": "Object Type",
+          "type": "string"
         }
       },
       "required": [
@@ -539,43 +709,10 @@
         "initial_state",
         "description",
         "coverage_ids",
-        "object_type",
-        "child_ids"
+        "child_ids",
+        "object_type"
       ],
-      "title": "ContainerObject",
-      "type": "object"
-    },
-    "Geometry": {
-      "additionalProperties": false,
-      "properties": {
-        "bounds": {
-          "$ref": "#/$defs/Bounds"
-        },
-        "points": {
-          "items": {
-            "$ref": "#/$defs/Point"
-          },
-          "title": "Points",
-          "type": "array"
-        },
-        "corner_radius": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Corner Radius"
-        }
-      },
-      "required": [
-        "bounds"
-      ],
-      "title": "Geometry",
+      "title": "GroupContainer",
       "type": "object"
     },
     "MarkObject": {
@@ -730,6 +867,261 @@
         "object_type"
       ],
       "title": "MarkObject",
+      "type": "object"
+    },
+    "MaskContainer": {
+      "additionalProperties": false,
+      "description": "Static alpha mask; source is a dedicated sibling, not painted content.",
+      "oneOf": [
+        {
+          "properties": {
+            "mask_mode": {
+              "type": "null"
+            },
+            "mask_source_object_id": {
+              "type": "null"
+            },
+            "mask_coordinate_space": {
+              "type": "null"
+            },
+            "invert": {
+              "type": "null"
+            },
+            "feather_px": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "mask_mode": {
+              "const": "alpha"
+            },
+            "mask_source_object_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "mask_coordinate_space": {
+              "const": "parent_local"
+            },
+            "invert": {
+              "const": false
+            },
+            "feather_px": {
+              "const": 0
+            }
+          },
+          "required": [
+            "mask_mode",
+            "mask_source_object_id",
+            "mask_coordinate_space",
+            "invert",
+            "feather_px"
+          ]
+        }
+      ],
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "child_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Child Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "const": "mask",
+          "title": "Object Type",
+          "type": "string"
+        },
+        "mask_mode": {
+          "anyOf": [
+            {
+              "const": "alpha",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mask Mode"
+        },
+        "mask_source_object_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mask Source Object Id"
+        },
+        "mask_coordinate_space": {
+          "anyOf": [
+            {
+              "const": "parent_local",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mask Coordinate Space"
+        },
+        "invert": {
+          "anyOf": [
+            {
+              "const": false,
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Invert"
+        },
+        "feather_px": {
+          "anyOf": [
+            {
+              "const": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Feather Px"
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "child_ids",
+        "object_type"
+      ],
+      "title": "MaskContainer",
       "type": "object"
     },
     "OutputProfile": {
@@ -1256,7 +1648,7 @@
             "callout": "#/$defs/TextObject",
             "character": "#/$defs/VisualObject",
             "chart": "#/$defs/VisualObject",
-            "clip": "#/$defs/ContainerObject",
+            "clip": "#/$defs/ClipContainer",
             "code": "#/$defs/TextObject",
             "comparison": "#/$defs/VisualObject",
             "composition": "#/$defs/VisualObject",
@@ -1267,14 +1659,14 @@
             "evidence": "#/$defs/VisualObject",
             "folder": "#/$defs/VisualObject",
             "freehand": "#/$defs/MarkObject",
-            "group": "#/$defs/ContainerObject",
+            "group": "#/$defs/GroupContainer",
             "highlight": "#/$defs/MarkObject",
             "icon": "#/$defs/VisualObject",
             "image": "#/$defs/VisualObject",
             "instance": "#/$defs/VisualObject",
             "line": "#/$defs/MarkObject",
             "list": "#/$defs/TextObject",
-            "mask": "#/$defs/ContainerObject",
+            "mask": "#/$defs/MaskContainer",
             "network": "#/$defs/ConnectorObject",
             "pictogram": "#/$defs/VisualObject",
             "polygon": "#/$defs/MarkObject",
@@ -1301,7 +1693,13 @@
             "$ref": "#/$defs/VisualObject"
           },
           {
-            "$ref": "#/$defs/ContainerObject"
+            "$ref": "#/$defs/GroupContainer"
+          },
+          {
+            "$ref": "#/$defs/ClipContainer"
+          },
+          {
+            "$ref": "#/$defs/MaskContainer"
           }
         ]
       },

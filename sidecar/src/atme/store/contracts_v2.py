@@ -30,6 +30,20 @@ ActionVerb = Literal[
     "insert_evidence", "return_board", "camera_hold", "camera_cut", "camera_pan",
     "camera_zoom", "camera_reframe", "sound_cue", "music_state", "purposeful_silence",
 ]
+MASK_SOURCE_TYPES = frozenset({"rectangle", "rounded_rectangle", "ellipse", "polygon"})
+MASK_FIELDS = ("mask_mode", "mask_source_object_id", "mask_coordinate_space",
+               "invert", "feather_px")
+MASK_SCHEMA_COMPATIBILITY = {
+    "oneOf": [
+        {"properties": {field: {"type": "null"} for field in MASK_FIELDS}},
+        {"required": list(MASK_FIELDS), "properties": {
+            "mask_mode": {"const": "alpha"},
+            "mask_source_object_id": {"type": "string", "minLength": 1},
+            "mask_coordinate_space": {"const": "parent_local"},
+            "invert": {"const": False}, "feather_px": {"const": 0},
+        }},
+    ]
+}
 
 
 class Point(StrictModel):
@@ -171,12 +185,38 @@ class VisualObject(ObjectBase):
 
 
 class ContainerObject(ObjectBase):
-    object_type: Literal["group", "mask", "clip"]
     child_ids: list[str] = Field(min_length=1)
 
 
+class GroupContainer(ContainerObject):
+    object_type: Literal["group"]
+
+
+class ClipContainer(ContainerObject):
+    object_type: Literal["clip"]
+
+
+class MaskContainer(ContainerObject):
+    """Static alpha mask; source is a dedicated sibling, not painted content."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False,
+                              json_schema_extra=MASK_SCHEMA_COMPATIBILITY)
+    object_type: Literal["mask"]
+    mask_mode: Literal["alpha"] | None = None
+    mask_source_object_id: str | None = Field(default=None, min_length=1)
+    mask_coordinate_space: Literal["parent_local"] | None = None
+    invert: Literal[False] | None = None
+    feather_px: Literal[0] | None = None
+
+    @model_validator(mode="after")
+    def no_partial_mask_policy(self):
+        _validate_mask_fields(self)
+        return self
+
+
 ExecutableObject = Annotated[
-    MarkObject | ConnectorObject | TextObject | VisualObject | ContainerObject,
+    MarkObject | ConnectorObject | TextObject | VisualObject
+    | GroupContainer | ClipContainer | MaskContainer,
     Field(discriminator="object_type"),
 ]
 
@@ -370,7 +410,6 @@ class SemanticObjectSpec(StrictModel):
     """Director-level object declaration; geometry is resolved in ExecutableLayoutV2."""
 
     object_id: str
-    object_type: ObjectType
     board_id: str
     beat_id: str
     semantic_role: str
@@ -378,6 +417,38 @@ class SemanticObjectSpec(StrictModel):
     asset_id: str | None = None
     initial_state: str
     coverage_ids: list[str] = Field(min_length=1)
+
+
+class SemanticStandardObjectSpec(SemanticObjectSpec):
+    object_type: Literal[
+        "freehand", "line", "arrow", "rectangle", "rounded_rectangle", "ellipse",
+        "polygon", "bracket", "underline", "highlight", "callout", "text", "list",
+        "icon", "pictogram", "character", "image", "evidence", "chart", "comparison",
+        "browser", "application", "terminal", "code", "document", "device", "server",
+        "database", "folder", "network", "group", "clip", "composition", "instance",
+    ]
+
+
+class SemanticMaskObjectSpec(SemanticObjectSpec):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False,
+                              json_schema_extra=MASK_SCHEMA_COMPATIBILITY)
+    object_type: Literal["mask"]
+    mask_mode: Literal["alpha"] | None = None
+    mask_source_object_id: str | None = Field(default=None, min_length=1)
+    mask_coordinate_space: Literal["parent_local"] | None = None
+    invert: Literal[False] | None = None
+    feather_px: Literal[0] | None = None
+
+    @model_validator(mode="after")
+    def no_partial_mask_policy(self):
+        _validate_mask_fields(self)
+        return self
+
+
+SemanticObject = Annotated[
+    SemanticStandardObjectSpec | SemanticMaskObjectSpec,
+    Field(discriminator="object_type"),
+]
 
 
 class AttentionPlan(StrictModel):
@@ -522,7 +593,7 @@ class VisualPlanV2(StrictModel):
     asset_registry_version: str
     declared_capability_version: str
     assets: list[AssetV2]
-    objects: list[SemanticObjectSpec] = Field(min_length=1)
+    objects: list[SemanticObject] = Field(min_length=1)
     boards: list[BoardSpec] = Field(min_length=1)
     actions: list[CanonicalAction]
     beats: list[BeatV2] = Field(min_length=1)
@@ -569,6 +640,16 @@ class VisualPlanV2(StrictModel):
             if obj.asset_id and obj.asset_id not in assets:
                 raise ValueError(f"object {obj.object_id} references unknown asset")
             _subset(obj.coverage_ids, coverage, f"object {obj.object_id} coverage")
+            if obj.object_type == "mask" and obj.mask_source_object_id is not None:
+                source = object_map.get(obj.mask_source_object_id)
+                if (source is None or source.object_type not in MASK_SOURCE_TYPES
+                        or source.board_id != obj.board_id
+                        or source.beat_id != obj.beat_id
+                        or source.initial_state != "visible"):
+                    raise ValueError(f"mask {obj.object_id} requires a same-board, same-beat geometry source")
+        _unique_mask_sources(self.objects)
+        mask_sources = {obj.mask_source_object_id for obj in self.objects
+                        if obj.object_type == "mask" and obj.mask_source_object_id is not None}
         for beat in self.beats:
             if beat.board_id not in boards:
                 raise ValueError(f"beat {beat.beat_id} references unknown board")
@@ -583,6 +664,14 @@ class VisualPlanV2(StrictModel):
             _subset(list(beat.continuity.replacements) + list(beat.continuity.replacements.values()),
                     objects, f"beat {beat.beat_id} replacements")
             _subset(beat.camera_intent.target_ids, objects, f"beat {beat.beat_id} camera")
+            visible_refs = (beat.attention.primary_targets + beat.attention.secondary_context
+                            + beat.attention.dimmed_targets + beat.camera_intent.target_ids
+                            + beat.continuity.keep + beat.continuity.change
+                            + beat.continuity.remove + list(beat.continuity.replacements)
+                            + list(beat.continuity.replacements.values())
+                            + list(beat.continuity.expected_state_versions))
+            if mask_sources.intersection(visible_refs):
+                raise ValueError(f"beat {beat.beat_id} cannot display or direct a mask source")
             owned_objects = {item.object_id for item in self.objects if item.beat_id == beat.beat_id}
             if set(beat.object_ids) != owned_objects:
                 raise ValueError(f"beat {beat.beat_id} must own all and only its declared objects")
@@ -608,8 +697,13 @@ class VisualPlanV2(StrictModel):
                     raise ValueError(f"beat {beat.beat_id} evidence references unknown destination board")
                 if beat.evidence.annotation_target_id and beat.evidence.annotation_target_id not in objects:
                     raise ValueError(f"beat {beat.beat_id} evidence annotation target is unknown")
-                if beat.evidence.mask_object_id and beat.evidence.mask_object_id not in objects:
-                    raise ValueError(f"beat {beat.beat_id} evidence mask target is unknown")
+                if beat.evidence.annotation_target_id in mask_sources:
+                    raise ValueError(f"beat {beat.beat_id} cannot annotate a mask source")
+                if beat.evidence.mask_object_id:
+                    mask = object_map.get(beat.evidence.mask_object_id)
+                    if (mask is None or mask.object_type != "mask"
+                            or mask.board_id != beat.board_id):
+                        raise ValueError(f"beat {beat.beat_id} evidence mask must be a same-board mask")
             if beat.sound_intent.asset_id:
                 asset = asset_map.get(beat.sound_intent.asset_id)
                 if asset is None:
@@ -635,6 +729,8 @@ class VisualPlanV2(StrictModel):
                     & set(action_fallback.affected_ids)):
                 raise ValueError(f"action {action.action_id} fallback does not identify its affected instruction")
             _validate_action_references(action, objects, assets, boards)
+            if mask_sources.intersection(_action_object_references(action)):
+                raise ValueError(f"action {action.action_id} cannot animate a mask source")
             if isinstance(action, GroupAction) and action.container_id is not None:
                 container = object_map[action.container_id]
                 if (not isinstance(container, ContainerObject)
@@ -727,6 +823,8 @@ class ExecutableLayoutV2(StrictModel):
         _unique(self.boards, "board_id"); _unique(self.objects, "object_id"); _unique(self.activations, "activation_id")
         board_ids = {x.board_id for x in self.boards}; object_ids = {x.object_id for x in self.objects}
         object_map = {x.object_id: x for x in self.objects}
+        mask_sources = {obj.mask_source_object_id for obj in self.objects
+                        if isinstance(obj, MaskContainer) and obj.mask_source_object_id is not None}
         for board in self.boards:
             _subset(board.object_ids, object_ids, f"board {board.board_id} objects")
             owned = {x.object_id for x in self.objects if x.board_id == board.board_id}
@@ -751,6 +849,8 @@ class ExecutableLayoutV2(StrictModel):
                     raise ValueError(f"object {obj.object_id} clip must be a mask or clip object")
             _unique(obj.anchors, "anchor_id")
             if isinstance(obj, ConnectorObject):
+                if obj.source_object_id in mask_sources or obj.destination_object_id in mask_sources:
+                    raise ValueError(f"connector {obj.object_id} cannot bind to a mask source")
                 if obj.role == "semantic_connector" and obj.source_object_id is None:
                     raise ValueError("semantic connectors require an authoritative source endpoint")
                 if obj.source_object_id and obj.source_object_id not in object_ids:
@@ -763,6 +863,7 @@ class ExecutableLayoutV2(StrictModel):
                 if len(obj.child_ids) != len(set(obj.child_ids)):
                     raise ValueError(f"container {obj.object_id} repeats a child")
                 _subset(obj.child_ids, object_ids, f"container {obj.object_id} children")
+        _validate_mask_layout(self.objects, object_map)
         _reject_parent_cycles(object_map)
         _reject_container_cycles(object_map)
         last_end = 0
@@ -1059,6 +1160,45 @@ def _unique(items, field):
     values = [getattr(x, field) for x in items]
     if len(values) != len(set(values)):
         raise ValueError(f"{field} values must be unique")
+
+
+def _validate_mask_fields(mask):
+    values = [getattr(mask, field) for field in MASK_FIELDS]
+    if any(value is None for value in values) and not all(value is None for value in values):
+        raise ValueError("mask policy must be fully specified or omitted as legacy non-executable")
+
+
+def _unique_mask_sources(objects):
+    sources = [obj.mask_source_object_id for obj in objects
+               if obj.object_type == "mask" and obj.mask_source_object_id is not None]
+    if len(sources) != len(set(sources)):
+        raise ValueError("each mask source must be owned by exactly one mask")
+
+
+def _validate_mask_layout(objects, object_map):
+    _unique_mask_sources(objects)
+    for mask in objects:
+        if not isinstance(mask, MaskContainer):
+            continue
+        if mask.mask_source_object_id is None:
+            # Existing 2.0.0 masks remain loadable but non-executable.
+            continue
+        source = object_map.get(mask.mask_source_object_id)
+        if (not isinstance(source, MarkObject)
+                or source.object_type not in MASK_SOURCE_TYPES
+                or source.board_id != mask.board_id
+                or source.beat_id != mask.beat_id
+                or source.parent_id != mask.parent_id
+                or source.clip_id is not None):
+            raise ValueError(f"mask {mask.object_id} source must be a dedicated same-parent geometry sibling")
+        if (source.object_id in mask.child_ids or not source.visible
+                or source.opacity != 1 or source.initial_state != "visible"
+                or source.asset_id is not None):
+            raise ValueError(f"mask {mask.object_id} source must be static, visible, and outside content")
+        if (mask.asset_id is not None or mask.anchors or mask.geometry.points
+                or mask.geometry.corner_radius is not None or mask.style.stroke
+                or mask.style.fill or mask.style.text or mask.style.effect):
+            raise ValueError(f"mask {mask.object_id} must be a non-painting stacking context")
 
 
 def _subset(values, allowed, label):

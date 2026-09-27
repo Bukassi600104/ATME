@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3Q independent PASS;
+Status: Slices 3A–3R independent PASS;
 Phase 3 remains incomplete
 
 Date: 2026-09-27
@@ -21,6 +21,19 @@ Date: 2026-09-27
   malformed pairings, non-finite input, overlap, and unsupported actions.
 
 ## Incomplete Phase 3 gates
+
+- Slice 3R defines an explicit static alpha-mask source contract without enabling
+  mask rendering. A fully specified mask declares its unique same-parent geometry
+  source, parent-local coordinate space, no inversion, and no feather. The source
+  is excluded from visible attention, camera, continuity, annotation, action, and
+  connector roles. Plan/layout mask semantics must match. Existing `2.0.0` masks
+  that omit all policy fields remain schema- and model-loadable for immutable
+  revision compatibility, including parse/dump/reparse when those fields become
+  `null`; they are legacy ambiguous masks and stay non-executable. Mixed or
+  partial policies fail validation. External `clip_id` remains
+  fail-closed: 3Q containment covers current clipping needs, while reference
+  ownership/coordinate semantics remain unspecified. Static mask compositing,
+  preview/export integration, and full Phase 3 acceptance remain incomplete.
 
 - Slice 3Q adds hard-edge rectangular static clip containers. A clip is a
   non-painting local stacking context whose authored bounds crop its child
@@ -218,6 +231,12 @@ Date: 2026-09-27
   focused set passed 63 tests and Ruff. The main v2-selected suite, nine direct
   clip tests, Ruff, and 14 targeted legacy render/checkpoint/offline tests
   passed. This is not full Phase 3 or installed-app acceptance.
+- Slice 3R: independent bounded audit PASS for explicit static-alpha mask
+  contracts, unique non-painted geometry ownership, schema/model parity,
+  preserved old `2.0.0` mask loading and parse/dump/reparse, mixed-policy
+  rejection, and fail-closed mask rendering. Thirty-three direct contract
+  cases and Ruff passed. Mask composition remains the next runtime slice;
+  this is not full Phase 3 or installed-app acceptance.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.

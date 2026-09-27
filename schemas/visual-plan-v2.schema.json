@@ -1898,53 +1898,59 @@
       "title": "ReplaceAction",
       "type": "object"
     },
-    "SemanticObjectSpec": {
+    "SemanticMaskObjectSpec": {
       "additionalProperties": false,
-      "description": "Director-level object declaration; geometry is resolved in ExecutableLayoutV2.",
+      "oneOf": [
+        {
+          "properties": {
+            "mask_mode": {
+              "type": "null"
+            },
+            "mask_source_object_id": {
+              "type": "null"
+            },
+            "mask_coordinate_space": {
+              "type": "null"
+            },
+            "invert": {
+              "type": "null"
+            },
+            "feather_px": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "mask_mode": {
+              "const": "alpha"
+            },
+            "mask_source_object_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "mask_coordinate_space": {
+              "const": "parent_local"
+            },
+            "invert": {
+              "const": false
+            },
+            "feather_px": {
+              "const": 0
+            }
+          },
+          "required": [
+            "mask_mode",
+            "mask_source_object_id",
+            "mask_coordinate_space",
+            "invert",
+            "feather_px"
+          ]
+        }
+      ],
       "properties": {
         "object_id": {
           "title": "Object Id",
-          "type": "string"
-        },
-        "object_type": {
-          "enum": [
-            "freehand",
-            "line",
-            "arrow",
-            "rectangle",
-            "rounded_rectangle",
-            "ellipse",
-            "polygon",
-            "bracket",
-            "underline",
-            "highlight",
-            "callout",
-            "text",
-            "list",
-            "icon",
-            "pictogram",
-            "character",
-            "image",
-            "evidence",
-            "chart",
-            "comparison",
-            "browser",
-            "application",
-            "terminal",
-            "code",
-            "document",
-            "device",
-            "server",
-            "database",
-            "folder",
-            "network",
-            "group",
-            "mask",
-            "clip",
-            "composition",
-            "instance"
-          ],
-          "title": "Object Type",
           "type": "string"
         },
         "board_id": {
@@ -1986,19 +1992,190 @@
           "minItems": 1,
           "title": "Coverage Ids",
           "type": "array"
+        },
+        "object_type": {
+          "const": "mask",
+          "title": "Object Type",
+          "type": "string"
+        },
+        "mask_mode": {
+          "anyOf": [
+            {
+              "const": "alpha",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mask Mode"
+        },
+        "mask_source_object_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mask Source Object Id"
+        },
+        "mask_coordinate_space": {
+          "anyOf": [
+            {
+              "const": "parent_local",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mask Coordinate Space"
+        },
+        "invert": {
+          "anyOf": [
+            {
+              "const": false,
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Invert"
+        },
+        "feather_px": {
+          "anyOf": [
+            {
+              "const": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Feather Px"
         }
       },
       "required": [
         "object_id",
-        "object_type",
         "board_id",
         "beat_id",
         "semantic_role",
         "description",
         "initial_state",
-        "coverage_ids"
+        "coverage_ids",
+        "object_type"
       ],
-      "title": "SemanticObjectSpec",
+      "title": "SemanticMaskObjectSpec",
+      "type": "object"
+    },
+    "SemanticStandardObjectSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "initial_state": {
+          "title": "Initial State",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "enum": [
+            "freehand",
+            "line",
+            "arrow",
+            "rectangle",
+            "rounded_rectangle",
+            "ellipse",
+            "polygon",
+            "bracket",
+            "underline",
+            "highlight",
+            "callout",
+            "text",
+            "list",
+            "icon",
+            "pictogram",
+            "character",
+            "image",
+            "evidence",
+            "chart",
+            "comparison",
+            "browser",
+            "application",
+            "terminal",
+            "code",
+            "document",
+            "device",
+            "server",
+            "database",
+            "folder",
+            "network",
+            "group",
+            "clip",
+            "composition",
+            "instance"
+          ],
+          "title": "Object Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "description",
+        "initial_state",
+        "coverage_ids",
+        "object_type"
+      ],
+      "title": "SemanticStandardObjectSpec",
       "type": "object"
     },
     "SoundAction": {
@@ -2597,7 +2774,54 @@
     },
     "objects": {
       "items": {
-        "$ref": "#/$defs/SemanticObjectSpec"
+        "discriminator": {
+          "mapping": {
+            "application": "#/$defs/SemanticStandardObjectSpec",
+            "arrow": "#/$defs/SemanticStandardObjectSpec",
+            "bracket": "#/$defs/SemanticStandardObjectSpec",
+            "browser": "#/$defs/SemanticStandardObjectSpec",
+            "callout": "#/$defs/SemanticStandardObjectSpec",
+            "character": "#/$defs/SemanticStandardObjectSpec",
+            "chart": "#/$defs/SemanticStandardObjectSpec",
+            "clip": "#/$defs/SemanticStandardObjectSpec",
+            "code": "#/$defs/SemanticStandardObjectSpec",
+            "comparison": "#/$defs/SemanticStandardObjectSpec",
+            "composition": "#/$defs/SemanticStandardObjectSpec",
+            "database": "#/$defs/SemanticStandardObjectSpec",
+            "device": "#/$defs/SemanticStandardObjectSpec",
+            "document": "#/$defs/SemanticStandardObjectSpec",
+            "ellipse": "#/$defs/SemanticStandardObjectSpec",
+            "evidence": "#/$defs/SemanticStandardObjectSpec",
+            "folder": "#/$defs/SemanticStandardObjectSpec",
+            "freehand": "#/$defs/SemanticStandardObjectSpec",
+            "group": "#/$defs/SemanticStandardObjectSpec",
+            "highlight": "#/$defs/SemanticStandardObjectSpec",
+            "icon": "#/$defs/SemanticStandardObjectSpec",
+            "image": "#/$defs/SemanticStandardObjectSpec",
+            "instance": "#/$defs/SemanticStandardObjectSpec",
+            "line": "#/$defs/SemanticStandardObjectSpec",
+            "list": "#/$defs/SemanticStandardObjectSpec",
+            "mask": "#/$defs/SemanticMaskObjectSpec",
+            "network": "#/$defs/SemanticStandardObjectSpec",
+            "pictogram": "#/$defs/SemanticStandardObjectSpec",
+            "polygon": "#/$defs/SemanticStandardObjectSpec",
+            "rectangle": "#/$defs/SemanticStandardObjectSpec",
+            "rounded_rectangle": "#/$defs/SemanticStandardObjectSpec",
+            "server": "#/$defs/SemanticStandardObjectSpec",
+            "terminal": "#/$defs/SemanticStandardObjectSpec",
+            "text": "#/$defs/SemanticStandardObjectSpec",
+            "underline": "#/$defs/SemanticStandardObjectSpec"
+          },
+          "propertyName": "object_type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/SemanticStandardObjectSpec"
+          },
+          {
+            "$ref": "#/$defs/SemanticMaskObjectSpec"
+          }
+        ]
       },
       "minItems": 1,
       "title": "Objects",

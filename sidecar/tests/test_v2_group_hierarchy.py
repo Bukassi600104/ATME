@@ -192,18 +192,18 @@ def test_unsupported_mask_container_is_never_silently_flattened():
     layout["objects"][3]["object_type"] = "mask"
     timeline["layout_sha256"] = digest(layout)
     for render in (evaluate_frame, compose_svg_frame):
-        with pytest.raises(V2FrameError, match="no composition semantics"):
+        with pytest.raises(ValidationError, match="mask_mode"):
             render(layout, timeline, 100)
 
 
 def test_clip_id_fails_but_grouped_camera_and_root_connector_use_world_geometry():
     layout, timeline = grouped_documents()
-    layout["objects"][3]["object_type"] = "mask"
+    layout["objects"][3]["object_type"] = "clip"
     layout["objects"][0]["clip_id"] = "object-group"
     timeline["layout_sha256"] = digest(layout)
     ExecutableLayoutV2.model_validate(layout)  # Structurally valid clip reference.
     for render in (evaluate_frame, compose_svg_frame):
-        with pytest.raises(V2FrameError, match="no composition semantics|clip_id"):
+        with pytest.raises(V2FrameError, match="clip_id"):
             render(layout, timeline, 100)
     layout, timeline = grouped_documents()
     append_camera(timeline, "camera-1", "camera_cut", 6000, 6500,
