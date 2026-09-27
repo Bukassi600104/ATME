@@ -680,6 +680,10 @@ class ProjectService:
         from atme.project_assets import read_asset
         return read_asset(self, project_id, asset_id, max_bytes)
 
+    def render_image_bytes(self, project_id, resolved_asset):
+        from atme.project_assets import read_verified_image_bytes
+        return read_verified_image_bytes(self, project_id, resolved_asset)
+
     def approve_script(self, project_id, script_revision, expected_revision, approved):
         if approved is not True:
             raise ProjectError("approval_required", "Explicit user approval is required")

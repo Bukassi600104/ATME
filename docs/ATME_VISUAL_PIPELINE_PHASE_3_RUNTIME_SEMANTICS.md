@@ -1,6 +1,6 @@
 # Phase 3 v2 runtime semantics — kernel contract
 
-Status: Slices 3A–3T independent PASS;
+Status: Slices 3A–3U independent PASS;
 not a production-renderer capability declaration
 
 This document fixes the meanings implemented by the first deterministic frame-state kernel. It
@@ -175,8 +175,9 @@ or the complete attention choreography validator.
 
 The bounded Slice 3C compositor may select an ATME-original Paper & Ink illustration by the
 executable visual object's `variant`, matching an ID in the pinned v2 asset registry. It is not a
-project-imported `asset_id`; arbitrary images, video, evidence, data charts, and generated art
-remain unsupported. The exact registry bytes are checksum-verified again before composition,
+project-imported `asset_id`; that 3C slice does not handle arbitrary images, video,
+evidence, data charts, or generated art. Slice 3U separately adds the bounded
+project-owned PNG path below. The exact registry bytes are checksum-verified again before composition,
 parsed into a narrow static SVG subset, and serialized from the validated tree. The authored
 geometry bounds the illustration, preserving its aspect ratio. Type/family matching is explicit:
 characters use people; devices use devices; documents use documents; static chart illustrations
@@ -336,6 +337,24 @@ liveness follows the replaced states. Frame evaluation, SVG, and PNG use the
 same random-access state.
 `morph`, dynamic grouping, arbitrary media substitution, and preview/export
 integration remain unsupported.
+
+## Bounded project-owned raster images
+
+Slice 3U permits an authored `image` visual object backed by an immutable PNG
+attachment owned by the same project. The project service verifies the asset
+row, revision, canonical project URI, managed-path confinement, role, media
+type, byte length, SHA-256, decoded dimensions, and upright orientation, then
+passes the exact verified bytes to the pure v2 compositor. No compositor path,
+URL, implicit file lookup, or network fetch is allowed. The decoder accepts
+only bounded, noninterlaced RGB/RGBA 8-bit PNG with optional sRGB metadata;
+unsupported metadata, animation, palette, external color profiles, and
+malformed chunks fail closed. The resulting deterministic RGBA pixels are
+contained within authored bounds, and the existing transform/opacity/reveal
+state applies. Rotation remains blocked until permission can be bound to the
+stored creative plan. An ordinary supporting image does not claim verified
+external evidence provenance. Images inside
+alpha masks, semantic evidence objects, arbitrary media, crop, and external
+assets remain unsupported. This does not promote v2 to desktop preview/export.
 
 ## Still to define and implement before Phase 3 exit
 

@@ -7,6 +7,7 @@ that object is hidden at the requested timestamp.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import html
 import math
@@ -39,6 +40,7 @@ from atme.render.v2_path import (
     InvalidFreehandPath,
     parse_freehand_path,
 )
+from atme.render.v2_raster import UnsupportedProjectPNG, canonical_png
 from atme.render.v2_state import FrameObject, evaluate_frame
 from atme.render.v2_world import UnsupportedWorldGeometry, transform_svg, world_anchor
 from atme.store.contracts_v2 import (
@@ -51,6 +53,7 @@ from atme.store.contracts_v2 import (
     ResolvedVisualTimelineV2,
     TargetAction,
     TextObject,
+    TransformAction,
     VisualObject,
 )
 
@@ -414,7 +417,8 @@ def _object_transform(obj, state: FrameObject) -> str:
 
 def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject,
                    state: FrameObject, style, root: Path, scale: float,
-                   active_verb: str | None, objects: dict, states: dict) -> str:
+                   active_verb: str | None, objects: dict, states: dict,
+                   raster_images: dict) -> str:
     if not state.visible or state.opacity <= 0 or state.reveal_fraction <= 0:
         return ""
     transform = _object_transform(obj, state)
@@ -444,6 +448,13 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
                                  state.reveal_fraction if active_verb in {
                                      "draw", "connect", "disconnect"
                                  } else None)
+    elif isinstance(obj, VisualObject) and obj.object_type == "image":
+        raster = raster_images[obj.asset_id]
+        encoded = base64.b64encode(raster.payload).decode("ascii")
+        inner = (f'<image x="{_n(bounds.x)}" y="{_n(bounds.y)}" '
+                 f'width="{_n(bounds.width)}" height="{_n(bounds.height)}" '
+                 f'preserveAspectRatio="xMidYMid meet" '
+                 f'href="data:image/png;base64,{encoded}"/>')
     else:
         inner = _registry_visual(obj)
     if state.emphasis_fraction > 0:
@@ -494,7 +505,9 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
 def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObject,
                       style, root: Path, scale: float, objects: dict) -> None:
     _xml_escape(obj.object_id)
-    if obj.clip_id or obj.style.effect or obj.asset_id:
+    if (obj.clip_id or obj.style.effect
+            or obj.asset_id and not (isinstance(obj, VisualObject)
+                                     and obj.object_type == "image")):
         raise UnsupportedVisualObject(
             f"v2 object {obj.object_id} requires unimplemented hierarchy, clip, effect, or asset composition"
         )
@@ -525,6 +538,13 @@ def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObj
         font = next(font for font in style.fonts if font.id == role.font_id)
         _text(obj, color, font.family, font.weight, role.size_px * scale, role.line_height,
               role.max_characters_per_line, root / font.file)
+    elif isinstance(obj, VisualObject) and obj.object_type == "image":
+        if (obj.asset_id is None or obj.variant is not None
+                or obj.style.stroke or obj.style.fill or obj.style.text
+                or obj.geometry.points or obj.geometry.corner_radius is not None):
+            raise UnsupportedVisualObject(
+                f"v2 image {obj.object_id} needs unstyled full-frame asset placement"
+            )
     else:
         if (obj.style.stroke or obj.style.fill or obj.style.text
                 or obj.geometry.points or obj.geometry.corner_radius is not None):
@@ -534,7 +554,8 @@ def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObj
         _registry_visual(obj)
 
 
-def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int) -> SVGFrame:
+def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int,
+                      asset_bytes: dict[str, bytes] | None = None) -> SVGFrame:
     """Draw supported objects in deterministic z order; never substitute boxes."""
     snapshot = evaluate_frame(layout_document, timeline_document, at_ms)
     layout = ExecutableLayoutV2.model_validate(layout_document)
@@ -565,7 +586,8 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                            or isinstance(obj, ConnectorObject) and obj.object_type == "arrow"
                            or isinstance(obj, ContainerObject) and obj.object_type in {"group", "clip", "mask"}
                            or isinstance(obj, VisualObject)
-                           and obj.object_type in SUPPORTED_REGISTRY_VISUALS)]
+                           and obj.object_type in SUPPORTED_REGISTRY_VISUALS
+                           or isinstance(obj, VisualObject) and obj.object_type == "image")]
     if unsupported:
         first = unsupported[0]
         raise UnsupportedVisualObject(
@@ -582,6 +604,47 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     for obj in layout.objects:
         if not isinstance(obj, ContainerObject):
             _preflight_object(obj, style, root, scale_x, objects)
+    resolved_assets = {asset.asset_id: asset for asset in timeline.resolved_assets}
+    raster_images = {}
+    for obj in layout.objects:
+        if not isinstance(obj, VisualObject) or obj.object_type != "image":
+            continue
+        asset = resolved_assets.get(obj.asset_id)
+        expected_uri = f"atme://projects/{layout.project_id}/assets/{obj.asset_id}"
+        if (asset is None or asset.managed_ref != expected_uri
+                or asset.kind not in {"image", "source_image"}
+                or asset.media_type != "image/png"
+                or asset.byte_length is None or asset.width is None or asset.height is None
+                or asset.orientation != "upright" or asset.provenance_verified
+                or asset.allowed_transformations != ["scale"]
+                or asset_bytes is None or obj.asset_id not in asset_bytes):
+            raise UnsupportedVisualObject(
+                f"v2 image {obj.object_id} lacks verified project PNG bytes and metadata"
+            )
+        if (obj.transform.rotation_degrees != 0
+                or any(isinstance(item.action, TransformAction)
+                       and item.action.verb == "rotate"
+                       and obj.object_id in item.action.target_ids
+                       for item in timeline.actions)):
+            raise UnsupportedVisualObject(
+                f"v2 image {obj.object_id} cannot rotate without plan-bound permission"
+            )
+        parent_id = obj.parent_id
+        while parent_id is not None:
+            parent = objects[parent_id]
+            if isinstance(parent, MaskContainer):
+                raise UnsupportedVisualObject(f"v2 image {obj.object_id} has no mask permission")
+            parent_id = parent.parent_id
+        raw = asset_bytes[obj.asset_id]
+        try:
+            raster = canonical_png(raw)
+        except UnsupportedProjectPNG as exc:
+            raise UnsupportedVisualObject(str(exc)) from exc
+        if (raster.source_sha256 != asset.checksum_sha256
+                or len(raw) != asset.byte_length
+                or (raster.width, raster.height) != (asset.width, asset.height)):
+            raise UnsupportedVisualObject(f"v2 image {obj.object_id} failed asset integrity")
+        raster_images[obj.asset_id] = raster
     active_verbs = {
         target: resolved.action.verb
         for resolved in timeline.actions
@@ -663,7 +726,8 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                     f'transform="{_object_transform(obj, state)}" '
                     f'opacity="{_n(state.opacity)}"{clip}>{inner}</g>')
         return _object_markup(obj, state, style, root, scale_x,
-                              active_verbs.get(obj.object_id), objects, states)
+                              active_verbs.get(obj.object_id), objects, states,
+                              raster_images)
 
     body.extend(render_object(obj) for obj in children.get(None, ()))
     width, height = layout.output_profile.width, layout.output_profile.height
@@ -677,11 +741,12 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     return SVGFrame(at_ms=at_ms, width=width, height=height, svg=svg)
 
 
-def compose_png_frame(layout_document: dict, timeline_document: dict, at_ms: int) -> PNGFrame:
+def compose_png_frame(layout_document: dict, timeline_document: dict, at_ms: int,
+                      asset_bytes: dict[str, bytes] | None = None) -> PNGFrame:
     """Rasterize a supported frame with verified, pinned fonts and no system-font fallback."""
     import resvg_py
 
-    frame = compose_svg_frame(layout_document, timeline_document, at_ms)
+    frame = compose_svg_frame(layout_document, timeline_document, at_ms, asset_bytes)
     style, _, root = resolve_contract_bundle(layout_document["style_system_version"],
                                              layout_document["asset_registry_version"])
     font_files = [str(root / font.file) for font in style.fonts]

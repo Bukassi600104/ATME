@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3T independent PASS;
+Status: Slices 3A–3U independent PASS;
 Phase 3 remains incomplete
 
 Date: 2026-09-27
@@ -22,6 +22,17 @@ Date: 2026-09-27
 
 ## Incomplete Phase 3 gates
 
+- Slice 3U adds a bounded project-owned PNG render path. The project service
+  verifies ownership, revision, managed path, metadata, checksum, and decoded
+  dimensions before supplying immutable bytes to the v2 compositor. That
+  compositor embeds only a validated/canonicalized RGB/RGBA PNG at authored
+  bounds with contain scaling. Missing or inconsistent bytes fail closed,
+  including for hidden objects. This is a standalone v2 frame path, not the
+  desktop preview/export or evidence compositor. This source-only slice is
+  not shipped in the currently built sidecar/Tauri binaries. Their embedded
+  v2 schemas are older than the regenerated source schema; packaging and
+  source/frozen schema parity remain an explicit later gate before any v2
+  installed-app capability is advertised.
 - Slice 3T adds deterministic `replace` crossfades for two co-located,
   same-parent, same-board authored paintable leaves. The plan and resolved
   timeline enforce distinct participants, source precondition, hidden
@@ -271,6 +282,12 @@ Date: 2026-09-27
   passed with exit code 0 against finalized Slice 3T files. Schemas remain
   equivalent to the checked-in generated JSON; this is not full Phase 3 or
   installed-app acceptance.
+- Slice 3U: independent bounded source-only audit PASS after correcting
+  unproven provenance/rotation claims and duplicate-project shared-asset
+  resolution. Eleven direct PNG/project-asset tests, a targeted legacy
+  supporting-asset/narrative-authority test, and Ruff passed in the independent
+  run. Source/frozen schema parity and desktop v2 preview/export are later
+  gates; this is not full Phase 3 or installed-app acceptance.
 - Slice 3R: independent bounded audit PASS for explicit static-alpha mask
   contracts, unique non-painted geometry ownership, schema/model parity,
   preserved old `2.0.0` mask loading and parse/dump/reparse, mixed-policy

@@ -931,6 +931,17 @@ class ResolvedAsset(StrictModel):
     managed_ref: str
     checksum_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     provenance_verified: bool
+    # Optional for old stored 2.0.0 timelines. Raster execution requires every
+    # field and rejects ambiguous legacy records rather than guessing.
+    kind: str | None = None
+    media_type: str | None = None
+    byte_length: int | None = Field(default=None, gt=0)
+    width: int | None = Field(default=None, gt=0)
+    height: int | None = Field(default=None, gt=0)
+    orientation: Literal["upright"] | None = None
+    allowed_transformations: list[Literal[
+        "crop", "scale", "rotate", "mask", "annotate", "color_treatment"
+    ]] | None = None
 
 
 class ObjectState(StrictModel):

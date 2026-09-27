@@ -27,7 +27,14 @@
       "revision": 1,
       "managed_ref": "assets/evidence.png",
       "checksum_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "provenance_verified": true
+      "provenance_verified": true,
+      "kind": null,
+      "media_type": null,
+      "byte_length": null,
+      "width": null,
+      "height": null,
+      "orientation": null,
+      "allowed_transformations": null
     }
   ],
   "initial_object_states": [
