@@ -220,6 +220,39 @@ quality gate. `movement_purpose` is preserved in the frame but does not by itsel
 choose a shot; the external visual director remains responsible for authored
 camera decisions.
 
+## Static group hierarchy and nested layers
+
+Slice 3O permits authored `group` containers as non-painting stacking contexts.
+Object geometry remains in board/canvas coordinates. A child's own transform is
+applied around its authored bounds, then each ancestor group's transform is
+applied around that group's authored bounds, from immediate parent outward.
+Root objects sort by `(z_index, object_id)`; children of each group sort by the
+same key locally. A group subtree paints contiguously and cannot interleave
+with an external sibling. Every child paints exactly once. Parent visibility
+gates all descendants; nested group opacity multiplies descendant visual
+opacity. Group position, scale, rotation, and fade use the existing ordinary
+transform semantics. Group geometry supplies its pivot and does not paint a box.
+`FrameObject.visible` is effective after active-board and ancestor visibility
+gates. `FrameObject.opacity` and `transform` are local to that object; SVG
+composes ancestor values through nested wrappers. The snapshot does not expose
+world-space geometry or effective opacity, so downstream consumers must not
+interpret those local fields as final visual values.
+
+Group membership is static for this slice: children and groups must share a
+board; `parent_id` and `child_ids` must agree; cycles, duplicate membership,
+and excessive nesting fail. Groups cannot carry independent paint, media,
+anchors, effects, or clipping payloads. No target attention/reveal action may
+address a group until descendant-action semantics are fixed. `group`,
+`ungroup`, and `split` remain unsupported, including when their action is
+future or hidden. `mask`, `clip`, and any `clip_id` remain unsupported in full.
+The frame evaluator and SVG compositor share this fail-closed hierarchy gate.
+When a dynamic group action names a container, the ID must exist and resolve
+to a same-board group, although execution of that action remains unsupported.
+Grouped camera focus and connectors involving grouped objects remain rejected
+until a shared world-transform resolver exists; the compositor must not show
+geometry that the camera or connector would frame differently. This is a
+bounded v2 compositor capability, not preview/export integration.
+
 ## Still to define and implement before Phase 3 exit
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be

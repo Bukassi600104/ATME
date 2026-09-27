@@ -635,6 +635,14 @@ class VisualPlanV2(StrictModel):
                     & set(action_fallback.affected_ids)):
                 raise ValueError(f"action {action.action_id} fallback does not identify its affected instruction")
             _validate_action_references(action, objects, assets, boards)
+            if isinstance(action, GroupAction) and action.container_id is not None:
+                container = object_map[action.container_id]
+                if (not isinstance(container, ContainerObject)
+                        or container.object_type != "group"
+                        or container.board_id != action.board_id):
+                    raise ValueError(
+                        f"action {action.action_id} needs a same-board group container"
+                    )
         action_order = {item.action_id: index for index, item in enumerate(self.actions)}
         for action in self.actions:
             if isinstance(action.trigger, BeatStartTrigger) and action.trigger.beat_id not in beats:
@@ -733,6 +741,8 @@ class ExecutableLayoutV2(StrictModel):
                 parent = object_map.get(obj.parent_id)
                 if not isinstance(parent, ContainerObject):
                     raise ValueError(f"object {obj.object_id} parent must be a group/mask/clip container")
+                if parent.board_id != obj.board_id:
+                    raise ValueError(f"object {obj.object_id} and parent {obj.parent_id} cross boards")
                 if obj.object_id not in parent.child_ids:
                     raise ValueError(f"object {obj.object_id} and parent {obj.parent_id} disagree on membership")
             if obj.clip_id:
@@ -750,6 +760,8 @@ class ExecutableLayoutV2(StrictModel):
                 _check_anchor(obj.source_object_id, obj.source_anchor_id, object_map)
                 _check_anchor(obj.destination_object_id, obj.destination_anchor_id, object_map)
             if isinstance(obj, ContainerObject):
+                if len(obj.child_ids) != len(set(obj.child_ids)):
+                    raise ValueError(f"container {obj.object_id} repeats a child")
                 _subset(obj.child_ids, object_ids, f"container {obj.object_id} children")
         _reject_parent_cycles(object_map)
         _reject_container_cycles(object_map)
@@ -1073,6 +1085,8 @@ def _reject_parent_cycles(object_map):
             if current in seen:
                 raise ValueError("group/mask/clip parentage must be acyclic")
             seen.add(current)
+            if len(seen) > 9:
+                raise ValueError("group/mask/clip nesting exceeds eight ancestor levels")
             current = object_map[current].parent_id if current in object_map else None
 
 
@@ -1115,6 +1129,8 @@ def _action_object_references(action):
     refs: list[str] = []
     if isinstance(action, (TargetAction, TransformAction, GroupAction, CameraAction)):
         refs.extend(action.target_ids)
+        if isinstance(action, GroupAction) and action.container_id is not None:
+            refs.append(action.container_id)
     elif isinstance(action, ConnectionAction):
         refs.extend([action.connector_id, action.destination_object_id])
         if action.source_object_id:

@@ -42,6 +42,7 @@ from atme.render.v2_state import FrameObject, evaluate_frame
 from atme.store.contracts_v2 import (
     ConnectionAction,
     ConnectorObject,
+    ContainerObject,
     ExecutableLayoutV2,
     MarkObject,
     ResolvedVisualTimelineV2,
@@ -410,19 +411,24 @@ def _connector_shape(obj: ConnectorObject, objects: dict, states: dict,
             f'stroke-linecap="round" stroke-linejoin="round"{dash}/>{arrowhead}')
 
 
+def _object_transform(obj, state: FrameObject) -> str:
+    t = state.transform
+    bounds = obj.geometry.bounds
+    origin_x = bounds.x + bounds.width * t.origin.x
+    origin_y = bounds.y + bounds.height * t.origin.y
+    return (f'translate({_n(t.position.x)} {_n(t.position.y)}) '
+            f'translate({_n(origin_x)} {_n(origin_y)}) '
+            f'rotate({_n(t.rotation_degrees)}) scale({_n(t.scale_x)} {_n(t.scale_y)}) '
+            f'translate({_n(-origin_x)} {_n(-origin_y)})')
+
+
 def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject,
                    state: FrameObject, style, root: Path, scale: float,
                    active_verb: str | None, objects: dict, states: dict) -> str:
     if not state.visible or state.opacity <= 0 or state.reveal_fraction <= 0:
         return ""
-    t = state.transform
+    transform = _object_transform(obj, state)
     bounds = obj.geometry.bounds
-    origin_x = bounds.x + bounds.width * t.origin.x
-    origin_y = bounds.y + bounds.height * t.origin.y
-    transform = (f'translate({_n(t.position.x)} {_n(t.position.y)}) '
-                 f'translate({_n(origin_x)} {_n(origin_y)}) '
-                 f'rotate({_n(t.rotation_degrees)}) scale({_n(t.scale_x)} {_n(t.scale_y)}) '
-                 f'translate({_n(-origin_x)} {_n(-origin_y)})')
     if isinstance(obj, MarkObject):
         stroke = _color(obj.style.stroke, style.colors, default=style.colors[
             "attention" if obj.object_type == "highlight" else
@@ -498,7 +504,7 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
 def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObject,
                       style, root: Path, scale: float, objects: dict) -> None:
     _xml_escape(obj.object_id)
-    if obj.parent_id or obj.clip_id or obj.style.effect or obj.asset_id:
+    if obj.clip_id or obj.style.effect or obj.asset_id:
         raise UnsupportedVisualObject(
             f"v2 object {obj.object_id} requires unimplemented hierarchy, clip, effect, or asset composition"
         )
@@ -567,6 +573,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_MARKS
                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_TEXT
                            or isinstance(obj, ConnectorObject) and obj.object_type == "arrow"
+                           or isinstance(obj, ContainerObject) and obj.object_type == "group"
                            or isinstance(obj, VisualObject)
                            and obj.object_type in SUPPORTED_REGISTRY_VISUALS)]
     if unsupported:
@@ -583,7 +590,8 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     if abs(scale_x - scale_y) > 1e-6:
         raise UnsupportedVisualObject("output profile cannot uniformly scale Paper & Ink design tokens")
     for obj in layout.objects:
-        _preflight_object(obj, style, root, scale_x, objects)
+        if not isinstance(obj, ContainerObject):
+            _preflight_object(obj, style, root, scale_x, objects)
     active_verbs = {
         target: resolved.action.verb
         for resolved in timeline.actions
@@ -601,6 +609,11 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
              f'width="{_n(layout.canvas.width)}" height="{_n(layout.canvas.height)}" '
              f'fill="{style.colors["paper"]}"/>')]
     states = {state.object_id: state for state in snapshot.objects}
+    children: dict[str | None, list] = {}
+    for obj in layout.objects:
+        children.setdefault(obj.parent_id, []).append(obj)
+    for siblings in children.values():
+        siblings.sort(key=lambda item: (item.z_index, item.object_id))
     for state in snapshot.objects:
         obj = objects[state.object_id]
         if 0 < state.reveal_fraction < 1 and active_verbs.get(state.object_id) not in {
@@ -613,8 +626,19 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                 f'width="{_n(bounds.width * state.reveal_fraction)}" '
                 f'height="{_n(bounds.height)}"/></clipPath>'
             )
-        body.append(_object_markup(obj, state, style, root, scale_x,
-                                   active_verbs.get(state.object_id), objects, states))
+    def render_object(obj) -> str:
+        state = states[obj.object_id]
+        if isinstance(obj, ContainerObject):
+            if not state.visible or state.opacity <= 0 or state.reveal_fraction <= 0:
+                return ""
+            inner = "".join(render_object(child) for child in children.get(obj.object_id, ()))
+            return (f'<g data-object-id="{_xml_escape(obj.object_id)}" '
+                    f'transform="{_object_transform(obj, state)}" '
+                    f'opacity="{_n(state.opacity)}">{inner}</g>')
+        return _object_markup(obj, state, style, root, scale_x,
+                              active_verbs.get(obj.object_id), objects, states)
+
+    body.extend(render_object(obj) for obj in children.get(None, ()))
     width, height = layout.output_profile.width, layout.output_profile.height
     viewport = snapshot.camera
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '

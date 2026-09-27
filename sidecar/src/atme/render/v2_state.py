@@ -30,7 +30,9 @@ from atme.store.contracts_v2 import (
     CameraAction,
     ConnectionAction,
     ConnectorObject,
+    ContainerObject,
     ExecutableLayoutV2,
+    GroupAction,
     MarkObject,
     ResolvedVisualTimelineV2,
     SoundAction,
@@ -89,6 +91,11 @@ class FrameTransform:
 
 @dataclass(frozen=True)
 class FrameObject:
+    """Frame state: visible is ancestor/board-effective; opacity and transform are local.
+
+    The compositor applies each ancestor's opacity and transform through nested
+    wrappers. Consumers must not mistake these local fields for world values.
+    """
     object_id: str
     board_id: str
     state: str
@@ -133,6 +140,51 @@ def _mix(start: float, end: float, progress: float) -> float:
     return start + (end - start) * progress
 
 
+def _ancestor_ids(obj, object_map: dict) -> tuple[str, ...]:
+    ancestors = []
+    parent_id = obj.parent_id
+    while parent_id is not None:
+        ancestors.append(parent_id)
+        parent_id = object_map[parent_id].parent_id
+    return tuple(ancestors)
+
+
+def validate_static_hierarchy(layout: ExecutableLayoutV2) -> None:
+    """Fail closed for hierarchy forms not yet supported by frame and paint paths."""
+    objects = {obj.object_id: obj for obj in layout.objects}
+    for obj in layout.objects:
+        if obj.clip_id is not None:
+            raise V2FrameError(f"v2 object {obj.object_id} has unsupported clip_id")
+        if isinstance(obj, ContainerObject):
+            if obj.object_type != "group":
+                raise V2FrameError(
+                    f"v2 {obj.object_type} container {obj.object_id} has no composition semantics"
+                )
+            if (obj.asset_id is not None or obj.anchors or obj.geometry.points
+                    or obj.geometry.corner_radius is not None or obj.style.stroke
+                    or obj.style.fill or obj.style.text or obj.style.effect):
+                raise V2FrameError(
+                    f"v2 group {obj.object_id} must be a non-painting stacking context"
+                )
+    for obj in layout.objects:
+        if obj.parent_id is not None and (
+            not isinstance(objects[obj.parent_id], ContainerObject)
+            or objects[obj.parent_id].object_type != "group"
+        ):
+            raise V2FrameError(f"v2 object {obj.object_id} needs a supported group parent")
+        if isinstance(obj, ConnectorObject):
+            endpoints = (obj.source_object_id, obj.destination_object_id)
+            if obj.parent_id is not None or any(
+                endpoint is not None and (
+                    objects[endpoint].parent_id is not None
+                    or isinstance(objects[endpoint], ContainerObject)
+                ) for endpoint in endpoints
+            ):
+                raise V2FrameError(
+                    f"v2 connector {obj.object_id} needs hierarchy-aware endpoint geometry"
+                )
+
+
 def _interpolate_transform(start: FrameTransform, end: Transform,
                            progress: float, verb: str) -> FrameTransform:
     return FrameTransform(
@@ -164,6 +216,7 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             or layout.asset_registry_version != timeline.asset_registry_version):
         raise V2FrameError("resolved timeline and executable layout do not describe the same composition")
     layout_objects = {item.object_id: item for item in layout.objects}
+    validate_static_hierarchy(layout)
     state_objects = {item.object_id for item in timeline.initial_object_states}
     if set(layout_objects) != state_objects:
         raise V2FrameError("the resolved timeline must initialize every layout object exactly once")
@@ -209,6 +262,14 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
         for object_id, obj in layout_objects.items()
     }
     for item in timeline.actions:
+        if isinstance(item.action, GroupAction) and item.action.container_id is not None:
+            container = layout_objects.get(item.action.container_id)
+            if (not isinstance(container, ContainerObject)
+                    or container.object_type != "group"
+                    or container.board_id != item.action.board_id):
+                raise V2FrameError(
+                    f"action {item.action.action_id} needs a same-board group container"
+                )
         if isinstance(item.action, ConnectionAction):
             action = item.action
             connector = layout_objects.get(action.connector_id)
@@ -254,6 +315,11 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                 raise V2FrameError(f"highlight {item.action.action_id} needs an active board")
             if isinstance(item.action, TargetAction) and item.action.verb == "isolate":
                 action = item.action
+                if any(isinstance(obj, ContainerObject) and obj.board_id == action.board_id
+                       for obj in layout.objects):
+                    raise V2FrameError(
+                        f"isolate {action.action_id} needs hierarchy-aware focus composition"
+                    )
                 if (action.expected_state, action.post_state) != ("visible", "visible"):
                     raise V2FrameError(
                         f"isolate {action.action_id} needs canonical visible-to-visible states"
@@ -276,6 +342,11 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                 ):
                     raise V2FrameError(f"isolate {action.action_id} needs visible secondary context")
             for target in item.action.target_ids:
+                if (isinstance(layout_objects[target], ContainerObject)
+                        and isinstance(item.action, TargetAction)):
+                    raise V2FrameError(
+                        f"action {item.action.action_id} needs defined descendant semantics for a group"
+                    )
                 if target in highlighted_targets:
                     raise V2FrameError(f"highlighted target {target} cannot receive another action")
                 if target in crossed_out_targets:
@@ -572,9 +643,12 @@ def evaluate_frame(
     active_board = activation.board_id if activation else None
     camera = evaluate_camera(layout, camera_plan, at_ms,
                              activation.activation_id if activation else None, _ease)
+    object_map = {obj.object_id: obj for obj in layout.objects}
     ordered = tuple(
         replace(current[obj.object_id],
-                visible=current[obj.object_id].visible and obj.board_id == active_board)
+                visible=current[obj.object_id].visible and obj.board_id == active_board
+                and all(current[parent_id].visible and current[parent_id].opacity > 0
+                        for parent_id in _ancestor_ids(obj, object_map)))
         for obj in sorted(layout.objects, key=lambda item: (item.z_index, item.object_id))
     )
     return FrameSnapshot(at_ms=at_ms, active_board_id=active_board,

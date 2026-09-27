@@ -204,6 +204,10 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                 obj = objects[target_id]
                 if obj.board_id != action.board_id:
                     raise UnsupportedCamera(f"camera {action.action_id} crosses board ownership")
+                if obj.parent_id is not None:
+                    raise UnsupportedCamera(
+                        f"camera {action.action_id} needs hierarchy-aware focus geometry"
+                    )
                 if not visible[target_id] or not revealed[target_id] or opacity[target_id] <= 0:
                     raise UnsupportedCamera(f"camera {action.action_id} needs revealed visible focus")
                 # The current compositor has faithful geometry for these types.

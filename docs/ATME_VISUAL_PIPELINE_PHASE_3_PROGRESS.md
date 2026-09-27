@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3N independent PASS;
+Status: Slices 3A–3O independent PASS;
 Phase 3 remains incomplete
 
 Date: 2026-09-23
@@ -21,6 +21,14 @@ Date: 2026-09-23
   malformed pairings, non-finite input, overlap, and unsupported actions.
 
 ## Incomplete Phase 3 gates
+
+- Slice 3O adds authored static groups as nested, non-painting stacking contexts. Root and
+  child layers sort locally; nested transforms, ancestor visibility and multiplicative
+  opacity reach SVG/PNG without changing v1. Group membership is contract-checked for
+  same-board ownership, bidirectional references, cycles, duplicate children, and depth.
+  Dynamic group/ungroup/split actions, masks, clips, clip references, and grouped
+  camera/connector geometry remain explicitly unsupported. This is not final hierarchy,
+  preview/export, or full Phase 3 acceptance.
 
 - Slice 3N adds bounded purposeful-camera mechanics for all five canonical camera verbs.
   Target geometry and completed transforms define a canvas-bounded, aspect-preserving viewport;
@@ -177,6 +185,11 @@ Date: 2026-09-23
   overlap and invalid-target guards were verified. The auditor's focused state/compositor
   set passed 73 tests, Ruff passed, and 14 targeted v1 render/checkpoint/offline tests
   passed. This is not full Phase 3 or installed-app acceptance.
+- Slice 3O: independent bounded re-audit PASS after fixing shared frame/SVG hierarchy
+  rejection, `GroupAction.container_id` references, and snapshot field semantics. The
+  auditor verified 41 focused group/camera/connector tests, Ruff, and direct unsupported
+  hierarchy probes. The main 13-case group suite and targeted legacy render/checkpoint/
+  offline regression passed. This is not full Phase 3 or installed-app acceptance.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.
