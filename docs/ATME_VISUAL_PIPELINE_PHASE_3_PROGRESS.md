@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3S independent PASS; Slice 3T bounded replacement under audit;
+Status: Slices 3A–3T independent PASS;
 Phase 3 remains incomplete
 
 Date: 2026-09-27
@@ -30,7 +30,8 @@ Date: 2026-09-27
   transition. Ancestor visibility, action overlaps, board activation, camera
   liveness, connector endpoints, mask-only sources, and future malformed
   actions fail closed. No morph or geometry interpolation is implied. The
-  bounded slice remains under independent audit; preview/export and full
+  bounded slice passed independent audit and full sidecar regression;
+  preview/export and full
   Phase 3 remain incomplete.
 
 - Slice 3S executes the bounded explicit static-alpha mask contract in v2 frame
@@ -261,12 +262,15 @@ Date: 2026-09-27
   cases passed. The full sidecar regression passed with exit code 0 against
   finalized Slice 3S files, and the final documentation re-audit passed.
   This is not full Phase 3 or installed-app acceptance.
-- Slice 3T: 28 direct authored-replacement tests passed, including PNG/SVG,
+- Slice 3T: independent bounded audit PASS. Twenty-eight direct
+  authored-replacement tests passed, including PNG/SVG,
   random seek, exact boundaries and easing, chain and board return, camera,
   plan-level rejection, ancestor visibility/overlap, later destination edits,
   portrait output, and connector-endpoint rejection. The v2-selected suite,
-  14 targeted legacy/offline tests, and Ruff passed after the initial slice;
-  final independent audit and full sidecar regression remain pending.
+  14 targeted legacy/offline tests, Ruff, and the full sidecar regression
+  passed with exit code 0 against finalized Slice 3T files. Schemas remain
+  equivalent to the checked-in generated JSON; this is not full Phase 3 or
+  installed-app acceptance.
 - Slice 3R: independent bounded audit PASS for explicit static-alpha mask
   contracts, unique non-painted geometry ownership, schema/model parity,
   preserved old `2.0.0` mask loading and parse/dump/reparse, mixed-policy
