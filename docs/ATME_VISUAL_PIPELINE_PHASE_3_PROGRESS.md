@@ -22,6 +22,16 @@ Date: 2026-09-27
 
 ## Incomplete Phase 3 gates
 
+- Next Slice 3V must preserve the full evidence treatment from semantic plan
+  through executable layout and resolved timeline before painting evidence.
+  The current plan has crop, focus, source label, annotation, provenance, and
+  readable-hold intent, but the executable artifacts currently discard them.
+  Add an evidence-specific, project-owned provenance attestation and immutable
+  PNG resolver; reject supporting-image substitution. Only then implement
+  bounded crop/focus/attribution/annotation and readable insert/return timing,
+  with random-seek, portrait/landscape, offline, and legacy evidence tests.
+  Old 2.0.0 evidence stays loadable but non-executable until the complete
+  treatment is present; do not route 3U images through an evidence shortcut.
 - Slice 3U adds a bounded project-owned PNG render path. The project service
   verifies ownership, revision, managed path, metadata, checksum, and decoded
   dimensions before supplying immutable bytes to the v2 compositor. That
