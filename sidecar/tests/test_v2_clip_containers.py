@@ -229,7 +229,7 @@ def test_mask_and_external_clip_reference_remain_unsupported():
     layout, timeline = clipped_documents()
     layout["objects"][3]["object_type"] = "mask"
     timeline["layout_sha256"] = digest(layout)
-    with pytest.raises(ValidationError, match="mask_mode"):
+    with pytest.raises(V2FrameError, match="legacy v2 mask.*no composition semantics"):
         evaluate_frame(layout, timeline, 100)
     layout, timeline = clipped_documents()
     layout["objects"][0]["clip_id"] = "object-group"

@@ -1,6 +1,7 @@
 # Phase 3 v2 runtime semantics — kernel contract
 
-Status: Slices 3A–3M independent PASS; not a production-renderer capability declaration
+Status: Slices 3A–3R independent PASS; Slice 3S bounded mask runtime under final gate;
+not a production-renderer capability declaration
 
 This document fixes the meanings implemented by the first deterministic frame-state kernel. It
 does not replace the v2 JSON contracts or authorize the v1 renderer to consume them. Real pixels,
@@ -244,7 +245,8 @@ and excessive nesting fail. Groups cannot carry independent paint, media,
 anchors, effects, or clipping payloads. No target attention/reveal action may
 address a group until descendant-action semantics are fixed. `group`,
 `ungroup`, and `split` remain unsupported, including when their action is
-future or hidden. Masks and any external `clip_id` remain unsupported in full.
+future or hidden. External `clip_id` remains unsupported; masks have the
+separate bounded semantics below.
 The frame evaluator and SVG compositor share this fail-closed hierarchy gate.
 When a dynamic group action names a container, the ID must exist and resolve
 to a same-board group, although execution of that action remains unsupported.
@@ -281,14 +283,34 @@ move/scale/rotate/fade of the clip container share group transform semantics.
 Hidden or zero-opacity clips gate their descendants.
 
 Target attention/reveal actions on a clip container, dynamic membership,
-mask containers, and all `clip_id` cross-references remain unsupported even
+and all `clip_id` cross-references remain unsupported even
 when future or hidden. Root connectors cannot bind to endpoints under a clip,
 and camera focus cannot target a clipped leaf: their current world geometry
 does not compute the post-clip visible region. A connector object cannot itself
 be a clip child. These cases fail closed rather than showing untrimmed geometry.
-Slice 3R separately defines the explicit static-alpha mask contract in plan/layout
-validation; old `2.0.0` masks remain loadable but ambiguous and non-executable.
-Neither mask form has frame or paint semantics yet. See the Phase 3 progress record.
+## Bounded static-alpha mask containers
+
+Slice 3R defines the explicit mask-source contract in plan/layout. Slice 3S
+executes only that form in v2 frame state and SVG/PNG: one same-parent,
+initially visible, static, non-painted geometry source provides a white alpha
+aperture. Supported source shapes are filled rectangle, rounded rectangle,
+ellipse, and polygon. The source's own transform positions the aperture in
+its parent's local coordinates. The mask container's transform moves its
+content beneath that stationary parent-local aperture; its opacity and
+visibility gate the masked result. Nested groups, clips, and masks compose
+in their existing local stacking order. The geometry source is not also
+painted as an ordinary sibling. Seeking any frame uses the same deterministic
+state evaluation and aperture bounds checks before SVG output.
+
+Old `2.0.0` masks without policy fields remain loadable and round-trippable,
+but are ambiguous and non-executable. Painted, animated, degenerate, or
+non-sibling mask sources fail closed, including future source actions. Inverted,
+feathered, media-derived, and dynamic masks are not supported. A camera focus
+or connector endpoint beneath a mask remains unsupported because its world
+geometry does not compute the post-mask visible region. Target attention or
+reveal actions on a mask container, dynamic membership, and external
+`clip_id` references also remain unsupported. This bounded compositor path
+is not desktop preview/export integration or a full Phase 3 capability gate.
 
 ## Still to define and implement before Phase 3 exit
 

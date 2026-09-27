@@ -35,7 +35,9 @@ def masked_documents():
     source = deepcopy(layout["objects"][0])
     source.update({"object_id": "mask-source", "parent_id": None,
                    "initial_state": "visible", "visible": True,
-                   "description": "Dedicated alpha geometry"})
+                   "description": "Dedicated alpha geometry", "anchors": [],
+                   "style": {"stroke": None, "fill": None,
+                             "text": None, "effect": None}})
     layout["objects"].append(source)
     layout["boards"][0]["object_ids"].append("mask-source")
     layout["boards"][0]["density_limit"] = 6
@@ -59,7 +61,7 @@ def masked_documents():
     return plan, layout, timeline
 
 
-def test_explicit_static_alpha_mask_passes_plan_layout_and_schema_but_not_renderer():
+def test_explicit_static_alpha_mask_passes_plan_layout_schema_and_frame_runtime():
     plan, layout, timeline = masked_documents()
     Draft202012Validator(load_schema("visual-plan-v2")).validate(plan)
     Draft202012Validator(load_schema("executable-layout-v2")).validate(layout)
@@ -72,8 +74,7 @@ def test_explicit_static_alpha_mask_passes_plan_layout_and_schema_but_not_render
     VisualPlanV2.model_validate(dumped_plan)
     ExecutableLayoutV2.model_validate(dumped_layout)
     validate_plan_layout(plan, layout)
-    with pytest.raises(V2FrameError, match="no composition semantics"):
-        evaluate_frame(layout, timeline, 100)
+    assert evaluate_frame(layout, timeline, 100).object("object-group").visible
 
 
 def test_mixed_null_and_explicit_mask_fields_are_rejected():

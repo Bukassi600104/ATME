@@ -192,7 +192,7 @@ def test_unsupported_mask_container_is_never_silently_flattened():
     layout["objects"][3]["object_type"] = "mask"
     timeline["layout_sha256"] = digest(layout)
     for render in (evaluate_frame, compose_svg_frame):
-        with pytest.raises(ValidationError, match="mask_mode"):
+        with pytest.raises(V2FrameError, match="legacy v2 mask.*no composition semantics"):
             render(layout, timeline, 100)
 
 

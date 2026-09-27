@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3R independent PASS;
+Status: Slices 3A–3R independent PASS; Slice 3S bounded mask runtime under final gate;
 Phase 3 remains incomplete
 
 Date: 2026-09-27
@@ -22,8 +22,19 @@ Date: 2026-09-27
 
 ## Incomplete Phase 3 gates
 
-- Slice 3R defines an explicit static alpha-mask source contract without enabling
-  mask rendering. A fully specified mask declares its unique same-parent geometry
+- Slice 3S executes the bounded explicit static-alpha mask contract in v2 frame
+  state and SVG/PNG. Four static filled aperture geometries (rectangle, rounded
+  rectangle, ellipse, polygon) compose with source transform, a stationary
+  parent-local aperture, transformed masked content, opacity/visibility, and
+  nested groups/clips/masks. The aperture source never paints independently.
+  Invalid geometry, source actions, legacy ambiguous masks, masked camera and
+  connector endpoints, dynamic/inverted/feathered/media masks, and external
+  `clip_id` fail closed. Independent audit found no compositor defect; the
+  documentation and full-suite gate are being closed. Desktop preview/export,
+  the broader object/action matrix, and full Phase 3 remain incomplete.
+
+- Slice 3R defined an explicit static alpha-mask source contract before 3S
+  enabled bounded mask rendering. A fully specified mask declares its unique same-parent geometry
   source, parent-local coordinate space, no inversion, and no feather. The source
   is excluded from visible attention, camera, continuity, annotation, action, and
   connector roles. Plan/layout mask semantics must match. Existing `2.0.0` masks
@@ -32,8 +43,8 @@ Date: 2026-09-27
   `null`; they are legacy ambiguous masks and stay non-executable. Mixed or
   partial policies fail validation. External `clip_id` remains
   fail-closed: 3Q containment covers current clipping needs, while reference
-  ownership/coordinate semantics remain unspecified. Static mask compositing,
-  preview/export integration, and full Phase 3 acceptance remain incomplete.
+  ownership/coordinate semantics remain unspecified. Preview/export integration
+  and full Phase 3 acceptance remain incomplete.
 
 - Slice 3Q adds hard-edge rectangular static clip containers. A clip is a
   non-painting local stacking context whose authored bounds crop its child
@@ -231,11 +242,18 @@ Date: 2026-09-27
   focused set passed 63 tests and Ruff. The main v2-selected suite, nine direct
   clip tests, Ruff, and 14 targeted legacy render/checkpoint/offline tests
   passed. This is not full Phase 3 or installed-app acceptance.
+- Slice 3S: independent bounded implementation audit found no state, SVG/PNG,
+  nesting, deterministic-seek, or v1-isolation defect. The auditor's focused
+  mask contract/compositor set passed 58 tests and Ruff; 14 targeted legacy
+  renderer/offline tests passed. The main v2-selected suite, 25 direct
+  compositor cases, 12 render smoke/checkpoint cases, and two offline render
+  cases passed. Full sidecar suite and final documentation re-audit are pending.
+  This is not full Phase 3 or installed-app acceptance.
 - Slice 3R: independent bounded audit PASS for explicit static-alpha mask
   contracts, unique non-painted geometry ownership, schema/model parity,
   preserved old `2.0.0` mask loading and parse/dump/reparse, mixed-policy
   rejection, and fail-closed mask rendering. Thirty-three direct contract
-  cases and Ruff passed. Mask composition remains the next runtime slice;
+  cases and Ruff passed. Mask composition was added in Slice 3S;
   this is not full Phase 3 or installed-app acceptance.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2

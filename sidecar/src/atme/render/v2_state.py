@@ -26,6 +26,7 @@ from atme.render.v2_emphasis import (
     emphasis_path,
 )
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
+from atme.render.v2_mask import UnsupportedMask, mask_source_region
 from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds
 from atme.store.contracts_v2 import (
     CameraAction,
@@ -35,6 +36,7 @@ from atme.store.contracts_v2 import (
     ExecutableLayoutV2,
     GroupAction,
     MarkObject,
+    MaskContainer,
     ResolvedVisualTimelineV2,
     SoundAction,
     TargetAction,
@@ -42,6 +44,7 @@ from atme.store.contracts_v2 import (
     Transform,
     TransformAction,
     VisualObject,
+    _action_object_references,
 )
 
 
@@ -157,7 +160,11 @@ def validate_static_hierarchy(layout: ExecutableLayoutV2) -> None:
         if obj.clip_id is not None:
             raise V2FrameError(f"v2 object {obj.object_id} has unsupported clip_id")
         if isinstance(obj, ContainerObject):
-            if obj.object_type not in {"group", "clip"}:
+            if isinstance(obj, MaskContainer) and obj.mask_source_object_id is None:
+                raise V2FrameError(
+                    f"legacy v2 mask {obj.object_id} has no composition semantics"
+                )
+            if obj.object_type not in {"group", "clip", "mask"}:
                 raise V2FrameError(
                     f"v2 {obj.object_type} container {obj.object_id} has no composition semantics"
                 )
@@ -167,10 +174,16 @@ def validate_static_hierarchy(layout: ExecutableLayoutV2) -> None:
                 raise V2FrameError(
                     f"v2 {obj.object_type} {obj.object_id} must be a non-painting stacking context"
                 )
+            if isinstance(obj, MaskContainer):
+                try:
+                    source = objects[obj.mask_source_object_id]
+                    mask_source_region(source, source.transform)
+                except UnsupportedMask as exc:
+                    raise V2FrameError(str(exc)) from exc
     for obj in layout.objects:
         if obj.parent_id is not None and (
             not isinstance(objects[obj.parent_id], ContainerObject)
-            or objects[obj.parent_id].object_type not in {"group", "clip"}
+            or objects[obj.parent_id].object_type not in {"group", "clip", "mask"}
         ):
             raise V2FrameError(f"v2 object {obj.object_id} needs a supported container parent")
         if isinstance(obj, ConnectorObject):
@@ -185,11 +198,11 @@ def validate_static_hierarchy(layout: ExecutableLayoutV2) -> None:
                     )
                 if endpoint_id is not None and any(
                     isinstance(objects[parent_id], ContainerObject)
-                    and objects[parent_id].object_type == "clip"
+                    and objects[parent_id].object_type in {"clip", "mask"}
                     for parent_id in _ancestor_ids(objects[endpoint_id], objects)
                 ):
                     raise V2FrameError(
-                        f"v2 connector {obj.object_id} needs clipped-endpoint geometry"
+                        f"v2 connector {obj.object_id} needs clipped-endpoint geometry, including masks"
                     )
 
 
@@ -229,6 +242,18 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
     if set(layout_objects) != state_objects:
         raise V2FrameError("the resolved timeline must initialize every layout object exactly once")
     initial = {item.object_id: item for item in timeline.initial_object_states}
+    mask_sources = {obj.mask_source_object_id for obj in layout.objects
+                    if isinstance(obj, MaskContainer)}
+    for source_id in mask_sources:
+        source_state = initial[source_id]
+        if (source_state.state != "visible" or not source_state.visible
+                or layout_objects[source_id].opacity != 1):
+            raise V2FrameError(f"mask source {source_id} must remain fully visible and static")
+    for resolved in timeline.actions:
+        if mask_sources.intersection(_action_object_references(resolved.action)):
+            raise V2FrameError(
+                f"action {resolved.action.action_id} cannot target a mask-only source"
+            )
     # Isolation affects every visible object on its board, not only target_ids.
     # Reject overlapping visual actions anywhere on that board before sampling.
     board_windows: dict[str, list] = {}

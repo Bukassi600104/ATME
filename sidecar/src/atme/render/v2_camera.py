@@ -193,9 +193,9 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                 parent_id = obj.parent_id
                 while parent_id is not None:
                     if (isinstance(objects[parent_id], ContainerObject)
-                            and objects[parent_id].object_type == "clip"):
+                            and objects[parent_id].object_type in {"clip", "mask"}):
                         raise UnsupportedCamera(
-                            f"camera {action.action_id} needs post-clip visible focus geometry"
+                            f"camera {action.action_id} needs post-clip visible focus geometry, including masks"
                         )
                     dependency_ids.add(parent_id)
                     parent_id = objects[parent_id].parent_id

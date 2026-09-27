@@ -32,6 +32,7 @@ from atme.render.v2_emphasis import (
     emphasis_path,
 )
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
+from atme.render.v2_mask import UnsupportedMask, mask_source_region
 from atme.render.v2_path import (
     MAX_COORDINATE,
     MAX_STROKE_LENGTH,
@@ -46,6 +47,7 @@ from atme.store.contracts_v2 import (
     ContainerObject,
     ExecutableLayoutV2,
     MarkObject,
+    MaskContainer,
     ResolvedVisualTimelineV2,
     TargetAction,
     TextObject,
@@ -106,6 +108,10 @@ def _clip_id(object_id: str) -> str:
 
 def _container_clip_id(object_id: str) -> str:
     return "clip-container-" + hashlib.sha256(object_id.encode("utf-8")).hexdigest()
+
+
+def _container_mask_id(object_id: str) -> str:
+    return "mask-container-" + hashlib.sha256(object_id.encode("utf-8")).hexdigest()
 
 
 @lru_cache(maxsize=32)
@@ -557,7 +563,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_MARKS
                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_TEXT
                            or isinstance(obj, ConnectorObject) and obj.object_type == "arrow"
-                           or isinstance(obj, ContainerObject) and obj.object_type in {"group", "clip"}
+                           or isinstance(obj, ContainerObject) and obj.object_type in {"group", "clip", "mask"}
                            or isinstance(obj, VisualObject)
                            and obj.object_type in SUPPORTED_REGISTRY_VISUALS)]
     if unsupported:
@@ -593,6 +599,8 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
              f'width="{_n(layout.canvas.width)}" height="{_n(layout.canvas.height)}" '
              f'fill="{style.colors["paper"]}"/>')]
     states = {state.object_id: state for state in snapshot.objects}
+    mask_sources = {obj.mask_source_object_id for obj in layout.objects
+                    if isinstance(obj, MaskContainer)}
     children: dict[str | None, list] = {}
     for obj in layout.objects:
         children.setdefault(obj.parent_id, []).append(obj)
@@ -609,6 +617,22 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                 f'width="{_n(bounds.width)}" height="{_n(bounds.height)}"/>'
                 f'</clipPath>'
             )
+        if isinstance(obj, MaskContainer):
+            source = objects[obj.mask_source_object_id]
+            source_state = states[source.object_id]
+            try:
+                x, y, width, height = mask_source_region(source, source_state.transform)
+            except UnsupportedMask as exc:
+                raise UnsupportedVisualObject(str(exc)) from exc
+            shape = _shape(source, "none", "#ffffff", 0)
+            definitions.append(
+                f'<mask id="{_container_mask_id(obj.object_id)}" '
+                f'maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" '
+                f'x="{_n(x)}" y="{_n(y)}" width="{_n(width)}" '
+                f'height="{_n(height)}" style="mask-type:alpha">'
+                f'<g transform="{_object_transform(source, source_state)}">'
+                f'{shape}</g></mask>'
+            )
         if 0 < state.reveal_fraction < 1 and active_verbs.get(state.object_id) not in {
             "draw", "write", "progressive_reveal", "connect", "disconnect"
         }:
@@ -620,11 +644,19 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                 f'height="{_n(bounds.height)}"/></clipPath>'
             )
     def render_object(obj) -> str:
+        if obj.object_id in mask_sources:
+            return ""
         state = states[obj.object_id]
         if isinstance(obj, ContainerObject):
             if not state.visible or state.opacity <= 0 or state.reveal_fraction <= 0:
                 return ""
             inner = "".join(render_object(child) for child in children.get(obj.object_id, ()))
+            if isinstance(obj, MaskContainer):
+                # Aperture stays in parent-local coordinates; content moves beneath it.
+                return (f'<g data-object-id="{_xml_escape(obj.object_id)}" '
+                        f'mask="url(#{_container_mask_id(obj.object_id)})" '
+                        f'opacity="{_n(state.opacity)}">'
+                        f'<g transform="{_object_transform(obj, state)}">{inner}</g></g>')
             clip = (f' clip-path="url(#{_container_clip_id(obj.object_id)})"'
                     if obj.object_type == "clip" else "")
             return (f'<g data-object-id="{_xml_escape(obj.object_id)}" '
