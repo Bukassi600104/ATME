@@ -286,7 +286,9 @@ Date: 2026-09-27
   unproven provenance/rotation claims and duplicate-project shared-asset
   resolution. Eleven direct PNG/project-asset tests, a targeted legacy
   supporting-asset/narrative-authority test, and Ruff passed in the independent
-  run. Source/frozen schema parity and desktop v2 preview/export are later
+  run. The finalized v2-selected suite, targeted legacy render/checkpoint/
+  offline tests, and full sidecar regression also passed with exit code 0.
+  Source/frozen schema parity and desktop v2 preview/export are later
   gates; this is not full Phase 3 or installed-app acceptance.
 - Slice 3R: independent bounded audit PASS for explicit static-alpha mask
   contracts, unique non-painted geometry ownership, schema/model parity,
