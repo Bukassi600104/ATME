@@ -1,6 +1,6 @@
 # Phase 3 v2 runtime semantics — kernel contract
 
-Status: Slices 3A–3R independent PASS; Slice 3S bounded mask runtime under final gate;
+Status: Slices 3A–3S independent PASS;
 not a production-renderer capability declaration
 
 This document fixes the meanings implemented by the first deterministic frame-state kernel. It
