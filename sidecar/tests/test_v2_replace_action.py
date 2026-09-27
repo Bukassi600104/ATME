@@ -228,6 +228,7 @@ def test_replacement_cannot_overlap_either_participant_or_leave_activation():
 
 def test_replace_plan_boundary_rejects_noncanonical_authoring():
     plan = visual_plan_v2()
+    plan["beats"][1]["evidence"] = None
     plan["actions"][2] = {
         "action_id": "action-3", "source_instruction_id": "instruction-3",
         "board_id": "board-main", "semantic_reason": "Develop the model",

@@ -489,30 +489,112 @@ class ContinuityPlan(StrictModel):
 
 
 class EvidenceIntent(StrictModel):
-    claim_id: str
-    claim: str
-    evidence_asset_id: str
+    claim_id: str = Field(min_length=1)
+    claim: str = Field(min_length=1)
+    evidence_asset_id: str = Field(min_length=1)
     crop: Bounds
     focus_region: Bounds
     mask_object_id: str | None = None
     darkening: float = Field(ge=0, le=1)
-    source_label: str
+    source_label: str = Field(min_length=1)
     annotation: str | None = None
     annotation_target_id: str | None = None
     annotation_omission_reason: str | None = None
     readable_hold_intent_ms: int = Field(gt=0)
-    destination_board_id: str
-    destination_state: str
+    destination_board_id: str = Field(min_length=1)
+    destination_state: str = Field(min_length=1)
     provenance_verified: bool
     checksum_verified: bool
 
     @model_validator(mode="after")
     def annotation_is_explained(self):
-        if self.annotation is None and not self.annotation_omission_reason:
-            raise ValueError("evidence without annotation requires an omission reason")
-        if self.annotation is not None and not self.annotation_target_id:
-            raise ValueError("evidence annotation requires a target")
+        if (not self.claim_id.strip() or not self.claim.strip()
+                or not self.source_label.strip()
+                or not self.destination_board_id.strip()
+                or not self.destination_state.strip()):
+            raise ValueError("evidence claim, source label, and destination must be readable")
+        if self.annotation is not None and not self.annotation.strip():
+            raise ValueError("evidence annotation cannot be blank")
+        if (self.annotation_omission_reason is not None
+                and not self.annotation_omission_reason.strip()):
+            raise ValueError("evidence annotation omission reason cannot be blank")
+        if self.annotation is None:
+            if self.annotation_target_id is not None or not self.annotation_omission_reason:
+                raise ValueError("evidence without annotation needs only an omission reason")
+        elif not self.annotation_target_id or self.annotation_omission_reason is not None:
+            raise ValueError("evidence annotation requires a target and no omission reason")
         return self
+
+
+class EvidenceTreatment(StrictModel):
+    """Exact forensic intent preserved across plan, layout and timing stages."""
+
+    beat_id: str = Field(min_length=1)
+    object_id: str = Field(min_length=1)
+    action_id: str = Field(min_length=1)
+    asset_revision: int = Field(ge=1)
+    asset_checksum_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    asset_managed_ref: str = Field(min_length=1)
+    asset_width: int = Field(gt=0)
+    asset_height: int = Field(gt=0)
+    asset_provenance: Provenance
+    allowed_transformations: list[Literal[
+        "crop", "scale", "rotate", "mask", "annotate", "color_treatment"
+    ]]
+    intent: EvidenceIntent
+
+    @model_validator(mode="after")
+    def bounded_source_geometry(self):
+        crop = self.intent.crop
+        focus = self.intent.focus_region
+        if any(not float(value).is_integer() for bounds in (crop, focus)
+               for value in (bounds.x, bounds.y, bounds.width, bounds.height)):
+            raise ValueError("evidence crop and focus require whole source pixels")
+        if (crop.x < 0 or crop.y < 0
+                or crop.x + crop.width > self.asset_width
+                or crop.y + crop.height > self.asset_height):
+            raise ValueError("evidence crop must fit the immutable source pixels")
+        if (focus.x < crop.x or focus.y < crop.y
+                or focus.x + focus.width > crop.x + crop.width
+                or focus.y + focus.height > crop.y + crop.height):
+            raise ValueError("evidence focus must fit inside the declared crop")
+        if self.asset_provenance.category != "external_evidence":
+            raise ValueError("evidence needs external-evidence provenance")
+        if (not self.asset_provenance.fabrication_prohibited
+                or self.asset_provenance.originality_status != "reference_only"):
+            raise ValueError("evidence source must prohibit fabrication and remain reference-only")
+        if (not self.asset_provenance.source_uri
+                or not self.asset_provenance.source_uri.strip()
+                or self.asset_provenance.license_status == "unresolved"):
+            raise ValueError("evidence needs a source URI and resolved license")
+        if self.asset_provenance.checksum_sha256 != self.asset_checksum_sha256:
+            raise ValueError("evidence provenance checksum must match the asset")
+        if not self.intent.provenance_verified or not self.intent.checksum_verified:
+            raise ValueError("evidence provenance and source checksum must be verified")
+        permitted = set(self.allowed_transformations)
+        required = {"crop", "scale"}
+        if self.intent.annotation is not None:
+            required.add("annotate")
+        if self.intent.darkening > 0:
+            required.add("color_treatment")
+        if self.intent.mask_object_id is not None:
+            required.add("mask")
+        if not required.issubset(permitted):
+            raise ValueError("evidence treatment exceeds declared asset permissions")
+        return self
+
+
+def _evidence_treatment_for(beat, asset, obj, action) -> EvidenceTreatment:
+    if (asset.managed_ref is None or asset.checksum_sha256 is None
+            or asset.width is None or asset.height is None):
+        raise ValueError(f"beat {beat.beat_id} evidence has no immutable source snapshot")
+    return EvidenceTreatment(
+        beat_id=beat.beat_id, object_id=obj.object_id, action_id=action.action_id,
+        asset_revision=asset.revision, asset_checksum_sha256=asset.checksum_sha256,
+        asset_managed_ref=asset.managed_ref, asset_width=asset.width,
+        asset_height=asset.height, asset_provenance=asset.provenance,
+        allowed_transformations=asset.allowed_transformations, intent=beat.evidence,
+    )
 
 
 class CameraIntent(StrictModel):
@@ -661,6 +743,7 @@ class VisualPlanV2(StrictModel):
         _unique_mask_sources(self.objects)
         mask_sources = {obj.mask_source_object_id for obj in self.objects
                         if obj.object_type == "mask" and obj.mask_source_object_id is not None}
+        evidence_claim_ids = []
         for beat in self.beats:
             if beat.board_id not in boards:
                 raise ValueError(f"beat {beat.beat_id} references unknown board")
@@ -704,10 +787,32 @@ class VisualPlanV2(StrictModel):
             if beat.evidence and beat.evidence.evidence_asset_id not in assets:
                 raise ValueError(f"beat {beat.beat_id} references unknown evidence asset")
             if beat.evidence:
+                evidence = beat.evidence
+                evidence_claim_ids.append(evidence.claim_id)
+                asset = asset_map[evidence.evidence_asset_id]
+                if asset.kind != "evidence":
+                    raise ValueError(f"beat {beat.beat_id} cannot use a supporting image as evidence")
+                matching_objects = [obj for obj in self.objects
+                                    if obj.beat_id == beat.beat_id
+                                    and obj.board_id == beat.board_id
+                                    and obj.object_type == "evidence"
+                                    and obj.asset_id == evidence.evidence_asset_id]
+                matching_actions = [action_map[action_id] for action_id in beat.action_ids
+                                    if isinstance(action_map[action_id], EvidenceAction)
+                                    and action_map[action_id].verb == "insert_evidence"
+                                    and action_map[action_id].evidence_asset_id == evidence.evidence_asset_id]
+                if (len(matching_objects) != 1 or len(matching_actions) != 1
+                        or evidence.destination_board_id != beat.board_id
+                        or matching_actions[0].destination_board_id != beat.board_id
+                        or matching_actions[0].destination_state != evidence.destination_state):
+                    raise ValueError(f"beat {beat.beat_id} needs one matched evidence object and insert action")
                 if beat.evidence.destination_board_id not in boards:
                     raise ValueError(f"beat {beat.beat_id} evidence references unknown destination board")
                 if beat.evidence.annotation_target_id and beat.evidence.annotation_target_id not in objects:
                     raise ValueError(f"beat {beat.beat_id} evidence annotation target is unknown")
+                if (beat.evidence.annotation_target_id
+                        and object_map[beat.evidence.annotation_target_id].board_id != beat.board_id):
+                    raise ValueError(f"beat {beat.beat_id} evidence annotation crosses boards")
                 if beat.evidence.annotation_target_id in mask_sources:
                     raise ValueError(f"beat {beat.beat_id} cannot annotate a mask source")
                 if beat.evidence.mask_object_id:
@@ -715,6 +820,12 @@ class VisualPlanV2(StrictModel):
                     if (mask is None or mask.object_type != "mask"
                             or mask.board_id != beat.board_id):
                         raise ValueError(f"beat {beat.beat_id} evidence mask must be a same-board mask")
+                # Old 2.0.0 plans may load without a materialized source snapshot.
+                # New writes and all executable layouts require completeness below.
+                if all(value is not None for value in (
+                    asset.managed_ref, asset.checksum_sha256, asset.width, asset.height
+                )):
+                    _evidence_treatment_for(beat, asset, matching_objects[0], matching_actions[0])
             if beat.sound_intent.asset_id:
                 asset = asset_map.get(beat.sound_intent.asset_id)
                 if asset is None:
@@ -723,6 +834,8 @@ class VisualPlanV2(StrictModel):
                                   else {"audio", "music"})
                 if asset.kind not in expected_kinds:
                     raise ValueError(f"beat {beat.beat_id} sound asset kind disagrees with its role")
+        if len(evidence_claim_ids) != len(set(evidence_claim_ids)):
+            raise ValueError("evidence claim IDs must be unique")
         beat_action_ids = [action_id for beat in self.beats for action_id in beat.action_ids]
         if len(beat_action_ids) != len(set(beat_action_ids)) or set(beat_action_ids) != actions:
             raise ValueError("actions must be owned by exactly one beat")
@@ -824,6 +937,7 @@ class ExecutableLayoutV2(StrictModel):
     boards: list[BoardSpec] = Field(min_length=1)
     objects: list[ExecutableObject] = Field(min_length=1)
     activations: list[BoardActivation] = Field(min_length=1)
+    evidence_treatments: list[EvidenceTreatment] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_scene_graph(self):
@@ -875,6 +989,21 @@ class ExecutableLayoutV2(StrictModel):
                     raise ValueError(f"container {obj.object_id} repeats a child")
                 _subset(obj.child_ids, object_ids, f"container {obj.object_id} children")
         _validate_mask_layout(self.objects, object_map)
+        _unique(self.evidence_treatments, "object_id")
+        _unique(self.evidence_treatments, "beat_id")
+        _unique(self.evidence_treatments, "action_id")
+        _unique_evidence_claims(self.evidence_treatments)
+        if self.evidence_treatments:
+            evidence_ids = {obj.object_id for obj in self.objects
+                            if isinstance(obj, VisualObject) and obj.object_type == "evidence"}
+            if {item.object_id for item in self.evidence_treatments} != evidence_ids:
+                raise ValueError("evidence treatment inventory must cover every evidence object")
+            for treatment in self.evidence_treatments:
+                obj = object_map[treatment.object_id]
+                if (obj.beat_id != treatment.beat_id
+                        or obj.board_id != treatment.intent.destination_board_id
+                        or obj.asset_id != treatment.intent.evidence_asset_id):
+                    raise ValueError("evidence treatment changes object, beat, board, or asset")
         _reject_parent_cycles(object_map)
         _reject_container_cycles(object_map)
         last_end = 0
@@ -1004,6 +1133,7 @@ class ResolvedVisualTimelineV2(StrictModel):
     duration_ms: int = Field(gt=0)
     compilation_fingerprint: str = Field(pattern=r"^[a-f0-9]{64}$")
     resolved_assets: list[ResolvedAsset]
+    evidence_treatments: list[EvidenceTreatment] = Field(default_factory=list)
     initial_object_states: list[ObjectState]
     beat_anchors: list[ResolvedBeatAnchor] = Field(min_length=1)
     actions: list[ResolvedAction] = Field(min_length=1)
@@ -1016,6 +1146,10 @@ class ResolvedVisualTimelineV2(StrictModel):
         if self.style_system_version != "atme-style-v2" or self.asset_registry_version != "atme-assets-v2":
             raise ValueError("unknown style-system or asset-registry version")
         _unique(self.resolved_assets, "asset_id"); _unique(self.initial_object_states, "object_id")
+        _unique(self.evidence_treatments, "object_id")
+        _unique(self.evidence_treatments, "beat_id")
+        _unique(self.evidence_treatments, "action_id")
+        _unique_evidence_claims(self.evidence_treatments)
         _unique(self.beat_anchors, "beat_id"); _unique(self.coverage, "coverage_id")
         _unique(self.fallbacks, "fallback_id")
         beat_anchors = {item.beat_id: item.start_ms for item in self.beat_anchors}
@@ -1089,6 +1223,31 @@ class ResolvedVisualTimelineV2(StrictModel):
         coverage_ids = {item.coverage_id for item in self.coverage}
         fallbacks = {item.fallback_id: item for item in self.fallbacks}
         action_map = {item.action.action_id: item.action for item in self.actions}
+        if self.evidence_treatments:
+            assets_by_id = {asset.asset_id: asset for asset in self.resolved_assets}
+            resolved_by_id = {item.action.action_id: item for item in self.actions}
+            for treatment in self.evidence_treatments:
+                asset = assets_by_id.get(treatment.intent.evidence_asset_id)
+                resolved = resolved_by_id.get(treatment.action_id)
+                if (asset is None or resolved is None
+                        or asset.revision != treatment.asset_revision
+                        or asset.checksum_sha256 != treatment.asset_checksum_sha256
+                        or asset.managed_ref != treatment.asset_managed_ref
+                        or asset.kind != "evidence"
+                         or asset.media_type != "image/png"
+                         or asset.byte_length is None
+                         or asset.width != treatment.asset_width
+                         or asset.height != treatment.asset_height
+                         or asset.orientation != "upright"
+                         or asset.allowed_transformations != treatment.allowed_transformations
+                        or not asset.provenance_verified
+                        or not isinstance(resolved.action, EvidenceAction)
+                        or resolved.action.verb != "insert_evidence"
+                        or resolved.action.evidence_asset_id != asset.asset_id
+                        or resolved.action.board_id != treatment.intent.destination_board_id
+                        or resolved.action.destination_state != treatment.intent.destination_state
+                         or resolved.end_ms + treatment.intent.readable_hold_intent_ms > self.duration_ms):
+                    raise ValueError("resolved evidence changes treatment, asset, action, or hold")
         allowed_affected = (set(action_map) | set(states) | {item.asset_id for item in self.resolved_assets}
                             | {item.source_instruction_id for item in action_map.values()}
                             | set(beat_anchors))
@@ -1187,12 +1346,64 @@ def validate_plan_layout(plan_document: dict, layout_document: dict) -> None:
         candidate = layout_boards[board_id]
         if candidate.model_dump(mode="json") != board.model_dump(mode="json"):
             raise ValueError(f"layout board {board_id} changes its directing declaration")
+    plan_assets = {item.asset_id: item for item in plan.assets}
+    plan_actions = {item.action_id: item for item in plan.actions}
+    expected_treatments = []
+    for beat in plan.beats:
+        if beat.evidence is None:
+            continue
+        evidence = beat.evidence
+        asset = plan_assets[evidence.evidence_asset_id]
+        obj = next(item for item in plan.objects
+                   if item.beat_id == beat.beat_id and item.object_type == "evidence"
+                   and item.asset_id == asset.asset_id)
+        action = next(plan_actions[action_id] for action_id in beat.action_ids
+                      if isinstance(plan_actions[action_id], EvidenceAction)
+                      and plan_actions[action_id].verb == "insert_evidence")
+        expected_treatments.append(_evidence_treatment_for(beat, asset, obj, action))
+    actual = {item.object_id: item for item in layout.evidence_treatments}
+    expected = {item.object_id: item for item in expected_treatments}
+    if actual != expected:
+        raise ValueError("layout must preserve every evidence treatment exactly")
+
+
+def validate_plan_evidence_completeness(plan_document: dict) -> None:
+    """Require immutable, executable evidence snapshots for new plan writes."""
+    plan = VisualPlanV2.model_validate(plan_document)
+    assets = {item.asset_id: item for item in plan.assets}
+    actions = {item.action_id: item for item in plan.actions}
+    evidence_objects = {item.object_id for item in plan.objects
+                        if item.object_type == "evidence"}
+    insert_actions = {item.action_id for item in plan.actions
+                      if isinstance(item, EvidenceAction) and item.verb == "insert_evidence"}
+    covered_objects = set()
+    covered_actions = set()
+    for beat in plan.beats:
+        if beat.evidence is None:
+            continue
+        asset = assets[beat.evidence.evidence_asset_id]
+        obj = next(item for item in plan.objects if item.beat_id == beat.beat_id
+                   and item.object_type == "evidence" and item.asset_id == asset.asset_id)
+        action = next(actions[action_id] for action_id in beat.action_ids
+                      if isinstance(actions[action_id], EvidenceAction)
+                      and actions[action_id].verb == "insert_evidence")
+        _evidence_treatment_for(beat, asset, obj, action)
+        covered_objects.add(obj.object_id)
+        covered_actions.add(action.action_id)
+    if covered_objects != evidence_objects or covered_actions != insert_actions:
+        raise ValueError("every evidence object and insert action needs an EvidenceIntent")
 
 
 def _unique(items, field):
     values = [getattr(x, field) for x in items]
     if len(values) != len(set(values)):
         raise ValueError(f"{field} values must be unique")
+
+
+def _unique_evidence_claims(treatments):
+    claim_ids = [item.intent.claim_id for item in treatments]
+    if len(claim_ids) != len(set(claim_ids)):
+        raise ValueError("evidence claim IDs must be unique")
 
 
 def _validate_mask_fields(mask):

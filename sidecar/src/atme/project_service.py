@@ -320,7 +320,7 @@ class ProjectService:
                 raise
         return self.open(copy_id)
 
-    def _serialized_artifact(self, kind, document):
+    def _serialized_artifact(self, kind, document, *, legacy_migration=False):
         version = document.get("contract_version", "1") if isinstance(document, dict) else "1"
         schema = self.schema(kind, version)
         try:
@@ -338,8 +338,14 @@ class ProjectService:
         if not errors and version == "2.0.0":
             try:
                 if kind == "storyboard":
-                    from atme.store.contracts_v2 import VisualPlanV2
-                    VisualPlanV2.model_validate(document)
+                    if legacy_migration:
+                        from atme.store.contracts_v2 import VisualPlanV2
+                        VisualPlanV2.model_validate(document)
+                    else:
+                        from atme.store.contracts_v2 import (
+                            validate_plan_evidence_completeness,
+                        )
+                        validate_plan_evidence_completeness(document)
                 elif kind == "layout":
                     from atme.store.contracts_v2 import ExecutableLayoutV2
                     ExecutableLayoutV2.model_validate(document)
@@ -488,7 +494,9 @@ class ProjectService:
                     output_profile={"profile_id": row["profile"], "width": profile[0],
                                     "height": profile[1], "fps": 30})
                 plan_doc = migrated["visual_plan"]
-                plan_serialized = self._serialized_artifact("storyboard", plan_doc)
+                plan_serialized = self._serialized_artifact(
+                    "storyboard", plan_doc, legacy_migration=True,
+                )
                 plan_revision = self._write_transaction(conn, project_id, "storyboard", plan_doc,
                                                         plan_serialized, row)
                 next_row = self._row(project_id)

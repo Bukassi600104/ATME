@@ -541,6 +541,212 @@
       "title": "ConnectorObject",
       "type": "object"
     },
+    "EvidenceIntent": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "minLength": 1,
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "claim": {
+          "minLength": 1,
+          "title": "Claim",
+          "type": "string"
+        },
+        "evidence_asset_id": {
+          "minLength": 1,
+          "title": "Evidence Asset Id",
+          "type": "string"
+        },
+        "crop": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "focus_region": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "mask_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mask Object Id"
+        },
+        "darkening": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Darkening",
+          "type": "number"
+        },
+        "source_label": {
+          "minLength": 1,
+          "title": "Source Label",
+          "type": "string"
+        },
+        "annotation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Annotation"
+        },
+        "annotation_target_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Annotation Target Id"
+        },
+        "annotation_omission_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Annotation Omission Reason"
+        },
+        "readable_hold_intent_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Readable Hold Intent Ms",
+          "type": "integer"
+        },
+        "destination_board_id": {
+          "minLength": 1,
+          "title": "Destination Board Id",
+          "type": "string"
+        },
+        "destination_state": {
+          "minLength": 1,
+          "title": "Destination State",
+          "type": "string"
+        },
+        "provenance_verified": {
+          "title": "Provenance Verified",
+          "type": "boolean"
+        },
+        "checksum_verified": {
+          "title": "Checksum Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "claim_id",
+        "claim",
+        "evidence_asset_id",
+        "crop",
+        "focus_region",
+        "darkening",
+        "source_label",
+        "readable_hold_intent_ms",
+        "destination_board_id",
+        "destination_state",
+        "provenance_verified",
+        "checksum_verified"
+      ],
+      "title": "EvidenceIntent",
+      "type": "object"
+    },
+    "EvidenceTreatment": {
+      "additionalProperties": false,
+      "description": "Exact forensic intent preserved across plan, layout and timing stages.",
+      "properties": {
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "asset_revision": {
+          "minimum": 1,
+          "title": "Asset Revision",
+          "type": "integer"
+        },
+        "asset_checksum_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Asset Checksum Sha256",
+          "type": "string"
+        },
+        "asset_managed_ref": {
+          "minLength": 1,
+          "title": "Asset Managed Ref",
+          "type": "string"
+        },
+        "asset_width": {
+          "exclusiveMinimum": 0,
+          "title": "Asset Width",
+          "type": "integer"
+        },
+        "asset_height": {
+          "exclusiveMinimum": 0,
+          "title": "Asset Height",
+          "type": "integer"
+        },
+        "asset_provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "allowed_transformations": {
+          "items": {
+            "enum": [
+              "crop",
+              "scale",
+              "rotate",
+              "mask",
+              "annotate",
+              "color_treatment"
+            ],
+            "type": "string"
+          },
+          "title": "Allowed Transformations",
+          "type": "array"
+        },
+        "intent": {
+          "$ref": "#/$defs/EvidenceIntent"
+        }
+      },
+      "required": [
+        "beat_id",
+        "object_id",
+        "action_id",
+        "asset_revision",
+        "asset_checksum_sha256",
+        "asset_managed_ref",
+        "asset_width",
+        "asset_height",
+        "asset_provenance",
+        "allowed_transformations",
+        "intent"
+      ],
+      "title": "EvidenceTreatment",
+      "type": "object"
+    },
     "Geometry": {
       "additionalProperties": false,
       "properties": {
@@ -1179,6 +1385,80 @@
       "title": "Point",
       "type": "object"
     },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "original",
+            "user_owned",
+            "licensed",
+            "external_evidence",
+            "generated"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "source_uri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Uri"
+        },
+        "checksum_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checksum Sha256"
+        },
+        "license_status": {
+          "enum": [
+            "owned",
+            "licensed",
+            "fair_use_review",
+            "not_applicable",
+            "unresolved"
+          ],
+          "title": "License Status",
+          "type": "string"
+        },
+        "fabrication_prohibited": {
+          "title": "Fabrication Prohibited",
+          "type": "boolean"
+        },
+        "originality_status": {
+          "enum": [
+            "original",
+            "transformed",
+            "reference_only",
+            "unresolved"
+          ],
+          "title": "Originality Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "category",
+        "license_status",
+        "fabrication_prohibited",
+        "originality_status"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
     "StyleRefs": {
       "additionalProperties": false,
       "properties": {
@@ -1713,6 +1993,13 @@
       },
       "minItems": 1,
       "title": "Activations",
+      "type": "array"
+    },
+    "evidence_treatments": {
+      "items": {
+        "$ref": "#/$defs/EvidenceTreatment"
+      },
+      "title": "Evidence Treatments",
       "type": "array"
     }
   },

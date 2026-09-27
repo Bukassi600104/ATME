@@ -29,6 +29,7 @@ def masked_documents():
     layout, timeline = grouped_documents()
     plan["objects"][2]["object_type"] = "ellipse"
     plan["objects"][2]["asset_id"] = None
+    plan["beats"][1]["evidence"] = None
     mask = layout["objects"][3]
     mask["object_type"] = "mask"
     mask.update(MASK_FIELDS)
@@ -233,6 +234,7 @@ def test_connector_cannot_bind_to_mask_only_geometry():
 
 def test_evidence_mask_must_reference_same_board_mask():
     plan, _, _ = masked_documents()
+    _restore_evidence(plan)
     plan["beats"][1]["evidence"]["mask_object_id"] = "object-system"
     with pytest.raises(ValidationError, match="same-board mask"):
         VisualPlanV2.model_validate(plan)
@@ -244,10 +246,18 @@ def test_evidence_mask_must_reference_same_board_mask():
     lambda p: p["beats"][0]["continuity"]["keep"].append("mask-source"),
     lambda p: p["beats"][0]["continuity"]["replacements"].update(
         {"object-system": "mask-source"}),
-    lambda p: p["beats"][1]["evidence"].update(annotation_target_id="mask-source"),
+    lambda p: (_restore_evidence(p),
+               p["beats"][1]["evidence"].update(annotation_target_id="mask-source")),
 ])
 def test_mask_only_source_cannot_be_directed_as_visible_content(place):
     plan, _, _ = masked_documents()
     place(plan)
     with pytest.raises(ValidationError, match="mask source"):
         VisualPlanV2.model_validate(plan)
+
+
+def _restore_evidence(plan):
+    original = visual_plan_v2()
+    plan["objects"][2]["object_type"] = "evidence"
+    plan["objects"][2]["asset_id"] = "asset-evidence"
+    plan["beats"][1]["evidence"] = deepcopy(original["beats"][1]["evidence"])

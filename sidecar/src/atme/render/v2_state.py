@@ -238,8 +238,19 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             or layout_sha256 != timeline.layout_sha256
             or layout.output_profile != timeline.output_profile
             or layout.style_system_version != timeline.style_system_version
-            or layout.asset_registry_version != timeline.asset_registry_version):
+            or layout.asset_registry_version != timeline.asset_registry_version
+            or layout.evidence_treatments != timeline.evidence_treatments):
         raise V2FrameError("resolved timeline and executable layout do not describe the same composition")
+    resolved_actions = {item.action.action_id: item for item in timeline.actions}
+    for treatment in layout.evidence_treatments:
+        resolved = resolved_actions.get(treatment.action_id)
+        if resolved is None or not any(
+            activation.board_id == treatment.intent.destination_board_id
+            and activation.start_ms <= resolved.start_ms
+            and resolved.end_ms + treatment.intent.readable_hold_intent_ms <= activation.end_ms
+            for activation in layout.activations
+        ):
+            raise V2FrameError("evidence readable hold outlasts its destination board")
     layout_objects = {item.object_id: item for item in layout.objects}
     validate_static_hierarchy(layout)
     state_objects = {item.object_id for item in timeline.initial_object_states}

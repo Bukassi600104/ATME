@@ -1191,14 +1191,17 @@
       "additionalProperties": false,
       "properties": {
         "claim_id": {
+          "minLength": 1,
           "title": "Claim Id",
           "type": "string"
         },
         "claim": {
+          "minLength": 1,
           "title": "Claim",
           "type": "string"
         },
         "evidence_asset_id": {
+          "minLength": 1,
           "title": "Evidence Asset Id",
           "type": "string"
         },
@@ -1227,6 +1230,7 @@
           "type": "number"
         },
         "source_label": {
+          "minLength": 1,
           "title": "Source Label",
           "type": "string"
         },
@@ -1272,10 +1276,12 @@
           "type": "integer"
         },
         "destination_board_id": {
+          "minLength": 1,
           "title": "Destination Board Id",
           "type": "string"
         },
         "destination_state": {
+          "minLength": 1,
           "title": "Destination State",
           "type": "string"
         },

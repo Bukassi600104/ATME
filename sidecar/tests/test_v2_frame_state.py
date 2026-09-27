@@ -42,6 +42,9 @@ def supported_documents(third_action="reveal"):
             "opacity": 0.2 if third_action == "fade" else None,
         }),
     }
+    # These legacy kernel fixtures exercise generic object state, not the
+    # explicit evidence action/treatment contract.
+    plan["beats"][1]["evidence"] = None
     if third_action in ("exit", "fade"):
         plan["actions"][2]["expected_state"] = "visible"
     if third_action == "exit":

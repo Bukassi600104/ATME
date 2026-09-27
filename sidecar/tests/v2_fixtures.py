@@ -147,13 +147,38 @@ def executable_layout_v2(plan=None):
          "points": [], "corner_radius": 12}, "asset_id": "asset-evidence", "description": "Cropped source evidence",
          "coverage_ids": ["coverage-3"], "variant": "annotated_crop"},
     ]
+    evidence_treatments = []
+    for beat in plan["beats"]:
+        intent = beat.get("evidence")
+        if intent is None:
+            continue
+        asset = next(item for item in plan["assets"]
+                     if item["asset_id"] == intent["evidence_asset_id"])
+        obj = next(item for item in plan["objects"]
+                   if item["beat_id"] == beat["beat_id"]
+                   and item["object_type"] == "evidence"
+                   and item["asset_id"] == asset["asset_id"])
+        action = next(item for item in plan["actions"]
+                      if item["action_id"] in beat["action_ids"]
+                      and item["verb"] == "insert_evidence")
+        evidence_treatments.append({
+            "beat_id": beat["beat_id"], "object_id": obj["object_id"],
+            "action_id": action["action_id"], "asset_revision": asset["revision"],
+            "asset_checksum_sha256": asset["checksum_sha256"],
+            "asset_managed_ref": asset["managed_ref"],
+            "asset_width": asset["width"], "asset_height": asset["height"],
+            "asset_provenance": asset["provenance"],
+            "allowed_transformations": asset["allowed_transformations"],
+            "intent": intent,
+        })
     return {"contract_version": "2.0.0", "layout_id": "layout-rich", "project_id": 1,
             "project_revision": plan["project_revision"] + 1, "plan_id": plan["plan_id"], "plan_revision": 4,
             "plan_sha256": digest(plan), "output_profile": PROFILE,
             "style_system_version": "atme-style-v2", "asset_registry_version": "atme-assets-v2",
             "canvas": {"x": 0, "y": 0, "width": 1280, "height": 720}, "boards": plan["boards"],
             "objects": objects, "activations": [{"activation_id": "activation-1", "board_id": "board-main",
-            "start_ms": 0, "end_ms": 10000, "reason": "Persistent board for the full explanation"}]}
+            "start_ms": 0, "end_ms": 10000, "reason": "Persistent board for the full explanation"}],
+            "evidence_treatments": evidence_treatments}
 
 
 def resolved_timeline_v2(plan=None, layout=None):
@@ -175,11 +200,12 @@ def resolved_timeline_v2(plan=None, layout=None):
             "duration_ms": 10000, "compilation_fingerprint": SHA_A,
             "resolved_assets": [{"asset_id": "asset-evidence", "revision": 1,
                                  "managed_ref": "assets/evidence.png", "checksum_sha256": SHA_A,
-                                 "provenance_verified": True, "kind": None,
-                                 "media_type": None, "byte_length": None,
-                                 "width": None, "height": None,
-                                 "orientation": None,
-                                 "allowed_transformations": None}],
+                                 "provenance_verified": True, "kind": "evidence",
+                                 "media_type": "image/png", "byte_length": 1000,
+                                 "width": 900, "height": 500,
+                                 "orientation": "upright",
+                                 "allowed_transformations": ["crop", "scale", "annotate", "color_treatment"]}],
+            "evidence_treatments": layout["evidence_treatments"],
             "initial_object_states": [{"object_id": obj["object_id"], "state": "hidden",
                                        "state_version": 1, "visible": False} for obj in layout["objects"]],
             "beat_anchors": [{"beat_id": "beat-001", "start_ms": 0},

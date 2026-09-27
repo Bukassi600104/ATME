@@ -224,5 +224,59 @@
       "end_ms": 10000,
       "reason": "Persistent board for the full explanation"
     }
+  ],
+  "evidence_treatments": [
+    {
+      "beat_id": "beat-002",
+      "object_id": "object-evidence",
+      "action_id": "action-3",
+      "asset_revision": 1,
+      "asset_checksum_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "asset_managed_ref": "assets/evidence.png",
+      "asset_width": 900,
+      "asset_height": 500,
+      "asset_provenance": {
+        "category": "external_evidence",
+        "source_uri": "https://example.com/source",
+        "checksum_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "license_status": "licensed",
+        "fabrication_prohibited": true,
+        "originality_status": "reference_only"
+      },
+      "allowed_transformations": [
+        "crop",
+        "scale",
+        "annotate",
+        "color_treatment"
+      ],
+      "intent": {
+        "claim_id": "claim-1",
+        "claim": "The source confirms the mechanism",
+        "evidence_asset_id": "asset-evidence",
+        "crop": {
+          "x": 0,
+          "y": 0,
+          "width": 900,
+          "height": 500
+        },
+        "focus_region": {
+          "x": 100,
+          "y": 100,
+          "width": 500,
+          "height": 200
+        },
+        "mask_object_id": null,
+        "darkening": 0.2,
+        "source_label": "Example Source",
+        "annotation": "Key mechanism",
+        "annotation_target_id": "object-evidence",
+        "annotation_omission_reason": null,
+        "readable_hold_intent_ms": 2500,
+        "destination_board_id": "board-main",
+        "destination_state": "evidence_visible",
+        "provenance_verified": true,
+        "checksum_verified": true
+      }
+    }
   ]
 }

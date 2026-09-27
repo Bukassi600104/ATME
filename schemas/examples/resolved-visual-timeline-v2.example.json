@@ -8,7 +8,7 @@
   "plan_sha256": "ca5d463c3ff429b712529197742a2337d40e7f935ce03ca7d6e8b1ec20aa31c8",
   "layout_id": "layout-rich",
   "layout_revision": 5,
-  "layout_sha256": "a2ea1cd085de606fe689a12b89b6df918102fa2c35792131b064d4946e851460",
+  "layout_sha256": "b0361a4c715d70584c841d0db5cd7f738f6257b98258bbc844d45721a1773222",
   "cleaned_timeline_revision": 2,
   "cleaned_timeline_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "output_profile": {
@@ -28,13 +28,72 @@
       "managed_ref": "assets/evidence.png",
       "checksum_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "provenance_verified": true,
-      "kind": null,
-      "media_type": null,
-      "byte_length": null,
-      "width": null,
-      "height": null,
-      "orientation": null,
-      "allowed_transformations": null
+      "kind": "evidence",
+      "media_type": "image/png",
+      "byte_length": 1000,
+      "width": 900,
+      "height": 500,
+      "orientation": "upright",
+      "allowed_transformations": [
+        "crop",
+        "scale",
+        "annotate",
+        "color_treatment"
+      ]
+    }
+  ],
+  "evidence_treatments": [
+    {
+      "beat_id": "beat-002",
+      "object_id": "object-evidence",
+      "action_id": "action-3",
+      "asset_revision": 1,
+      "asset_checksum_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "asset_managed_ref": "assets/evidence.png",
+      "asset_width": 900,
+      "asset_height": 500,
+      "asset_provenance": {
+        "category": "external_evidence",
+        "source_uri": "https://example.com/source",
+        "checksum_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "license_status": "licensed",
+        "fabrication_prohibited": true,
+        "originality_status": "reference_only"
+      },
+      "allowed_transformations": [
+        "crop",
+        "scale",
+        "annotate",
+        "color_treatment"
+      ],
+      "intent": {
+        "claim_id": "claim-1",
+        "claim": "The source confirms the mechanism",
+        "evidence_asset_id": "asset-evidence",
+        "crop": {
+          "x": 0,
+          "y": 0,
+          "width": 900,
+          "height": 500
+        },
+        "focus_region": {
+          "x": 100,
+          "y": 100,
+          "width": 500,
+          "height": 200
+        },
+        "mask_object_id": null,
+        "darkening": 0.2,
+        "source_label": "Example Source",
+        "annotation": "Key mechanism",
+        "annotation_target_id": "object-evidence",
+        "annotation_omission_reason": null,
+        "readable_hold_intent_ms": 2500,
+        "destination_board_id": "board-main",
+        "destination_state": "evidence_visible",
+        "provenance_verified": true,
+        "checksum_verified": true
+      }
     }
   ],
   "initial_object_states": [

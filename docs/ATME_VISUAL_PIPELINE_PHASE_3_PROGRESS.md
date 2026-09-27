@@ -300,6 +300,19 @@ Date: 2026-09-27
   offline tests, and full sidecar regression also passed with exit code 0.
   Source/frozen schema parity and desktop v2 preview/export are later
   gates; this is not full Phase 3 or installed-app acceptance.
+- Slice 3V (contract stage): independent behavioral re-audit found no remaining
+  evidence-contract gap after normal storyboard writes began requiring exact
+  EvidenceIntent/object/insert-action inventory, immutable source snapshot,
+  verified provenance/checksum, reference-only nonfabrication, permitted
+  crop/annotation/color treatment, bounded source geometry, and a post-insert
+  readable hold within the destination board activation. Older 2.0.0 plans
+  with incomplete evidence snapshots remain loadable, but cannot pass new
+  writes or become executable; the v1 migration path has an explicit legacy
+  compatibility exception and remains recorded unsupported. Thirty-two
+  direct evidence tests, the visual-contract suite, the v2-selected suite,
+  and Ruff passed. This stage preserves and validates forensic intent only:
+  evidence-specific asset attestation, action execution, raster/SVG pixels,
+  desktop integration, and full production acceptance remain open.
 - Slice 3R: independent bounded audit PASS for explicit static-alpha mask
   contracts, unique non-painted geometry ownership, schema/model parity,
   preserved old `2.0.0` mask loading and parse/dump/reparse, mixed-policy
