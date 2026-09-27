@@ -39,6 +39,7 @@ from atme.render.v2_path import (
     parse_freehand_path,
 )
 from atme.render.v2_state import FrameObject, evaluate_frame
+from atme.render.v2_world import UnsupportedWorldGeometry, transform_svg, world_anchor
 from atme.store.contracts_v2 import (
     ConnectionAction,
     ConnectorObject,
@@ -314,31 +315,6 @@ def _registry_visual(obj: VisualObject) -> str:
             f'{inner}</svg>')
 
 
-def _anchor_canvas_point(obj, state: FrameObject, anchor_id: str) -> tuple[float, float]:
-    anchor = next(anchor for anchor in obj.anchors if anchor.anchor_id == anchor_id)
-    bounds = obj.geometry.bounds
-    # Match the serialized geometry and transform, not higher-precision inputs
-    # that the rasterizer never sees.
-    x = float(_n(bounds.x)) + float(_n(bounds.width)) * anchor.point.x
-    y = float(_n(bounds.y)) + float(_n(bounds.height)) * anchor.point.y
-    transform = state.transform
-    if abs(transform.rotation_degrees) > 1_000_000:
-        raise UnsupportedVisualObject(f"v2 connector endpoint {obj.object_id} rotation is out of range")
-    origin_x = float(_n(bounds.x + bounds.width * transform.origin.x))
-    origin_y = float(_n(bounds.y + bounds.height * transform.origin.y))
-    scale_x = float(_n(transform.scale_x))
-    scale_y = float(_n(transform.scale_y))
-    if scale_x <= 0 or scale_y <= 0:
-        raise UnsupportedVisualObject(f"v2 connector endpoint {obj.object_id} has collapsed scale")
-    delta_x = (x - origin_x) * scale_x
-    delta_y = (y - origin_y) * scale_y
-    radians = math.radians(float(_n(transform.rotation_degrees)))
-    return (origin_x + delta_x * math.cos(radians) - delta_y * math.sin(radians)
-            + float(_n(transform.position.x)),
-            origin_y + delta_x * math.sin(radians) + delta_y * math.cos(radians)
-            + float(_n(transform.position.y)))
-
-
 def _connector_shape(obj: ConnectorObject, objects: dict, states: dict,
                      stroke: str, weight: float, draw_fraction: float | None) -> str:
     source = objects[obj.source_object_id]
@@ -348,8 +324,19 @@ def _connector_shape(obj: ConnectorObject, objects: dict, states: dict,
     if any(not endpoint.visible or endpoint.opacity <= 0 or endpoint.reveal_fraction <= 0
            for endpoint in (source_state, destination_state)):
         raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has a hidden endpoint")
-    start = _anchor_canvas_point(source, source_state, obj.source_anchor_id)
-    end = _anchor_canvas_point(destination, destination_state, obj.destination_anchor_id)
+    for endpoint in (source, destination):
+        parent_id = endpoint.parent_id
+        while parent_id is not None:
+            parent_state = states[parent_id]
+            if not parent_state.visible or parent_state.opacity <= 0:
+                raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has a hidden endpoint")
+            parent_id = objects[parent_id].parent_id
+    transforms = {object_id: state.transform for object_id, state in states.items()}
+    try:
+        start = world_anchor(source, obj.source_anchor_id, objects, transforms)
+        end = world_anchor(destination, obj.destination_anchor_id, objects, transforms)
+    except UnsupportedWorldGeometry as exc:
+        raise UnsupportedVisualObject(str(exc)) from exc
     if not all(math.isfinite(value) and abs(value) <= 1_000_000 for point in (start, end)
                for value in point):
         raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} endpoint is outside supported range")
@@ -412,14 +399,7 @@ def _connector_shape(obj: ConnectorObject, objects: dict, states: dict,
 
 
 def _object_transform(obj, state: FrameObject) -> str:
-    t = state.transform
-    bounds = obj.geometry.bounds
-    origin_x = bounds.x + bounds.width * t.origin.x
-    origin_y = bounds.y + bounds.height * t.origin.y
-    return (f'translate({_n(t.position.x)} {_n(t.position.y)}) '
-            f'translate({_n(origin_x)} {_n(origin_y)}) '
-            f'rotate({_n(t.rotation_degrees)}) scale({_n(t.scale_x)} {_n(t.scale_y)}) '
-            f'translate({_n(-origin_x)} {_n(-origin_y)})')
+    return transform_svg(obj, state.transform)
 
 
 def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject,

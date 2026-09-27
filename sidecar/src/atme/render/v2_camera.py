@@ -7,8 +7,8 @@ time at which a caller happens to seek. The legacy camera renderer is untouched.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import cos, radians, sin
 
+from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds
 from atme.store.contracts_v2 import (
     CameraAction,
     ExecutableLayoutV2,
@@ -52,22 +52,6 @@ def _safe_contains(viewport: CameraViewport,
     return _contains(CameraViewport(viewport.x + inset_x, viewport.y + inset_y,
                                     viewport.width - 2 * inset_x,
                                     viewport.height - 2 * inset_y), rect)
-
-
-def _bounds(obj, transform) -> tuple[float, float, float, float]:
-    bounds = obj.geometry.bounds
-    origin_x = bounds.x + bounds.width * transform.origin.x
-    origin_y = bounds.y + bounds.height * transform.origin.y
-    angle = radians(transform.rotation_degrees)
-    points = []
-    for x in (bounds.x, bounds.x + bounds.width):
-        for y in (bounds.y, bounds.y + bounds.height):
-            dx = (x - origin_x) * transform.scale_x
-            dy = (y - origin_y) * transform.scale_y
-            points.append((origin_x + transform.position.x + dx * cos(angle) - dy * sin(angle),
-                           origin_y + transform.position.y + dx * sin(angle) + dy * cos(angle)))
-    return (min(x for x, _ in points), min(y for _, y in points),
-            max(x for x, _ in points), max(y for _, y in points))
 
 
 def _target_viewport(layout: ExecutableLayoutV2, rects, framing: str) -> CameraViewport:
@@ -204,11 +188,13 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                 obj = objects[target_id]
                 if obj.board_id != action.board_id:
                     raise UnsupportedCamera(f"camera {action.action_id} crosses board ownership")
-                if obj.parent_id is not None:
-                    raise UnsupportedCamera(
-                        f"camera {action.action_id} needs hierarchy-aware focus geometry"
-                    )
-                if not visible[target_id] or not revealed[target_id] or opacity[target_id] <= 0:
+                dependency_ids = {target_id}
+                parent_id = obj.parent_id
+                while parent_id is not None:
+                    dependency_ids.add(parent_id)
+                    parent_id = objects[parent_id].parent_id
+                if any(not visible[item] or not revealed[item] or opacity[item] <= 0
+                       for item in dependency_ids):
                     raise UnsupportedCamera(f"camera {action.action_id} needs revealed visible focus")
                 # The current compositor has faithful geometry for these types.
                 if obj.object_type not in {"freehand", "line", "rectangle", "rounded_rectangle",
@@ -218,12 +204,15 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                     raise UnsupportedCamera(f"camera {action.action_id} targets unsupported visual geometry")
                 if any((other.action.verb in {"move", "scale", "rotate", "fade", "reveal",
                                               "write", "draw", "enter", "exit", "progressive_reveal"}
-                        and target_id in getattr(other.action, "target_ids", ())
+                        and dependency_ids.intersection(getattr(other.action, "target_ids", ()))
                         and other.start_ms < resolved.end_ms
                         and resolved.start_ms < other.end_ms)
                        for other in timeline.actions):
                     raise UnsupportedCamera(f"camera {action.action_id} overlaps a focus-object edit")
-                rects.append(_bounds(obj, transforms[target_id]))
+                try:
+                    rects.append(world_bounds(obj, objects, transforms))
+                except UnsupportedWorldGeometry as exc:
+                    raise UnsupportedCamera(str(exc)) from exc
             rect = (min(r[0] for r in rects), min(r[1] for r in rects),
                     max(r[2] for r in rects), max(r[3] for r in rects))
             target_viewport = _target_viewport(layout, rects, action.framing)

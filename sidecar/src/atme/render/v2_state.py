@@ -26,6 +26,7 @@ from atme.render.v2_emphasis import (
     emphasis_path,
 )
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
+from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds
 from atme.store.contracts_v2 import (
     CameraAction,
     ConnectionAction,
@@ -173,16 +174,15 @@ def validate_static_hierarchy(layout: ExecutableLayoutV2) -> None:
         ):
             raise V2FrameError(f"v2 object {obj.object_id} needs a supported group parent")
         if isinstance(obj, ConnectorObject):
-            endpoints = (obj.source_object_id, obj.destination_object_id)
-            if obj.parent_id is not None or any(
-                endpoint is not None and (
-                    objects[endpoint].parent_id is not None
-                    or isinstance(objects[endpoint], ContainerObject)
-                ) for endpoint in endpoints
-            ):
+            if obj.parent_id is not None:
                 raise V2FrameError(
-                    f"v2 connector {obj.object_id} needs hierarchy-aware endpoint geometry"
+                    f"v2 connector {obj.object_id} needs inverse parent geometry"
                 )
+            for endpoint_id in (obj.source_object_id, obj.destination_object_id):
+                if endpoint_id is not None and isinstance(objects[endpoint_id], ContainerObject):
+                    raise V2FrameError(
+                        f"v2 connector {obj.object_id} cannot anchor to a non-painting group"
+                    )
 
 
 def _interpolate_transform(start: FrameTransform, end: Transform,
@@ -651,5 +651,11 @@ def evaluate_frame(
                         for parent_id in _ancestor_ids(obj, object_map)))
         for obj in sorted(layout.objects, key=lambda item: (item.z_index, item.object_id))
     )
+    transforms = {state.object_id: state.transform for state in ordered}
+    try:
+        for obj in layout.objects:
+            world_bounds(obj, object_map, transforms)
+    except UnsupportedWorldGeometry as exc:
+        raise V2FrameError(str(exc)) from exc
     return FrameSnapshot(at_ms=at_ms, active_board_id=active_board,
                          objects=ordered, camera=camera)

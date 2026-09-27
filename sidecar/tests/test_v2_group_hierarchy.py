@@ -197,7 +197,7 @@ def test_unsupported_container_is_never_silently_flattened(container_type):
             render(layout, timeline, 100)
 
 
-def test_clip_id_and_grouped_camera_or_connector_fail_closed():
+def test_clip_id_fails_but_grouped_camera_and_root_connector_use_world_geometry():
     layout, timeline = grouped_documents()
     layout["objects"][3]["object_type"] = "mask"
     layout["objects"][0]["clip_id"] = "object-group"
@@ -209,8 +209,7 @@ def test_clip_id_and_grouped_camera_or_connector_fail_closed():
     layout, timeline = grouped_documents()
     append_camera(timeline, "camera-1", "camera_cut", 6000, 6500,
                   target="object-system")
-    with pytest.raises(V2FrameError, match="hierarchy-aware focus geometry"):
-        evaluate_frame(layout, timeline, 100)
+    assert evaluate_frame(layout, timeline, 6000).camera.width < layout["canvas"]["width"]
     layout, timeline = connector_documents()
     group_layout, _ = grouped_documents()
     layout["objects"].append(group_layout["objects"][3])
@@ -222,9 +221,8 @@ def test_clip_id_and_grouped_camera_or_connector_fail_closed():
          "visible": True}
     )
     timeline["layout_sha256"] = digest(layout)
-    for render in (evaluate_frame, compose_svg_frame):
-        with pytest.raises(V2FrameError, match="hierarchy-aware endpoint geometry"):
-            render(layout, timeline, 5000)
+    assert evaluate_frame(layout, timeline, 5000).object("object-arrow").visible
+    assert 'data-object-id="object-arrow"' in compose_svg_frame(layout, timeline, 5000).svg
 
 
 def test_cross_board_duplicate_membership_and_cycle_reject_at_contract_boundary():

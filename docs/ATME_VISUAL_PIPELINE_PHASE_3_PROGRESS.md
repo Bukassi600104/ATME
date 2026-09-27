@@ -1,9 +1,9 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3O independent PASS;
+Status: Slices 3A–3P independent PASS;
 Phase 3 remains incomplete
 
-Date: 2026-09-23
+Date: 2026-09-27
 
 ## Delivered in Slice 3A
 
@@ -21,6 +21,13 @@ Date: 2026-09-23
   malformed pairings, non-finite input, overlap, and unsupported actions.
 
 ## Incomplete Phase 3 gates
+
+- Slice 3P introduces one deterministic affine resolver for the compositor's
+  nested SVG transforms, camera focus bounds, and root-level connector endpoints.
+  Grouped visual leaves can now be framed, and root connectors can bind to grouped
+  endpoint anchors. Ancestor visibility/opacity and camera-window conflicts are
+  checked. Connector objects inside groups, masks/clips, dynamic membership,
+  preview/export, and full Phase 3 acceptance remain unsupported.
 
 - Slice 3O adds authored static groups as nested, non-painting stacking contexts. Root and
   child layers sort locally; nested transforms, ancestor visibility and multiplicative
@@ -190,6 +197,12 @@ Date: 2026-09-23
   auditor verified 41 focused group/camera/connector tests, Ruff, and direct unsupported
   hierarchy probes. The main 13-case group suite and targeted legacy render/checkpoint/
   offline regression passed. This is not full Phase 3 or installed-app acceptance.
+- Slice 3P: independent bounded re-audit PASS after shared nested affine geometry,
+  four-decimal SVG/world-bounds parity, and finite/bounded transform guards were
+  verified. The auditor passed 68 focused world/group/camera/connector/connection
+  tests and Ruff. The main v2-selected suite and 14 targeted legacy render/
+  checkpoint/offline tests passed with exit code 0. This is not full Phase 3 or
+  installed-app acceptance.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.

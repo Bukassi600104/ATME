@@ -248,10 +248,22 @@ future or hidden. `mask`, `clip`, and any `clip_id` remain unsupported in full.
 The frame evaluator and SVG compositor share this fail-closed hierarchy gate.
 When a dynamic group action names a container, the ID must exist and resolve
 to a same-board group, although execution of that action remains unsupported.
-Grouped camera focus and connectors involving grouped objects remain rejected
-until a shared world-transform resolver exists; the compositor must not show
-geometry that the camera or connector would frame differently. This is a
-bounded v2 compositor capability, not preview/export integration.
+Slice 3P uses one affine resolver for nested SVG transforms, camera focus
+rectangles, and connector anchor positions. Authored transform components are
+quantized to the emitted four-decimal SVG factors before matrix composition;
+intermediate matrix products are not rounded. Quantized local components, each composed affine matrix, and
+all sampled world-bounds corners must be finite and within an absolute
+1,000,000-unit bound; otherwise frame evaluation fails before SVG output. A
+grouped visual leaf can be a
+camera focus, with every ancestor's completed transform, visibility, and
+opacity participating. A camera window cannot overlap a target or ancestor
+geometry/visibility edit. A root connector can anchor to grouped objects, and
+its route and authored bounds remain in world/board coordinates. An ancestor
+that is hidden or fully transparent makes the endpoint unavailable. A connector
+object inside a group still fails closed because it would require mapping the
+world route back into its own parent space. Groups themselves are non-painting
+and cannot be camera focus or connector endpoints. This is a bounded v2
+compositor capability, not preview/export integration.
 
 ## Still to define and implement before Phase 3 exit
 
