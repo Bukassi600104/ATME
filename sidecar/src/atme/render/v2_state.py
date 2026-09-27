@@ -157,7 +157,7 @@ def validate_static_hierarchy(layout: ExecutableLayoutV2) -> None:
         if obj.clip_id is not None:
             raise V2FrameError(f"v2 object {obj.object_id} has unsupported clip_id")
         if isinstance(obj, ContainerObject):
-            if obj.object_type != "group":
+            if obj.object_type not in {"group", "clip"}:
                 raise V2FrameError(
                     f"v2 {obj.object_type} container {obj.object_id} has no composition semantics"
                 )
@@ -165,14 +165,14 @@ def validate_static_hierarchy(layout: ExecutableLayoutV2) -> None:
                     or obj.geometry.corner_radius is not None or obj.style.stroke
                     or obj.style.fill or obj.style.text or obj.style.effect):
                 raise V2FrameError(
-                    f"v2 group {obj.object_id} must be a non-painting stacking context"
+                    f"v2 {obj.object_type} {obj.object_id} must be a non-painting stacking context"
                 )
     for obj in layout.objects:
         if obj.parent_id is not None and (
             not isinstance(objects[obj.parent_id], ContainerObject)
-            or objects[obj.parent_id].object_type != "group"
+            or objects[obj.parent_id].object_type not in {"group", "clip"}
         ):
-            raise V2FrameError(f"v2 object {obj.object_id} needs a supported group parent")
+            raise V2FrameError(f"v2 object {obj.object_id} needs a supported container parent")
         if isinstance(obj, ConnectorObject):
             if obj.parent_id is not None:
                 raise V2FrameError(
@@ -182,6 +182,14 @@ def validate_static_hierarchy(layout: ExecutableLayoutV2) -> None:
                 if endpoint_id is not None and isinstance(objects[endpoint_id], ContainerObject):
                     raise V2FrameError(
                         f"v2 connector {obj.object_id} cannot anchor to a non-painting group"
+                    )
+                if endpoint_id is not None and any(
+                    isinstance(objects[parent_id], ContainerObject)
+                    and objects[parent_id].object_type == "clip"
+                    for parent_id in _ancestor_ids(objects[endpoint_id], objects)
+                ):
+                    raise V2FrameError(
+                        f"v2 connector {obj.object_id} needs clipped-endpoint geometry"
                     )
 
 
@@ -345,7 +353,7 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                 if (isinstance(layout_objects[target], ContainerObject)
                         and isinstance(item.action, TargetAction)):
                     raise V2FrameError(
-                        f"action {item.action.action_id} needs defined descendant semantics for a group"
+                        f"action {item.action.action_id} needs defined descendant semantics for a container"
                     )
                 if target in highlighted_targets:
                     raise V2FrameError(f"highlighted target {target} cannot receive another action")

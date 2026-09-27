@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3P independent PASS;
+Status: Slices 3A–3Q independent PASS;
 Phase 3 remains incomplete
 
 Date: 2026-09-27
@@ -21,6 +21,14 @@ Date: 2026-09-27
   malformed pairings, non-finite input, overlap, and unsupported actions.
 
 ## Incomplete Phase 3 gates
+
+- Slice 3Q adds hard-edge rectangular static clip containers. A clip is a
+  non-painting local stacking context whose authored bounds crop its child
+  subtree, including nested groups and clips. Local transforms, opacity,
+  visibility, deterministic ordering, and animated transforms are preserved.
+  Masks, external `clip_id` references, dynamic membership, connector children,
+  clipped connector endpoints, and clipped camera focus still fail closed.
+  This does not complete Phase 3 or enable desktop preview/export.
 
 - Slice 3P introduces one deterministic affine resolver for the compositor's
   nested SVG transforms, camera focus bounds, and root-level connector endpoints.
@@ -203,6 +211,13 @@ Date: 2026-09-27
   tests and Ruff. The main v2-selected suite and 14 targeted legacy render/
   checkpoint/offline tests passed with exit code 0. This is not full Phase 3 or
   installed-app acceptance.
+- Slice 3Q: independent bounded audit PASS for static hard-edge clip containers,
+  local-coordinate raster crop, nested intersection, group/clip nesting,
+  transformed and animated clips, opacity/visibility, deterministic seeking,
+  and fail-closed mask/external-clip/camera/connector boundaries. The auditor's
+  focused set passed 63 tests and Ruff. The main v2-selected suite, nine direct
+  clip tests, Ruff, and 14 targeted legacy render/checkpoint/offline tests
+  passed. This is not full Phase 3 or installed-app acceptance.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.

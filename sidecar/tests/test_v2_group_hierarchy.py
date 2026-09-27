@@ -187,10 +187,9 @@ def test_group_target_actions_and_dynamic_membership_fail_before_sampling():
         evaluate_frame(layout, timeline, 100)
 
 
-@pytest.mark.parametrize("container_type", ["mask", "clip"])
-def test_unsupported_container_is_never_silently_flattened(container_type):
+def test_unsupported_mask_container_is_never_silently_flattened():
     layout, timeline = grouped_documents()
-    layout["objects"][3]["object_type"] = container_type
+    layout["objects"][3]["object_type"] = "mask"
     timeline["layout_sha256"] = digest(layout)
     for render in (evaluate_frame, compose_svg_frame):
         with pytest.raises(V2FrameError, match="no composition semantics"):

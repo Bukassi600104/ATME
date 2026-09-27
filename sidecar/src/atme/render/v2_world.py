@@ -113,6 +113,8 @@ def world_bounds(obj, objects: dict, transforms: dict) -> tuple[float, float, fl
     matrix = world_matrix(obj, objects, transforms)
     x, y, width, height = (_q(bounds.x), _q(bounds.y),
                            _q(bounds.width), _q(bounds.height))
+    if width <= 0 or height <= 0:
+        raise UnsupportedWorldGeometry("serialized world bounds collapse to zero area")
     points = [matrix.point(px, py) for px in (x, x + width)
               for py in (y, y + height)]
     return (min(x for x, _ in points), min(y for _, y in points),

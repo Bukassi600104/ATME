@@ -104,6 +104,10 @@ def _clip_id(object_id: str) -> str:
     return "clip-" + hashlib.sha256(object_id.encode("utf-8")).hexdigest()
 
 
+def _container_clip_id(object_id: str) -> str:
+    return "clip-container-" + hashlib.sha256(object_id.encode("utf-8")).hexdigest()
+
+
 @lru_cache(maxsize=32)
 def _font(path: str, size: int):
     return ImageFont.truetype(path, size)
@@ -553,7 +557,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_MARKS
                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_TEXT
                            or isinstance(obj, ConnectorObject) and obj.object_type == "arrow"
-                           or isinstance(obj, ContainerObject) and obj.object_type == "group"
+                           or isinstance(obj, ContainerObject) and obj.object_type in {"group", "clip"}
                            or isinstance(obj, VisualObject)
                            and obj.object_type in SUPPORTED_REGISTRY_VISUALS)]
     if unsupported:
@@ -596,6 +600,15 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
         siblings.sort(key=lambda item: (item.z_index, item.object_id))
     for state in snapshot.objects:
         obj = objects[state.object_id]
+        if isinstance(obj, ContainerObject) and obj.object_type == "clip":
+            bounds = obj.geometry.bounds
+            definitions.append(
+                f'<clipPath id="{_container_clip_id(obj.object_id)}" '
+                f'clipPathUnits="userSpaceOnUse">'
+                f'<rect x="{_n(bounds.x)}" y="{_n(bounds.y)}" '
+                f'width="{_n(bounds.width)}" height="{_n(bounds.height)}"/>'
+                f'</clipPath>'
+            )
         if 0 < state.reveal_fraction < 1 and active_verbs.get(state.object_id) not in {
             "draw", "write", "progressive_reveal", "connect", "disconnect"
         }:
@@ -612,9 +625,11 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
             if not state.visible or state.opacity <= 0 or state.reveal_fraction <= 0:
                 return ""
             inner = "".join(render_object(child) for child in children.get(obj.object_id, ()))
+            clip = (f' clip-path="url(#{_container_clip_id(obj.object_id)})"'
+                    if obj.object_type == "clip" else "")
             return (f'<g data-object-id="{_xml_escape(obj.object_id)}" '
                     f'transform="{_object_transform(obj, state)}" '
-                    f'opacity="{_n(state.opacity)}">{inner}</g>')
+                    f'opacity="{_n(state.opacity)}"{clip}>{inner}</g>')
         return _object_markup(obj, state, style, root, scale_x,
                               active_verbs.get(obj.object_id), objects, states)
 

@@ -244,7 +244,7 @@ and excessive nesting fail. Groups cannot carry independent paint, media,
 anchors, effects, or clipping payloads. No target attention/reveal action may
 address a group until descendant-action semantics are fixed. `group`,
 `ungroup`, and `split` remain unsupported, including when their action is
-future or hidden. `mask`, `clip`, and any `clip_id` remain unsupported in full.
+future or hidden. Masks and any external `clip_id` remain unsupported in full.
 The frame evaluator and SVG compositor share this fail-closed hierarchy gate.
 When a dynamic group action names a container, the ID must exist and resolve
 to a same-board group, although execution of that action remains unsupported.
@@ -264,6 +264,28 @@ object inside a group still fails closed because it would require mapping the
 world route back into its own parent space. Groups themselves are non-painting
 and cannot be camera focus or connector endpoints. This is a bounded v2
 compositor capability, not preview/export integration.
+
+## Static clip containers
+
+Slice 3Q gives authored `clip` containers a hard-edge rectangular meaning. The
+container's `geometry.bounds` is a rectangle in its own local authored
+coordinate system; its `child_ids` are its clipped subtree. The container
+paints no shape. SVG applies the container's local transform and opacity once
+to a `<g>` and applies a `clipPathUnits="userSpaceOnUse"` rectangle to that
+group. Parent groups/clips transform the entire subtree outside it. Nested
+clips therefore intersect. Clip IDs use a deterministic namespace distinct
+from per-object reveal clips. The rectangle uses the same four-decimal
+serialization as the v2 compositor; a rectangle whose serialized width or
+height collapses to zero fails before output. Ordinary completed and animated
+move/scale/rotate/fade of the clip container share group transform semantics.
+Hidden or zero-opacity clips gate their descendants.
+
+Target attention/reveal actions on a clip container, dynamic membership,
+mask containers, and all `clip_id` cross-references remain unsupported even
+when future or hidden. Root connectors cannot bind to endpoints under a clip,
+and camera focus cannot target a clipped leaf: their current world geometry
+does not compute the post-clip visible region. A connector object cannot itself
+be a clip child. These cases fail closed rather than showing untrimmed geometry.
 
 ## Still to define and implement before Phase 3 exit
 

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds
 from atme.store.contracts_v2 import (
     CameraAction,
+    ContainerObject,
     ExecutableLayoutV2,
     ResolvedVisualTimelineV2,
     TargetAction,
@@ -191,6 +192,11 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                 dependency_ids = {target_id}
                 parent_id = obj.parent_id
                 while parent_id is not None:
+                    if (isinstance(objects[parent_id], ContainerObject)
+                            and objects[parent_id].object_type == "clip"):
+                        raise UnsupportedCamera(
+                            f"camera {action.action_id} needs post-clip visible focus geometry"
+                        )
                     dependency_ids.add(parent_id)
                     parent_id = objects[parent_id].parent_id
                 if any(not visible[item] or not revealed[item] or opacity[item] <= 0
