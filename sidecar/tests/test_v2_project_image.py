@@ -197,5 +197,5 @@ def test_png_decoder_rejects_ancillary_metadata_and_bad_crc():
 
 def test_image_does_not_weaken_evidence_boundary():
     layout, timeline = supported_documents()
-    with pytest.raises(UnsupportedVisualObject, match="uses evidence"):
+    with pytest.raises(UnsupportedVisualObject, match="verified project evidence"):
         compose_svg_frame(layout, timeline, 5000, {"asset-evidence": _png()})

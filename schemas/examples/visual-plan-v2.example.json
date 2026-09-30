@@ -180,7 +180,7 @@
       },
       "easing": "ease_out",
       "expected_state": "hidden",
-      "post_state": "visible",
+      "post_state": "evidence_visible",
       "fallback": {
         "fallback_id": "fallback-3",
         "on_failure": "block"
@@ -189,6 +189,7 @@
       "verb": "insert_evidence",
       "evidence_asset_id": "asset-evidence",
       "destination_board_id": "board-main",
+      "target_object_id": "object-evidence",
       "destination_state": "evidence_visible"
     }
   ],

@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import html
+import io
 import math
 from dataclasses import dataclass
 from functools import lru_cache
@@ -17,8 +18,9 @@ from itertools import pairwise
 from pathlib import Path
 
 import regex
-from PIL import ImageFont
+from PIL import Image, ImageFont
 
+from atme.project_assets import VerifiedEvidenceBytes
 from atme.render.style_bundle import (
     _font_css,
     resolve_contract_bundle,
@@ -415,10 +417,141 @@ def _object_transform(obj, state: FrameObject) -> str:
     return transform_svg(obj, state.transform)
 
 
+@lru_cache(maxsize=8)
+def _evidence_crop_png(payload: bytes, crop: tuple[int, int, int, int]) -> bytes:
+    """Make an exact source-pixel crop from the already canonical RGBA source."""
+    with Image.open(io.BytesIO(payload)) as image:
+        result = image.crop(crop)
+        output = io.BytesIO()
+        result.save(output, format="PNG", optimize=False, compress_level=9)
+    encoded = output.getvalue()
+    if len(encoded) > 16 * 1024 * 1024:
+        raise UnsupportedVisualObject("evidence crop exceeds bounded PNG output")
+    return encoded
+
+
+def _evidence_text(value: str, font_file: Path, font_size: float, max_width: float) -> str:
+    if len(value) > 120:
+        raise UnsupportedVisualObject("evidence attribution or annotation is too long")
+    _xml_escape(value)
+    font = ImageFont.truetype(str(font_file), max(1, round(font_size)))
+    if font.getlength(value) > max_width:
+        raise UnsupportedVisualObject("evidence attribution or annotation does not fit its frame")
+    return _xml_escape(value)
+
+
+def _evidence_markup(obj: VisualObject, state: FrameObject, style, root: Path,
+                     scale: float, raster, treatment) -> str:
+    """Render a bounded evidence card, never a fabricated substitute image."""
+    bounds = obj.geometry.bounds
+    intent = treatment.intent
+    if intent.annotation is not None and intent.annotation_target_id != obj.object_id:
+        raise UnsupportedVisualObject(
+            f"evidence {obj.object_id} needs a supported self-anchored annotation"
+        )
+    if bounds.width < 180 * scale or bounds.height < 160 * scale:
+        raise UnsupportedVisualObject(f"evidence {obj.object_id} is too small to remain readable")
+    caption_role = style.typography.caption
+    caption_font = next(font for font in style.fonts if font.id == caption_role.font_id)
+    label_height = 34 * scale
+    annotation_height = 34 * scale if intent.annotation is not None else 0
+    gap = 4 * scale
+    image_height = bounds.height - label_height - annotation_height - gap
+    if image_height < 90 * scale:
+        raise UnsupportedVisualObject(f"evidence {obj.object_id} has no readable source image area")
+    crop = intent.crop
+    crop_box = (int(crop.x), int(crop.y), int(crop.x + crop.width), int(crop.y + crop.height))
+    encoded = base64.b64encode(_evidence_crop_png(raster.payload, crop_box)).decode("ascii")
+    image_scale = min(bounds.width / crop.width, image_height / crop.height)
+    image_width = crop.width * image_scale
+    shown_height = crop.height * image_scale
+    image_x = bounds.x + (bounds.width - image_width) / 2
+    image_y = bounds.y + (image_height - shown_height) / 2
+    focus = intent.focus_region
+    focus_x = image_x + (focus.x - crop.x) * image_scale
+    focus_y = image_y + (focus.y - crop.y) * image_scale
+    focus_width = focus.width * image_scale
+    focus_height = focus.height * image_scale
+    margin = 10 * scale
+    font_size = min(caption_role.size_px * scale, 20 * scale)
+    label = _evidence_text(intent.source_label, root / caption_font.file,
+                           font_size, bounds.width - 2 * margin)
+    annotation = (_evidence_text(intent.annotation, root / caption_font.file,
+                                  font_size, bounds.width - 2 * margin)
+                  if intent.annotation is not None else None)
+    ink = style.colors["ink"]
+    paper = style.colors["paper"]
+    accent = style.colors["attention"]
+    border = _color(obj.style.stroke, style.colors, default=ink)
+    backing = _color(obj.style.fill, style.colors, default=paper)
+    family = _xml_escape(caption_font.family)
+    radius = obj.geometry.corner_radius or 0
+    clip_id = f"evidence-card-{_clip_id(obj.object_id)}"
+    markup = [
+        (f'<defs><clipPath id="{clip_id}" clipPathUnits="userSpaceOnUse">'
+         f'<rect x="{_n(bounds.x)}" y="{_n(bounds.y)}" width="{_n(bounds.width)}" '
+         f'height="{_n(bounds.height)}" rx="{_n(radius)}"/></clipPath></defs>'),
+        f'<g clip-path="url(#{clip_id})">',
+        (f'<rect x="{_n(bounds.x)}" y="{_n(bounds.y)}" width="{_n(bounds.width)}" '
+         f'height="{_n(bounds.height)}" fill="{backing}"/>'),
+        (f'<image data-evidence-crop="{_xml_escape(intent.claim_id)}" '
+         f'x="{_n(image_x)}" y="{_n(image_y)}" width="{_n(image_width)}" '
+         f'height="{_n(shown_height)}" preserveAspectRatio="xMidYMid meet" '
+         f'href="data:image/png;base64,{encoded}"/>'),
+    ]
+    if intent.darkening:
+        strips = (
+            (image_x, image_y, image_width, focus_y - image_y),
+            (image_x, focus_y + focus_height, image_width,
+             image_y + shown_height - focus_y - focus_height),
+            (image_x, focus_y, focus_x - image_x, focus_height),
+            (focus_x + focus_width, focus_y,
+             image_x + image_width - focus_x - focus_width, focus_height),
+        )
+        for x, y, width, height in strips:
+            if width > 0 and height > 0:
+                markup.append(
+                    f'<rect data-evidence-darkening="outside-focus" x="{_n(x)}" y="{_n(y)}" '
+                    f'width="{_n(width)}" height="{_n(height)}" fill="{ink}" '
+                    f'opacity="{_n(intent.darkening)}"/>'
+                )
+    markup.append(
+        f'<rect data-evidence-focus="{_xml_escape(intent.claim_id)}" '
+        f'x="{_n(focus_x)}" y="{_n(focus_y)}" width="{_n(focus_width)}" '
+        f'height="{_n(focus_height)}" fill="none" stroke="{accent}" '
+        f'stroke-width="{_n(2 * scale)}"/>'
+    )
+    if annotation is not None:
+        annotation_y = bounds.y + image_height + gap
+        markup.extend((
+            (f'<path data-evidence-annotation="pointer" d="M {_n(focus_x + focus_width / 2)} '
+             f'{_n(focus_y + focus_height)} L {_n(bounds.x + margin)} {_n(annotation_y + annotation_height / 2)}" '
+             f'fill="none" stroke="{accent}" stroke-width="{_n(2 * scale)}"/>'),
+            (f'<text data-evidence-annotation="text" x="{_n(bounds.x + margin)}" '
+             f'y="{_n(annotation_y + annotation_height * 0.72)}" fill="{ink}" '
+             f'font-family="{family}" font-weight="{caption_font.weight}" '
+             f'font-size="{_n(font_size)}">{annotation}</text>'),
+        ))
+    label_y = bounds.y + bounds.height - label_height
+    markup.extend((
+        (f'<rect x="{_n(bounds.x)}" y="{_n(label_y)}" width="{_n(bounds.width)}" '
+         f'height="{_n(label_height)}" fill="{paper}"/>'),
+        (f'<text data-evidence-source-label="{_xml_escape(intent.claim_id)}" '
+         f'x="{_n(bounds.x + margin)}" y="{_n(label_y + label_height * 0.72)}" '
+         f'fill="{ink}" font-family="{family}" font-weight="{caption_font.weight}" '
+         f'font-size="{_n(font_size)}">{label}</text>'),
+        '</g>',
+        (f'<rect x="{_n(bounds.x)}" y="{_n(bounds.y)}" width="{_n(bounds.width)}" '
+         f'height="{_n(bounds.height)}" rx="{_n(radius)}" fill="none" stroke="{border}" '
+         f'stroke-width="{_n(2 * scale)}"/>'),
+    ))
+    return "".join(markup)
+
+
 def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject,
                    state: FrameObject, style, root: Path, scale: float,
                    active_verb: str | None, objects: dict, states: dict,
-                   raster_images: dict) -> str:
+                   raster_images: dict, evidence_treatments: dict) -> str:
     if not state.visible or state.opacity <= 0 or state.reveal_fraction <= 0:
         return ""
     transform = _object_transform(obj, state)
@@ -455,6 +588,9 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
                  f'width="{_n(bounds.width)}" height="{_n(bounds.height)}" '
                  f'preserveAspectRatio="xMidYMid meet" '
                  f'href="data:image/png;base64,{encoded}"/>')
+    elif isinstance(obj, VisualObject) and obj.object_type == "evidence":
+        inner = _evidence_markup(obj, state, style, root, scale,
+                                 raster_images[obj.asset_id], evidence_treatments[obj.object_id])
     else:
         inner = _registry_visual(obj)
     if state.emphasis_fraction > 0:
@@ -507,7 +643,7 @@ def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObj
     _xml_escape(obj.object_id)
     if (obj.clip_id or obj.style.effect
             or obj.asset_id and not (isinstance(obj, VisualObject)
-                                     and obj.object_type == "image")):
+                                     and obj.object_type in {"image", "evidence"})):
         raise UnsupportedVisualObject(
             f"v2 object {obj.object_id} requires unimplemented hierarchy, clip, effect, or asset composition"
         )
@@ -545,6 +681,13 @@ def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObj
             raise UnsupportedVisualObject(
                 f"v2 image {obj.object_id} needs unstyled full-frame asset placement"
             )
+    elif isinstance(obj, VisualObject) and obj.object_type == "evidence":
+        if (obj.asset_id is None or obj.variant not in {None, "annotated_crop"}
+                or obj.style.text or obj.geometry.points
+                or obj.geometry.corner_radius is not None and obj.geometry.corner_radius > 32 * scale):
+            raise UnsupportedVisualObject(
+                f"v2 evidence {obj.object_id} has unsupported styling or geometry"
+            )
     else:
         if (obj.style.stroke or obj.style.fill or obj.style.text
                 or obj.geometry.points or obj.geometry.corner_radius is not None):
@@ -555,7 +698,7 @@ def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObj
 
 
 def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int,
-                      asset_bytes: dict[str, bytes] | None = None) -> SVGFrame:
+                      asset_bytes: dict[str, bytes | VerifiedEvidenceBytes] | None = None) -> SVGFrame:
     """Draw supported objects in deterministic z order; never substitute boxes."""
     snapshot = evaluate_frame(layout_document, timeline_document, at_ms)
     layout = ExecutableLayoutV2.model_validate(layout_document)
@@ -587,7 +730,8 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                            or isinstance(obj, ContainerObject) and obj.object_type in {"group", "clip", "mask"}
                            or isinstance(obj, VisualObject)
                            and obj.object_type in SUPPORTED_REGISTRY_VISUALS
-                           or isinstance(obj, VisualObject) and obj.object_type == "image")]
+                           or isinstance(obj, VisualObject)
+                           and obj.object_type in {"image", "evidence"})]
     if unsupported:
         first = unsupported[0]
         raise UnsupportedVisualObject(
@@ -605,6 +749,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
         if not isinstance(obj, ContainerObject):
             _preflight_object(obj, style, root, scale_x, objects)
     resolved_assets = {asset.asset_id: asset for asset in timeline.resolved_assets}
+    evidence_treatments = {item.object_id: item for item in layout.evidence_treatments}
     raster_images = {}
     for obj in layout.objects:
         if not isinstance(obj, VisualObject) or obj.object_type != "image":
@@ -644,6 +789,36 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                 or len(raw) != asset.byte_length
                 or (raster.width, raster.height) != (asset.width, asset.height)):
             raise UnsupportedVisualObject(f"v2 image {obj.object_id} failed asset integrity")
+        raster_images[obj.asset_id] = raster
+    for obj in layout.objects:
+        if not isinstance(obj, VisualObject) or obj.object_type != "evidence":
+            continue
+        treatment = evidence_treatments.get(obj.object_id)
+        asset = resolved_assets.get(obj.asset_id)
+        verified = asset_bytes.get(obj.asset_id) if asset_bytes is not None else None
+        if (treatment is None or asset is None
+                or not isinstance(verified, VerifiedEvidenceBytes)
+                or verified.asset_id != obj.asset_id
+                or verified.revision != asset.revision
+                or verified.sha256 != asset.checksum_sha256
+                or verified.treatment != treatment
+                or verified.width != asset.width or verified.height != asset.height
+                or asset.kind != "evidence" or asset.media_type != "image/png"
+                or asset.byte_length is None or asset.orientation != "upright"
+                or not asset.provenance_verified
+                or asset.allowed_transformations != treatment.allowed_transformations
+                or asset.managed_ref != treatment.asset_managed_ref):
+            raise UnsupportedVisualObject(
+                f"v2 evidence {obj.object_id} lacks verified project evidence bytes and treatment"
+            )
+        try:
+            raster = canonical_png(verified.payload)
+        except UnsupportedProjectPNG as exc:
+            raise UnsupportedVisualObject(str(exc)) from exc
+        if (raster.source_sha256 != asset.checksum_sha256
+                or len(verified.payload) != asset.byte_length
+                or (raster.width, raster.height) != (asset.width, asset.height)):
+            raise UnsupportedVisualObject(f"v2 evidence {obj.object_id} failed asset integrity")
         raster_images[obj.asset_id] = raster
     active_verbs = {
         target: resolved.action.verb
@@ -727,7 +902,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                     f'opacity="{_n(state.opacity)}"{clip}>{inner}</g>')
         return _object_markup(obj, state, style, root, scale_x,
                               active_verbs.get(obj.object_id), objects, states,
-                              raster_images)
+                              raster_images, evidence_treatments)
 
     body.extend(render_object(obj) for obj in children.get(None, ()))
     width, height = layout.output_profile.width, layout.output_profile.height
@@ -742,7 +917,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
 
 
 def compose_png_frame(layout_document: dict, timeline_document: dict, at_ms: int,
-                      asset_bytes: dict[str, bytes] | None = None) -> PNGFrame:
+                      asset_bytes: dict[str, bytes | VerifiedEvidenceBytes] | None = None) -> PNGFrame:
     """Rasterize a supported frame with verified, pinned fonts and no system-font fallback."""
     import resvg_py
 

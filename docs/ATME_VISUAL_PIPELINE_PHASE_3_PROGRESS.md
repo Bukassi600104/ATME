@@ -30,14 +30,22 @@ Date: 2026-09-30
   Uploaded originals are not deleted. Duplicating a project preserves evidence
   origin references and records separate artifact-derivation hashes without
   rewriting inherited migration receipts. The independent bounded re-audit
-  passed, including focused tests; Windows redirect tests skipped only when
-  this host denied symlink creation. The full sidecar regression has not yet
-  been confirmed for this slice. These changes do not
-  paint evidence or expose an MCP upload tool. Next implement bounded
-  crop/focus/attribution/annotation and readable insert/return timing, with
-  random-seek, portrait/landscape, offline, and legacy evidence tests. Old
-  2.0.0 evidence stays loadable but non-executable until the complete treatment
-  is present; do not route 3U images through an evidence shortcut.
+  passed for the ingestion stage; Windows redirect tests skipped only when
+  this host denied symlink creation. The subsequent source-only compositor
+  stage now draws attested exact-pixel crops with bounded focus, optional
+  outside-focus darkening, source label, self-anchored annotation, and a
+  rounded card in SVG/PNG. `insert_evidence` fades this immutable evidence
+  object in; its authored hold requires board activation, visible/opaque
+  ancestors, sufficient on-screen size and focus, camera containment, and
+  a non-clipping rectangular mask/clip if declared. Undeclared rotation is
+  rejected across the full timeline. Other mask shapes and annotation targets
+  remain fail-closed for evidence. `return_board` remains fail-closed until
+  source-board/activation provenance and developed-state semantics are explicit.
+  Old incomplete 2.0.0 evidence remains loadable but non-executable. This
+  compositor stage still needs the final independent re-audit and full suite
+  result; it has not been packaged into the installed sidecar, exposed via MCP,
+  or connected to desktop preview/export. Do not route 3U supporting images
+  through the evidence trust path.
 - Slice 3U adds a bounded project-owned PNG render path. The project service
   verifies ownership, revision, managed path, metadata, checksum, and decoded
   dimensions before supplying immutable bytes to the v2 compositor. That

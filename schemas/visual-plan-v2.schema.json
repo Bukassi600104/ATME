@@ -1162,6 +1162,18 @@
           "default": null,
           "title": "Evidence Asset Id"
         },
+        "target_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Object Id"
+        },
         "destination_board_id": {
           "title": "Destination Board Id",
           "type": "string"

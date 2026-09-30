@@ -27,12 +27,13 @@ from atme.render.v2_emphasis import (
 )
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.render.v2_mask import UnsupportedMask, mask_source_region
-from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds
+from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds, world_matrix
 from atme.store.contracts_v2 import (
     CameraAction,
     ConnectionAction,
     ConnectorObject,
     ContainerObject,
+    EvidenceAction,
     ExecutableLayoutV2,
     GroupAction,
     MarkObject,
@@ -242,6 +243,28 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             or layout.evidence_treatments != timeline.evidence_treatments):
         raise V2FrameError("resolved timeline and executable layout do not describe the same composition")
     resolved_actions = {item.action.action_id: item for item in timeline.actions}
+    treatments_by_action = {item.action_id: item for item in layout.evidence_treatments}
+    for item in timeline.actions:
+        action = item.action
+        if not isinstance(action, EvidenceAction):
+            continue
+        if action.verb != "insert_evidence":
+            raise UnsupportedVisualAction(
+                f"v2 action {action.action_id} uses {action.verb}, which has no frame implementation"
+            )
+        treatment = treatments_by_action.get(action.action_id)
+        if treatment is None:
+            raise UnsupportedVisualAction(
+                f"v2 action {action.action_id} uses insert_evidence without executable treatment"
+            )
+        if (action.target_object_id != treatment.object_id
+                or action.evidence_asset_id != treatment.intent.evidence_asset_id
+                or action.board_id != treatment.intent.destination_board_id
+                or action.destination_board_id != action.board_id
+                or action.expected_state != "hidden"
+                or action.post_state != action.destination_state
+                or action.destination_state != treatment.intent.destination_state):
+            raise V2FrameError(f"insert_evidence {action.action_id} changes its authored binding")
     for treatment in layout.evidence_treatments:
         resolved = resolved_actions.get(treatment.action_id)
         if resolved is None or not any(
@@ -257,6 +280,34 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
     if set(layout_objects) != state_objects:
         raise V2FrameError("the resolved timeline must initialize every layout object exactly once")
     initial = {item.object_id: item for item in timeline.initial_object_states}
+    for treatment in layout.evidence_treatments:
+        obj = layout_objects[treatment.object_id]
+        chain = {obj.object_id, *_ancestor_ids(obj, layout_objects)}
+        if "rotate" not in treatment.allowed_transformations and any(
+            isinstance(other.action, TransformAction)
+            and other.action.verb == "rotate"
+            and chain.intersection(other.action.target_ids)
+            for other in timeline.actions
+        ):
+            raise V2FrameError(
+                f"evidence {treatment.object_id} has an undeclared rotation"
+            )
+        initial_state = initial[treatment.object_id]
+        if (not isinstance(obj, VisualObject) or obj.object_type != "evidence"
+                or obj.asset_id != treatment.intent.evidence_asset_id
+                or obj.opacity <= 0 or initial_state.state != "hidden"
+                or initial_state.visible):
+            raise V2FrameError(f"evidence {treatment.object_id} needs an untouched hidden source")
+        resolved = resolved_actions[treatment.action_id]
+        hold_end = resolved.end_ms + treatment.intent.readable_hold_intent_ms
+        for other in timeline.actions:
+            if other is resolved or isinstance(other.action, SoundAction):
+                continue
+            if (other.action.board_id == obj.board_id
+                    and other.start_ms < hold_end and other.end_ms > resolved.start_ms):
+                raise V2FrameError(
+                    f"evidence {treatment.object_id} needs an uninterrupted readable insert and hold"
+                )
     mask_sources = {obj.mask_source_object_id for obj in layout.objects
                     if isinstance(obj, MaskContainer)}
     for source_id in mask_sources:
@@ -315,6 +366,105 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
         for object_id, obj in layout_objects.items()
     }
     for item in timeline.actions:
+        if isinstance(item.action, EvidenceAction) and item.action.verb == "insert_evidence":
+            action = item.action
+            target = action.target_object_id
+            obj = layout_objects[target]
+            ancestors = _ancestor_ids(obj, layout_objects)
+            treatment = treatments_by_action[action.action_id]
+            if (target in last_target_end or completed_visible[target]
+                    or completed_reveal[target] != 0
+                    or any(not completed_visible[parent_id]
+                           or completed_opacity[parent_id] <= 0
+                           or completed_reveal[parent_id] < 1
+                           for parent_id in ancestors)):
+                raise V2FrameError(
+                    f"insert_evidence {action.action_id} needs a visible parent and untouched hidden source"
+                )
+            chain = (target, *ancestors)
+            if any(completed_opacity[object_id] != 1 for object_id in chain):
+                raise V2FrameError(
+                    f"evidence {target} must remain fully opaque for its readable hold"
+                )
+            if ("rotate" not in treatment.allowed_transformations
+                    and any(completed_transform[object_id].rotation_degrees != 0
+                            for object_id in chain)):
+                raise V2FrameError(f"evidence {target} has an undeclared rotation")
+            try:
+                rect = world_bounds(obj, layout_objects, completed_transform)
+                matrix = world_matrix(obj, layout_objects, completed_transform)
+                camera_plan = camera_segments(layout, timeline)
+            except (UnsupportedWorldGeometry, UnsupportedCamera) as exc:
+                raise V2FrameError(str(exc)) from exc
+            for parent_id in ancestors:
+                parent = layout_objects[parent_id]
+                if isinstance(parent, MaskContainer):
+                    source = layout_objects[parent.mask_source_object_id]
+                    if (source.object_type != "rectangle"
+                            or any(completed_transform[object_id].rotation_degrees != 0
+                                   for object_id in (*chain, source.object_id))):
+                        raise V2FrameError(
+                            f"evidence {target} needs an axis-aligned rectangular mask aperture"
+                        )
+                    try:
+                        aperture = world_bounds(source, layout_objects, completed_transform)
+                    except UnsupportedWorldGeometry as exc:
+                        raise V2FrameError(str(exc)) from exc
+                    if (rect[0] < aperture[0] or rect[1] < aperture[1]
+                            or rect[2] > aperture[2] or rect[3] > aperture[3]):
+                        raise V2FrameError(
+                            f"evidence {target} is clipped by its declared mask"
+                        )
+                elif isinstance(parent, ContainerObject) and parent.object_type == "clip":
+                    if any(completed_transform[object_id].rotation_degrees != 0
+                           for object_id in chain):
+                        raise V2FrameError(
+                            f"evidence {target} needs an axis-aligned clip aperture"
+                        )
+                    try:
+                        aperture = world_bounds(parent, layout_objects, completed_transform)
+                    except UnsupportedWorldGeometry as exc:
+                        raise V2FrameError(str(exc)) from exc
+                    if (rect[0] < aperture[0] or rect[1] < aperture[1]
+                            or rect[2] > aperture[2] or rect[3] > aperture[3]):
+                        raise V2FrameError(f"evidence {target} is clipped by its parent")
+            activation = next(
+                activation for activation in layout.activations
+                if activation.board_id == action.board_id
+                and activation.start_ms <= item.start_ms
+                and item.end_ms + treatment.intent.readable_hold_intent_ms <= activation.end_ms
+            )
+            for moment in (item.start_ms, item.end_ms,
+                           item.end_ms + treatment.intent.readable_hold_intent_ms - 1):
+                viewport = evaluate_camera(layout, camera_plan, moment,
+                                           activation.activation_id, _ease)
+                crop = treatment.intent.crop
+                focus = treatment.intent.focus_region
+                bounds = obj.geometry.bounds
+                source_scale = min(bounds.width / crop.width,
+                                   bounds.height * 0.5 / crop.height)
+                origin = matrix.point(0, 0)
+                focus_x = matrix.point(focus.width * source_scale, 0)
+                focus_y = matrix.point(0, focus.height * source_scale)
+                displayed_focus_x = ((focus_x[0] - origin[0]) ** 2
+                                     + (focus_x[1] - origin[1]) ** 2) ** 0.5
+                displayed_focus_y = ((focus_y[0] - origin[0]) ** 2
+                                     + (focus_y[1] - origin[1]) ** 2) ** 0.5
+                if (rect[0] < viewport.x or rect[1] < viewport.y
+                        or rect[2] > viewport.x + viewport.width
+                        or rect[3] > viewport.y + viewport.height
+                        or (rect[2] - rect[0]) * layout.canvas.width / viewport.width < 180
+                        or (rect[3] - rect[1]) * layout.canvas.height / viewport.height < 160
+                        or displayed_focus_x * layout.canvas.width / viewport.width < 8
+                        or displayed_focus_y * layout.canvas.height / viewport.height < 8):
+                    raise V2FrameError(
+                        f"evidence {target} is not fully readable in the camera frame during its hold"
+                    )
+            last_target_end[target] = item.end_ms
+            last_target_verb[target] = "insert_evidence"
+            completed_visible[target] = True
+            completed_reveal[target] = 1.0
+            continue
         if isinstance(item.action, ReplaceAction) and item.action.verb == "replace":
             action = item.action
             source_id, destination_id = action.from_object_id, action.to_object_id
@@ -669,6 +819,7 @@ def evaluate_frame(
         action = resolved.action
         supported = (
             isinstance(action, (TransformAction, ConnectionAction, CameraAction))
+            or isinstance(action, EvidenceAction) and action.verb == "insert_evidence"
             or isinstance(action, ReplaceAction) and action.verb == "replace"
             or isinstance(action, TargetAction) and action.verb in {
                 "reveal", "write", "draw", "enter", "exit", "progressive_reveal", "highlight",
@@ -690,6 +841,16 @@ def evaluate_frame(
             action.easing,
         )
         completed = at_ms >= resolved.end_ms
+        if isinstance(action, EvidenceAction):
+            before = current[action.target_object_id]
+            current[action.target_object_id] = replace(
+                before,
+                state=action.post_state if completed else before.state,
+                visible=True,
+                opacity=before.opacity * (1.0 if completed else progress),
+                reveal_fraction=1.0,
+            )
+            continue
         if isinstance(action, ReplaceAction):
             source = current[action.from_object_id]
             destination = current[action.to_object_id]

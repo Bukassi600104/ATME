@@ -343,6 +343,9 @@ class GroupAction(ActionBase):
 class EvidenceAction(ActionBase):
     verb: Literal["insert_evidence", "return_board"]
     evidence_asset_id: str | None = None
+    # Optional only so older 2.0.0 documents remain loadable. New writes and
+    # frame execution require an exact object binding for insert_evidence.
+    target_object_id: str | None = None
     destination_board_id: str
     destination_state: str
 
@@ -1004,6 +1007,17 @@ class ExecutableLayoutV2(StrictModel):
                         or obj.board_id != treatment.intent.destination_board_id
                         or obj.asset_id != treatment.intent.evidence_asset_id):
                     raise ValueError("evidence treatment changes object, beat, board, or asset")
+                mask_ancestors = []
+                parent_id = obj.parent_id
+                while parent_id is not None:
+                    parent = object_map[parent_id]
+                    if isinstance(parent, MaskContainer):
+                        mask_ancestors.append(parent_id)
+                    parent_id = parent.parent_id
+                declared_mask = treatment.intent.mask_object_id
+                if (mask_ancestors and mask_ancestors != [declared_mask]
+                        or declared_mask is not None and mask_ancestors != [declared_mask]):
+                    raise ValueError("evidence mask must actually contain its evidence object")
         _reject_parent_cycles(object_map)
         _reject_container_cycles(object_map)
         last_end = 0
@@ -1360,6 +1374,10 @@ def validate_plan_layout(plan_document: dict, layout_document: dict) -> None:
         action = next(plan_actions[action_id] for action_id in beat.action_ids
                       if isinstance(plan_actions[action_id], EvidenceAction)
                       and plan_actions[action_id].verb == "insert_evidence")
+        if (action.target_object_id != obj.object_id
+                or action.expected_state != "hidden"
+                or action.post_state != evidence.destination_state):
+            raise ValueError("evidence insert must bind its hidden object and declared destination state")
         expected_treatments.append(_evidence_treatment_for(beat, asset, obj, action))
     actual = {item.object_id: item for item in layout.evidence_treatments}
     expected = {item.object_id: item for item in expected_treatments}
@@ -1387,6 +1405,10 @@ def validate_plan_evidence_completeness(plan_document: dict) -> None:
         action = next(actions[action_id] for action_id in beat.action_ids
                       if isinstance(actions[action_id], EvidenceAction)
                       and actions[action_id].verb == "insert_evidence")
+        if (action.target_object_id != obj.object_id
+                or action.expected_state != "hidden"
+                or action.post_state != beat.evidence.destination_state):
+            raise ValueError("evidence insert must bind its hidden object and declared destination state")
         _evidence_treatment_for(beat, asset, obj, action)
         covered_objects.add(obj.object_id)
         covered_actions.add(action.action_id)
@@ -1521,4 +1543,7 @@ def _action_object_references(action):
             refs.append(action.source_object_id)
     elif isinstance(action, ReplaceAction):
         refs.extend([action.from_object_id, action.to_object_id])
+    elif isinstance(action, EvidenceAction) and action.verb == "insert_evidence":
+        if action.target_object_id is not None:
+            refs.append(action.target_object_id)
     return refs

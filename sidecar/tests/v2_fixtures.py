@@ -33,6 +33,7 @@ def visual_plan_v2(project_revision=3):
          "target_ids": ["object-label"], "annotation": None},
         {**common_action("action-3", "instruction-3"), "verb": "insert_evidence",
          "evidence_asset_id": "asset-evidence", "destination_board_id": "board-main",
+         "target_object_id": "object-evidence", "post_state": "evidence_visible",
          "destination_state": "evidence_visible"},
     ]
     fallbacks = [{"fallback_id": f"fallback-{n}", "affected_ids": [f"instruction-{n}"],

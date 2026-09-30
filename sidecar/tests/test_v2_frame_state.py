@@ -126,10 +126,13 @@ def test_transform_interpolation_is_pure_and_channel_specific(verb):
     assert evaluate_frame(layout, timeline, 100).object("object-evidence").transform.position.x == 0
 
 
-def test_unimplemented_authored_action_fails_before_any_frame_is_shown():
+def test_authored_evidence_action_requires_full_treatment_before_any_frame_is_shown():
     plan = visual_plan_v2()
     layout = executable_layout_v2(plan)
     timeline = resolved_timeline_v2(plan, layout)
+    layout.pop("evidence_treatments")
+    timeline.pop("evidence_treatments")
+    timeline["layout_sha256"] = digest(layout)
     with pytest.raises(UnsupportedVisualAction, match="insert_evidence"):
         evaluate_frame(layout, timeline, 0)
 

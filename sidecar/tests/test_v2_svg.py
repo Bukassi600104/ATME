@@ -58,11 +58,11 @@ def test_reveal_is_clipped_then_unclipped():
     assert 'data-object-id="object-label"' not in during.svg
 
 
-def test_unsupported_hidden_object_rejects_full_layout():
+def test_hidden_evidence_without_verified_bytes_rejects_full_layout():
     layout, timeline = supported_documents()
     timeline["actions"][0]["action"]["verb"] = "reveal"
     timeline["actions"][1]["action"]["verb"] = "reveal"
-    with pytest.raises(UnsupportedVisualObject, match="object-evidence uses evidence"):
+    with pytest.raises(UnsupportedVisualObject, match="verified project evidence"):
         compose_svg_frame(layout, timeline, 100)
 
 

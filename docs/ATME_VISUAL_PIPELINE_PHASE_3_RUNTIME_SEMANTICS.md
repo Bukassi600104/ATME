@@ -1,12 +1,12 @@
 # Phase 3 v2 runtime semantics — kernel contract
 
-Status: Slices 3A–3U independent PASS;
+Status: Slices 3A–3U independent PASS; bounded 3V compositor under final audit;
 not a production-renderer capability declaration
 
-This document fixes the meanings implemented by the first deterministic frame-state kernel. It
-does not replace the v2 JSON contracts or authorize the v1 renderer to consume them. Real pixels,
-asset resolution, the full action vocabulary, and project preview/export wiring remain later
-Phase 3 slices. Until then, the desktop and MCP capability must continue reporting renderer v1.
+This document records the deterministic frame-state kernel and subsequent bounded source-only
+SVG/PNG slices. It does not replace the v2 JSON contracts or authorize the v1 renderer to consume
+them. The full action vocabulary, installed-app asset routing, and project preview/export wiring
+remain later Phase 3 work. Until then, desktop and MCP capability must continue reporting renderer v1.
 
 ## Input and time authority
 
@@ -352,16 +352,42 @@ malformed chunks fail closed. The resulting deterministic RGBA pixels are
 contained within authored bounds, and the existing transform/opacity/reveal
 state applies. Rotation remains blocked until permission can be bound to the
 stored creative plan. An ordinary supporting image does not claim verified
-external evidence provenance. Images inside
-alpha masks, semantic evidence objects, arbitrary media, crop, and external
-assets remain unsupported. This does not promote v2 to desktop preview/export.
+external evidence provenance. Supporting images inside alpha masks, arbitrary
+media, crop, and external assets remain unsupported on the ordinary-image path.
+Bounded semantic evidence uses the separate attested path below. This does not
+promote v2 to desktop preview/export.
+
+## Bounded 3V evidence execution
+
+An evidence object is distinct from a supporting image. It requires a plan-bound
+evidence treatment, project-owned attested PNG bytes, exact asset revision and
+checksum, declared provenance and rights, and matching transformations. The
+compositor draws the exact source-pixel crop without invented replacement imagery,
+then an authored focus outline, optional outside-focus darkening, source label,
+and optional self-anchored annotation. Rounded card geometry clips its contents.
+Unsupported annotation targets and masks that cannot preserve the entire card
+fail closed. The source label is attribution supplied by the external AI/user;
+ATME does not research or independently verify its semantic claim.
+
+`insert_evidence` requires an untouched hidden object and a visible, fully
+opaque ancestor chain. It fades the complete card into the authored destination
+state. The board must remain active through the readable hold, with no other
+same-board visual action during insertion/hold. World-size, minimum focus size,
+retained camera framing, and rectangular mask/clip containment are checked
+before frames can be returned. Rotation without declared evidence permission
+is rejected throughout the resolved timeline. Mask apertures that are not
+axis-aligned rectangles remain unsupported for evidence. `return_board` is
+still rejected; it needs explicit source-board, activation, and developed-state
+provenance rather than an inferred transition. This is only the pure source
+SVG/PNG path, not installed-app preview/export or MCP production routing.
 
 ## Still to define and implement before Phase 3 exit
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be
 fixed before their first runtime implementation: `morph`, `annotate`,
 `group`, `ungroup`, `split`, `count`,
-`insert_evidence`, `return_board`, and sound state/events. In particular,
+`return_board`, and sound state/events. `insert_evidence` has only the bounded
+semantics above. In particular,
 the contract needs explicit rules for morph compatibility, dynamic group ownership, split result
 mapping, isolate restoration, and ordered progressive disclosure. Audible mixing remains Phase 7;
 Phase 3 must at least expose deterministic sound events at the correct resolved times.

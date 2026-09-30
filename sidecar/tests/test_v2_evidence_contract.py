@@ -5,15 +5,6 @@ from __future__ import annotations
 from copy import deepcopy
 
 import pytest
-from pydantic import ValidationError
-from test_visual_contracts_v2 import _store_v2_plan
-from v2_fixtures import (
-    digest,
-    executable_layout_v2,
-    resolved_timeline_v2,
-    visual_plan_v2,
-)
-
 from atme.project_service import ProjectError
 from atme.render.v2_state import UnsupportedVisualAction, V2FrameError, evaluate_frame
 from atme.render.v2_svg import compose_svg_frame
@@ -24,9 +15,17 @@ from atme.store.contracts_v2 import (
     validate_plan_evidence_completeness,
     validate_plan_layout,
 )
+from pydantic import ValidationError
+from test_visual_contracts_v2 import _store_v2_plan
+from v2_fixtures import (
+    digest,
+    executable_layout_v2,
+    resolved_timeline_v2,
+    visual_plan_v2,
+)
 
 
-def test_exact_evidence_treatment_is_preserved_but_not_yet_rendered():
+def test_exact_evidence_treatment_is_preserved_and_drives_frame_state():
     plan = visual_plan_v2()
     layout = executable_layout_v2(plan)
     timeline = resolved_timeline_v2(plan, layout)
@@ -34,8 +33,14 @@ def test_exact_evidence_treatment_is_preserved_but_not_yet_rendered():
     assert ExecutableLayoutV2.model_validate(layout).evidence_treatments
     assert ResolvedVisualTimelineV2.model_validate(timeline).evidence_treatments
     validate_plan_layout(plan, layout)
-    with pytest.raises(UnsupportedVisualAction, match="insert_evidence"):
-        evaluate_frame(layout, timeline, 4500)
+    before = evaluate_frame(layout, timeline, 3999).object("object-evidence")
+    during = evaluate_frame(layout, timeline, 4450).object("object-evidence")
+    after = evaluate_frame(layout, timeline, 4900).object("object-evidence")
+    assert not before.visible
+    assert during.visible and 0 < during.opacity < 1
+    assert after.visible and after.state == "evidence_visible" and after.opacity == 1
+    assert evaluate_frame(layout, timeline, 4000).object("object-evidence").opacity == 0
+    assert evaluate_frame(layout, timeline, 7000).object("object-evidence") == after
 
 
 def test_layout_cannot_omit_or_rewrite_plan_evidence():
@@ -105,6 +110,19 @@ def test_old_evidence_documents_remain_loadable_but_fail_closed():
         compose_svg_frame(layout, timeline, 4500)
 
 
+@pytest.mark.parametrize("mutate", [
+    lambda p: p["actions"][2].pop("target_object_id"),
+    lambda p: p["actions"][2].update(target_object_id="object-label"),
+    lambda p: p["actions"][2].update(post_state="visible"),
+    lambda p: p["actions"][2].update(expected_state="visible"),
+])
+def test_new_evidence_plan_requires_exact_target_and_state(mutate):
+    plan = visual_plan_v2()
+    mutate(plan)
+    with pytest.raises(ValueError, match="bind its hidden object"):
+        validate_plan_evidence_completeness(plan)
+
+
 @pytest.mark.parametrize("mutate,problem", [
     (lambda p: p["beats"][1]["evidence"].update(provenance_verified=False), "verified"),
     (lambda p: p["beats"][1]["evidence"].update(checksum_verified=False), "verified"),
@@ -140,6 +158,24 @@ def test_evidence_readable_hold_must_fit_destination_board_activation():
     timeline = resolved_timeline_v2(plan, layout)
     with pytest.raises(V2FrameError, match="readable hold outlasts"):
         evaluate_frame(layout, timeline, 4500)
+
+
+def test_evidence_insert_and_hold_reject_other_visual_actions_on_same_board():
+    plan = visual_plan_v2()
+    layout = executable_layout_v2(plan)
+    timeline = resolved_timeline_v2(plan, layout)
+    timeline["actions"][1]["end_ms"] = 4100
+    with pytest.raises(V2FrameError, match="uninterrupted readable insert and hold"):
+        evaluate_frame(layout, timeline, 4500)
+
+
+def test_evidence_insert_is_random_seek_deterministic():
+    layout = executable_layout_v2()
+    timeline = resolved_timeline_v2(layout=layout)
+    first = evaluate_frame(layout, timeline, 4450)
+    evaluate_frame(layout, timeline, 7000)
+    evaluate_frame(layout, timeline, 0)
+    assert evaluate_frame(layout, timeline, 4450) == first
 
 
 def test_legacy_unsnapshotted_evidence_plan_loads_but_cannot_be_newly_written():
