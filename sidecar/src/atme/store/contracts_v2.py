@@ -1326,7 +1326,7 @@ def validate_plan_layout(plan_document: dict, layout_document: dict) -> None:
     """Reject any executable layout that silently changes semantic-plan meaning."""
     plan = VisualPlanV2.model_validate(plan_document)
     layout = ExecutableLayoutV2.model_validate(layout_document)
-    if layout.plan_id != plan.plan_id:
+    if layout.project_id != plan.project_id or layout.plan_id != plan.plan_id:
         raise ValueError("layout references a different visual plan")
     semantic = {item.object_id: item for item in plan.objects}
     executable = {item.object_id: item for item in layout.objects}

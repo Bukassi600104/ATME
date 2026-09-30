@@ -72,6 +72,17 @@ class ProjectService:
                     contract_version TEXT NOT NULL,
                     migration_report TEXT,
                     PRIMARY KEY(job_id,kind,revision));
+                CREATE TABLE IF NOT EXISTS project_duplicate_derivations (
+                    job_id INTEGER NOT NULL REFERENCES jobs(id),
+                    kind TEXT NOT NULL,
+                    revision INTEGER NOT NULL,
+                    derivation_id TEXT NOT NULL,
+                    source_project_id INTEGER NOT NULL REFERENCES jobs(id),
+                    source_revision INTEGER NOT NULL,
+                    source_sha256 TEXT NOT NULL,
+                    copied_sha256 TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    PRIMARY KEY(job_id,kind,revision));
                 CREATE TABLE IF NOT EXISTS project_source_media (
                     job_id INTEGER NOT NULL,
                     media_id TEXT NOT NULL,
@@ -145,6 +156,12 @@ class ProjectService:
                                  "audio_max_bytes": 67108864, "video_max_bytes": 1073741824,
                                  "transport": "authenticated_http"},
                 "supporting_assets": {"max_bytes": 268435456, "narrative_authority": False},
+                 "evidence_assets": {"transport": "authenticated_http",
+                                     "path": "/projects/{project_id}/evidence-assets",
+                                     "max_bytes": 8388608,
+                                     "format": "strict_png",
+                                     "provenance": "externally_declared_not_internally_researched",
+                                     "v2_renderer_available": False},
                 "semantic_authority": {
                     "script_authority": "approved_external_script",
                     "recording_authority": "user_recording",
@@ -314,11 +331,87 @@ class ProjectService:
                         f"SELECT ?,{columns} FROM {table} WHERE job_id=?",
                         (copy_id, project_id),
                     )
+                self._rebind_duplicated_v2_artifacts(conn, project_id, copy_id)
                 conn.commit()
             except Exception:
                 conn.rollback()
                 raise
         return self.open(copy_id)
+
+    @staticmethod
+    def _rebind_duplicated_v2_artifacts(conn, source_id, copy_id):
+        """Clone v2 identity and its exact hashes without touching source revisions."""
+        rows = conn.execute(
+            "SELECT kind,revision,document FROM project_artifact_versions "
+            "WHERE job_id=? AND kind IN ('storyboard','layout') ORDER BY revision",
+            (copy_id,),
+        ).fetchall()
+        plans = {}
+        derivations = []
+        for row in rows:
+            if row["kind"] != "storyboard":
+                continue
+            document = json.loads(row["document"])
+            if document.get("contract_version") != "2.0.0":
+                continue
+            old_hash = hashlib.sha256(json.dumps(
+                document, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+            ).encode()).hexdigest()
+            document["project_id"] = copy_id
+            serialized = json.dumps(document, ensure_ascii=False, allow_nan=False)
+            new_hash = hashlib.sha256(json.dumps(
+                document, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+            ).encode()).hexdigest()
+            conn.execute(
+                "UPDATE project_artifact_versions SET document=? "
+                "WHERE job_id=? AND kind='storyboard' AND revision=?",
+                (serialized, copy_id, row["revision"]),
+            )
+            plans[row["revision"]] = document
+            derivations.append(("storyboard", row["revision"], old_hash, new_hash))
+        for row in rows:
+            if row["kind"] != "layout":
+                continue
+            document = json.loads(row["document"])
+            if document.get("contract_version") != "2.0.0":
+                continue
+            plan = plans.get(document["plan_revision"])
+            if plan is None:
+                raise ProjectError("invalid_artifact", "Cloned v2 layout has no matching plan")
+            old_hash = hashlib.sha256(json.dumps(
+                document, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+            ).encode()).hexdigest()
+            document["project_id"] = copy_id
+            document["plan_sha256"] = hashlib.sha256(json.dumps(
+                plan, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+            ).encode()).hexdigest()
+            from atme.store.contracts_v2 import validate_plan_layout
+            try:
+                validate_plan_layout(plan, document)
+            except ValueError as exc:
+                raise ProjectError("invalid_artifact", "Cloned v2 layout does not preserve its plan") from exc
+            serialized = json.dumps(document, ensure_ascii=False, allow_nan=False)
+            new_hash = hashlib.sha256(json.dumps(
+                document, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+            ).encode()).hexdigest()
+            conn.execute(
+                "UPDATE project_artifact_versions SET document=? "
+                "WHERE job_id=? AND kind='layout' AND revision=?",
+                (serialized, copy_id, row["revision"]),
+            )
+            derivations.append(("layout", row["revision"], old_hash, new_hash))
+        for kind, revision, source_sha, copied_sha in derivations:
+            seed = json.dumps({
+                "source_project_id": source_id, "copied_project_id": copy_id,
+                "kind": kind, "revision": revision, "source_sha256": source_sha,
+                "copied_sha256": copied_sha,
+            }, sort_keys=True, separators=(",", ":"))
+            derivation_id = "copy-" + hashlib.sha256(seed.encode()).hexdigest()[:20]
+            conn.execute(
+                "INSERT INTO project_duplicate_derivations VALUES(?,?,?,?,?,?,?,?,?)",
+                (copy_id, kind, revision, derivation_id, source_id, revision,
+                 source_sha, copied_sha, time.time()),
+            )
 
     def _serialized_artifact(self, kind, document, *, legacy_migration=False):
         version = document.get("contract_version", "1") if isinstance(document, dict) else "1"
@@ -608,6 +701,16 @@ class ProjectService:
                                           result["document"].get("contract_version", "1"))
             if metadata and metadata["migration_report"]:
                 result["migration_report"] = json.loads(metadata["migration_report"])
+            derivation = self.store.conn.execute(
+                "SELECT derivation_id,source_project_id,source_revision,source_sha256,"
+                "copied_sha256 FROM project_duplicate_derivations "
+                "WHERE job_id=? AND kind=? AND revision=?",
+                (project_id, kind, row["revision"]),
+            ).fetchone()
+            if derivation:
+                result["duplicate_derivation"] = dict(derivation)
+                if metadata and metadata["migration_report"]:
+                    result["migration_report_provenance"] = "inherited_source_lineage"
             dependency = self.store.conn.execute(
                 "SELECT script_revision FROM project_artifact_dependencies WHERE job_id=? AND kind=? AND revision=?",
                 (project_id, kind, row["revision"])).fetchone()
@@ -680,6 +783,12 @@ class ProjectService:
         from atme.project_assets import attach_asset_file
         return attach_asset_file(self, project_id, staged_file, filename, expected_revision)
 
+    def attach_evidence_file(self, project_id, staged_file, filename, expected_revision,
+                             provenance, allowed_transformations):
+        from atme.project_assets import attach_evidence_file
+        return attach_evidence_file(self, project_id, staged_file, filename, expected_revision,
+                                    provenance, allowed_transformations)
+
     def list_assets(self, project_id):
         from atme.project_assets import list_assets
         return list_assets(self, project_id)
@@ -691,6 +800,10 @@ class ProjectService:
     def render_image_bytes(self, project_id, resolved_asset):
         from atme.project_assets import read_verified_image_bytes
         return read_verified_image_bytes(self, project_id, resolved_asset)
+
+    def render_evidence_bytes(self, project_id, resolved_asset, treatment):
+        from atme.project_assets import read_verified_evidence_bytes
+        return read_verified_evidence_bytes(self, project_id, resolved_asset, treatment)
 
     def approve_script(self, project_id, script_revision, expected_revision, approved):
         if approved is not True:

@@ -171,12 +171,12 @@ def create_mcp(service: ProjectService, activity: McpActivity | None = None):
 
     @server.tool(name="atme.list_project_assets", annotations=read)
     def list_project_assets(project_id: Id) -> CallToolResult:
-        """List immutable supporting assets without confusing them with narrative authority."""
+        """List project-owned supporting/evidence assets and their distinct managed refs."""
         return invoke(service.list_assets, project_id, tool="atme.list_project_assets", project_id=project_id)
 
     @server.resource("atme://projects/{project_id}/assets/{asset_id}",
                      name="ATME project asset", mime_type="application/octet-stream",
-                     description="Integrity-checked supporting project asset.")
+                     description="Integrity-checked project asset; role and provenance are listed separately.")
     def project_asset_resource(project_id: int, asset_id: str) -> bytes:
         try:
             path, _ = service.asset(project_id, asset_id, MAX_RESOURCE_BYTES)

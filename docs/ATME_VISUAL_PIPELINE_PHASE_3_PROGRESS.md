@@ -1,9 +1,9 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3U independent PASS;
+Status: Slices 3A–3U and bounded 3V contract/ingestion stages independent PASS;
 Phase 3 remains incomplete
 
-Date: 2026-09-27
+Date: 2026-09-30
 
 ## Delivered in Slice 3A
 
@@ -22,16 +22,22 @@ Date: 2026-09-27
 
 ## Incomplete Phase 3 gates
 
-- Next Slice 3V must preserve the full evidence treatment from semantic plan
-  through executable layout and resolved timeline before painting evidence.
-  The current plan has crop, focus, source label, annotation, provenance, and
-  readable-hold intent, but the executable artifacts currently discard them.
-  Add an evidence-specific, project-owned provenance attestation and immutable
-  PNG resolver; reject supporting-image substitution. Only then implement
-  bounded crop/focus/attribution/annotation and readable insert/return timing,
-  with random-seek, portrait/landscape, offline, and legacy evidence tests.
-  Old 2.0.0 evidence stays loadable but non-executable until the complete
-  treatment is present; do not route 3U images through an evidence shortcut.
+- Slice 3V now preserves evidence-treatment intent in the v2 contract and has
+  source-only evidence PNG ingestion and a separate immutable-byte resolver.
+  The latter accepts only project-owned evidence assets with declared external
+  provenance, matching checksum and revision, resolved usage rights, and
+  explicit permitted transformations; supporting images cannot substitute.
+  Uploaded originals are not deleted. Duplicating a project preserves evidence
+  origin references and records separate artifact-derivation hashes without
+  rewriting inherited migration receipts. The independent bounded re-audit
+  passed, including focused tests; Windows redirect tests skipped only when
+  this host denied symlink creation. The full sidecar regression has not yet
+  been confirmed for this slice. These changes do not
+  paint evidence or expose an MCP upload tool. Next implement bounded
+  crop/focus/attribution/annotation and readable insert/return timing, with
+  random-seek, portrait/landscape, offline, and legacy evidence tests. Old
+  2.0.0 evidence stays loadable but non-executable until the complete treatment
+  is present; do not route 3U images through an evidence shortcut.
 - Slice 3U adds a bounded project-owned PNG render path. The project service
   verifies ownership, revision, managed path, metadata, checksum, and decoded
   dimensions before supplying immutable bytes to the v2 compositor. That
@@ -313,6 +319,15 @@ Date: 2026-09-27
   and Ruff passed. This stage preserves and validates forensic intent only:
   evidence-specific asset attestation, action execution, raster/SVG pixels,
   desktop integration, and full production acceptance remain open.
+- Slice 3V (ingestion/lineage stage): independent bounded re-audit PASS for
+  declared evidence-only PNG ingestion, immutable byte resolution, project
+  containment and duplicate-project evidence origin, plus separately recorded
+  derivation hashes that preserve inherited migration receipts. Focused tests
+  and sidecar Ruff passed. Redirect tests skip where Windows denies symlink
+  creation; a stronger hostile same-user filesystem model would require
+  handle-based final-path verification. Evidence placement and pixels, MCP
+  upload, installed desktop integration, and full Phase 3 acceptance remain
+  open. Full sidecar regression is not yet confirmed for this slice.
 - Slice 3R: independent bounded audit PASS for explicit static-alpha mask
   contracts, unique non-painted geometry ownership, schema/model parity,
   preserved old `2.0.0` mask loading and parse/dump/reparse, mixed-policy

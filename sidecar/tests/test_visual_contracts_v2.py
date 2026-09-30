@@ -9,14 +9,6 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
-from atme.narrative_source import describe
-from atme.project_service import ProjectError, ProjectService
-from atme.store.contracts_v2 import (
-    ExecutableLayoutV2,
-    ResolvedVisualTimelineV2,
-    VisualPlanV2,
-)
-from atme.store.migrate_visual_v1 import migrate_visual_bundle_v1
 from conftest import load_example, load_schema
 from jsonschema import Draft202012Validator
 from mcp import Client
@@ -30,6 +22,15 @@ from v2_fixtures import (
     resolved_timeline_v2,
     visual_plan_v2,
 )
+
+from atme.narrative_source import describe
+from atme.project_service import ProjectError, ProjectService
+from atme.store.contracts_v2 import (
+    ExecutableLayoutV2,
+    ResolvedVisualTimelineV2,
+    VisualPlanV2,
+)
+from atme.store.migrate_visual_v1 import migrate_visual_bundle_v1
 
 
 def _semantic_connector_without_source(document):
@@ -520,3 +521,26 @@ def test_service_migration_appends_revisions_and_preserves_v1_history(tmp_path):
     assert service.runner.validate(project_id)["ready"] is False
     assert any(x["code"] == "renderer_contract_unsupported"
                for x in service.runner.validate(project_id)["issues"])
+
+
+def test_duplicate_migrated_v2_keeps_original_receipt_and_records_derivation(tmp_path):
+    service, state = ready_project(tmp_path)
+    source_id = state["project_id"]
+    migrated = service.migrate_visual_contracts_v1(source_id, state["revision"])
+    source_plan = service.artifact(source_id, "storyboard")
+    source_layout = service.artifact(source_id, "layout")
+    copy_id = service.duplicate(source_id)["project_id"]
+    copied_plan = service.artifact(copy_id, "storyboard")
+    copied_layout = service.artifact(copy_id, "layout")
+    assert copied_plan["document"]["project_id"] == copied_layout["document"]["project_id"] == copy_id
+    assert copied_layout["document"]["plan_sha256"] == digest(copied_plan["document"])
+    assert copied_plan["migration_report"] == copied_layout["migration_report"] == migrated["migration_report"]
+    assert copied_plan["migration_report_provenance"] == "inherited_source_lineage"
+    assert copied_plan["migration_report"]["output_sha256"]["visual_plan_v2"] == digest(source_plan["document"])
+    assert copied_plan["duplicate_derivation"]["source_project_id"] == source_id
+    assert copied_plan["duplicate_derivation"]["source_sha256"] == digest(source_plan["document"])
+    assert copied_plan["duplicate_derivation"]["copied_sha256"] == digest(copied_plan["document"])
+    assert copied_layout["duplicate_derivation"]["source_sha256"] == digest(source_layout["document"])
+    assert copied_layout["duplicate_derivation"]["copied_sha256"] == digest(copied_layout["document"])
+    assert service.artifact(source_id, "storyboard") == source_plan
+    assert service.artifact(source_id, "layout") == source_layout
