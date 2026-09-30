@@ -30,7 +30,7 @@ Date: 2026-09-30
   objects; A→B→A and same-board activation-gap returns are covered. This is
   bounded continuity mechanics, not the full evidence-to-developed-abstraction
   golden cycle, installed preview/export, or final Phase 3 acceptance. Its
-  bounded independent re-audit passed; broader regression is being completed.
+  bounded independent re-audit, the v2 suite, and full sidecar regression passed.
 - Slice 3V now preserves evidence-treatment intent in the v2 contract and has
   source-only evidence PNG ingestion and a separate immutable-byte resolver.
   The latter accepts only project-owned evidence assets with declared external
