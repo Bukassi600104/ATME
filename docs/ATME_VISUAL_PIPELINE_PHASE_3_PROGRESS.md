@@ -42,8 +42,10 @@ Date: 2026-09-30
   remain fail-closed for evidence. `return_board` remains fail-closed until
   source-board/activation provenance and developed-state semantics are explicit.
   Old incomplete 2.0.0 evidence remains loadable but non-executable. This
-  compositor stage still needs the final independent re-audit and full suite
-  result; it has not been packaged into the installed sidecar, exposed via MCP,
+  compositor stage passed `pytest -q sidecar/tests -k v2 -x`, the full
+  `pytest -q sidecar/tests -x` regression, and Ruff on changed Python files.
+  The final independent re-audit remains open because the auditor's retry hit
+  its usage limit. This slice has not been packaged into the installed sidecar, exposed via MCP,
   or connected to desktop preview/export. Do not route 3U supporting images
   through the evidence trust path.
 - Slice 3U adds a bounded project-owned PNG render path. The project service
