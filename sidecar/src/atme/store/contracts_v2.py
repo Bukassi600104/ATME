@@ -348,6 +348,15 @@ class EvidenceAction(ActionBase):
     target_object_id: str | None = None
     destination_board_id: str
     destination_state: str
+    # A return is an authored cut to a previously activated board, not a
+    # request to invent or reset its retained object state. Optional parsing
+    # preserves older 2.0.0 documents; new writes and execution require all.
+    source_board_id: str | None = None
+    source_activation_id: str | None = None
+    prior_destination_activation_id: str | None = None
+    destination_activation_id: str | None = None
+    expected_object_states: dict[str, str] | None = None
+    expected_object_state_versions: dict[str, int] | None = None
 
 
 class CameraAction(ActionBase):
@@ -1360,6 +1369,23 @@ def validate_plan_layout(plan_document: dict, layout_document: dict) -> None:
         candidate = layout_boards[board_id]
         if candidate.model_dump(mode="json") != board.model_dump(mode="json"):
             raise ValueError(f"layout board {board_id} changes its directing declaration")
+    activations = {item.activation_id: item for item in layout.activations}
+    for action in plan.actions:
+        if not isinstance(action, EvidenceAction) or action.verb != "return_board":
+            continue
+        _require_return_contract(action)
+        _require_return_board_policy(plan_boards[action.destination_board_id])
+        source = activations.get(action.source_activation_id)
+        prior = activations.get(action.prior_destination_activation_id)
+        destination = activations.get(action.destination_activation_id)
+        if (source is None or prior is None or destination is None
+                or action.board_id != action.destination_board_id
+                or source.board_id != action.source_board_id
+                or prior.board_id != action.destination_board_id
+                or destination.board_id != action.destination_board_id
+                or prior.end_ms > destination.start_ms
+                or source.end_ms > destination.start_ms):
+            raise ValueError(f"return_board {action.action_id} changes its activation lineage")
     plan_assets = {item.asset_id: item for item in plan.assets}
     plan_actions = {item.action_id: item for item in plan.actions}
     expected_treatments = []
@@ -1386,7 +1412,7 @@ def validate_plan_layout(plan_document: dict, layout_document: dict) -> None:
 
 
 def validate_plan_evidence_completeness(plan_document: dict) -> None:
-    """Require immutable, executable evidence snapshots for new plan writes."""
+    """Require executable evidence and return declarations for new plan writes."""
     plan = VisualPlanV2.model_validate(plan_document)
     assets = {item.asset_id: item for item in plan.assets}
     actions = {item.action_id: item for item in plan.actions}
@@ -1414,6 +1440,51 @@ def validate_plan_evidence_completeness(plan_document: dict) -> None:
         covered_actions.add(action.action_id)
     if covered_objects != evidence_objects or covered_actions != insert_actions:
         raise ValueError("every evidence object and insert action needs an EvidenceIntent")
+    boards = {item.board_id: item for item in plan.boards}
+    for beat in plan.beats:
+        for action_id in beat.action_ids:
+            action = actions[action_id]
+            if not isinstance(action, EvidenceAction) or action.verb != "return_board":
+                continue
+            _require_return_contract(action)
+            board = boards[action.destination_board_id]
+            _require_return_board_policy(board)
+            expected_versions = beat.continuity.expected_state_versions
+            if (action.board_id != beat.board_id
+                    or action.destination_board_id != beat.board_id
+                    or action.source_board_id != beat.continuity.return_from_board_id
+                    or action.destination_state != beat.continuity.developed_return_state
+                    or action.expected_state != board.expected_prior_state
+                    or set(action.expected_object_states) != set(board.object_ids)
+                    or not expected_versions
+                    or not set(expected_versions).issubset(set(board.object_ids))
+                    or any(action.expected_object_state_versions[object_id] != version
+                           for object_id, version in expected_versions.items())):
+                raise ValueError("return_board must match its board, continuity, and full object inventory")
+
+
+def _require_return_contract(action: EvidenceAction) -> None:
+    if (action.source_board_id is None or action.source_activation_id is None
+            or action.prior_destination_activation_id is None
+            or action.destination_activation_id is None
+            or action.expected_object_states is None
+            or action.expected_object_state_versions is None
+            or not action.expected_object_states
+            or set(action.expected_object_states) != set(action.expected_object_state_versions)
+            or any(not state for state in action.expected_object_states.values())
+            or any(version < 1 for version in action.expected_object_state_versions.values())
+            or action.easing != "step" or action.expected_state is None
+            or action.post_state != action.destination_state
+            or action.evidence_asset_id is not None or action.target_object_id is not None):
+        raise ValueError("return_board needs complete activation and retained-state provenance")
+
+
+def _require_return_board_policy(board: BoardSpec) -> None:
+    if (board.persistence_policy != "returnable"
+            or board.activation_policy not in {"returnable", "persistent"}
+            or not board.return_reason or not board.return_reason.strip()
+            or not board.expected_prior_state):
+        raise ValueError(f"board {board.board_id} has no declared returnable policy")
 
 
 def _unique(items, field):
@@ -1525,6 +1596,8 @@ def _validate_action_references(action, objects, assets, boards):
     if isinstance(action, EvidenceAction):
         if action.destination_board_id not in boards:
             raise ValueError(f"action {action.action_id} references unknown destination board")
+        if action.source_board_id is not None and action.source_board_id not in boards:
+            raise ValueError(f"action {action.action_id} references unknown source board")
         if action.evidence_asset_id and action.evidence_asset_id not in assets:
             raise ValueError(f"action {action.action_id} references unknown evidence asset")
     if isinstance(action, SoundAction) and action.asset_id and action.asset_id not in assets:

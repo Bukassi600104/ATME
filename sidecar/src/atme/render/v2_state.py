@@ -47,6 +47,8 @@ from atme.store.contracts_v2 import (
     TransformAction,
     VisualObject,
     _action_object_references,
+    _require_return_board_policy,
+    _require_return_contract,
 )
 
 
@@ -244,9 +246,98 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
         raise V2FrameError("resolved timeline and executable layout do not describe the same composition")
     resolved_actions = {item.action.action_id: item for item in timeline.actions}
     treatments_by_action = {item.action_id: item for item in layout.evidence_treatments}
+    layout_objects = {item.object_id: item for item in layout.objects}
+    validate_static_hierarchy(layout)
+    state_objects = {item.object_id for item in timeline.initial_object_states}
+    if set(layout_objects) != state_objects:
+        raise V2FrameError("the resolved timeline must initialize every layout object exactly once")
+    initial = {item.object_id: item for item in timeline.initial_object_states}
     for item in timeline.actions:
         action = item.action
         if not isinstance(action, EvidenceAction):
+            continue
+        if action.verb == "return_board":
+            try:
+                _require_return_contract(action)
+            except ValueError as exc:
+                raise UnsupportedVisualAction(str(exc)) from exc
+            activations = layout.activations
+            destination = next((activation for activation in activations
+                                if activation.activation_id == action.destination_activation_id), None)
+            prior = next((activation for activation in activations
+                          if activation.activation_id == action.prior_destination_activation_id), None)
+            source = next((activation for activation in activations
+                           if activation.activation_id == action.source_activation_id), None)
+            destination_board = next((board for board in layout.boards
+                                      if board.board_id == action.destination_board_id), None)
+            if destination_board is None:
+                raise V2FrameError(f"return_board {action.action_id} has no destination board")
+            try:
+                _require_return_board_policy(destination_board)
+            except ValueError as exc:
+                raise V2FrameError(str(exc)) from exc
+            if (destination is None or prior is None or source is None
+                    or destination.board_id != action.destination_board_id
+                    or action.board_id != destination.board_id
+                    or prior.board_id != destination.board_id
+                    or source.board_id != action.source_board_id
+                    or destination.start_ms != item.start_ms
+                    or item.end_ms > destination.end_ms
+                    or prior is not source and prior.end_ms > source.start_ms
+                    or source.end_ms > destination.start_ms
+                    or source is not max((a for a in activations if a.end_ms <= destination.start_ms),
+                                         key=lambda a: a.end_ms, default=None)
+                    or prior is not max((a for a in activations
+                                         if a.board_id == destination.board_id
+                                         and a.end_ms <= destination.start_ms),
+                                        key=lambda a: a.end_ms, default=None)):
+                raise V2FrameError(f"return_board {action.action_id} has invalid activation lineage")
+            board_objects = {obj.object_id for obj in layout.objects
+                             if obj.board_id == destination.board_id}
+            if (set(action.expected_object_states) != board_objects
+                    or set(action.expected_object_state_versions) != board_objects
+                    or destination_board.expected_prior_state != action.expected_state):
+                raise V2FrameError(f"return_board {action.action_id} has incomplete board state")
+            states = {object_id: initial[object_id].state for object_id in board_objects}
+            versions = {object_id: initial[object_id].state_version for object_id in board_objects}
+            for earlier in timeline.actions:
+                if earlier is item:
+                    continue
+                previous = earlier.action
+                if previous.board_id != destination.board_id:
+                    continue
+                if (earlier.start_ms < item.start_ms
+                        and not any(activation.board_id == destination.board_id
+                                    and activation.start_ms <= earlier.start_ms
+                                    and earlier.end_ms <= activation.end_ms
+                                    for activation in activations)):
+                    raise V2FrameError(
+                        f"return_board {action.action_id} has an action outside its board activation"
+                    )
+                if (prior.end_ms <= earlier.start_ms < item.start_ms
+                        or earlier.start_ms < prior.end_ms < earlier.end_ms):
+                    raise V2FrameError(f"return_board {action.action_id} has off-board mutations")
+                if earlier.end_ms > prior.end_ms:
+                    continue
+                if isinstance(previous, (CameraAction, SoundAction)) or (
+                    isinstance(previous, EvidenceAction) and previous.verb == "return_board"
+                ):
+                    continue
+                if isinstance(previous, ReplaceAction):
+                    mutations = ((previous.from_object_id, "removed"),
+                                 (previous.to_object_id, previous.post_state))
+                elif isinstance(previous, ConnectionAction):
+                    mutations = ((previous.connector_id, previous.post_state),)
+                else:
+                    mutations = ((object_id, previous.post_state)
+                                 for object_id in _action_object_references(previous))
+                for object_id, state in mutations:
+                    if object_id in board_objects:
+                        states[object_id] = state
+                        versions[object_id] += 1
+            if (states != action.expected_object_states
+                    or versions != action.expected_object_state_versions):
+                raise V2FrameError(f"return_board {action.action_id} changes retained board state")
             continue
         if action.verb != "insert_evidence":
             raise UnsupportedVisualAction(
@@ -274,12 +365,6 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             for activation in layout.activations
         ):
             raise V2FrameError("evidence readable hold outlasts its destination board")
-    layout_objects = {item.object_id: item for item in layout.objects}
-    validate_static_hierarchy(layout)
-    state_objects = {item.object_id for item in timeline.initial_object_states}
-    if set(layout_objects) != state_objects:
-        raise V2FrameError("the resolved timeline must initialize every layout object exactly once")
-    initial = {item.object_id: item for item in timeline.initial_object_states}
     for treatment in layout.evidence_treatments:
         obj = layout_objects[treatment.object_id]
         chain = {obj.object_id, *_ancestor_ids(obj, layout_objects)}
@@ -819,7 +904,8 @@ def evaluate_frame(
         action = resolved.action
         supported = (
             isinstance(action, (TransformAction, ConnectionAction, CameraAction))
-            or isinstance(action, EvidenceAction) and action.verb == "insert_evidence"
+            or isinstance(action, EvidenceAction)
+            and action.verb in {"insert_evidence", "return_board"}
             or isinstance(action, ReplaceAction) and action.verb == "replace"
             or isinstance(action, TargetAction) and action.verb in {
                 "reveal", "write", "draw", "enter", "exit", "progressive_reveal", "highlight",
@@ -833,6 +919,8 @@ def evaluate_frame(
                 f"v2 action {action.action_id} uses {action.verb}, which has no frame implementation"
             )
         if isinstance(action, CameraAction):
+            continue
+        if isinstance(action, EvidenceAction) and action.verb == "return_board":
             continue
         if at_ms < resolved.start_ms:
             continue

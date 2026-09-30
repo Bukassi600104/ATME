@@ -190,7 +190,13 @@
       "evidence_asset_id": "asset-evidence",
       "destination_board_id": "board-main",
       "target_object_id": "object-evidence",
-      "destination_state": "evidence_visible"
+      "destination_state": "evidence_visible",
+      "source_board_id": null,
+      "source_activation_id": null,
+      "prior_destination_activation_id": null,
+      "destination_activation_id": null,
+      "expected_object_states": null,
+      "expected_object_state_versions": null
     }
   ],
   "beats": [

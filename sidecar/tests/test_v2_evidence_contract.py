@@ -5,6 +5,15 @@ from __future__ import annotations
 from copy import deepcopy
 
 import pytest
+from pydantic import ValidationError
+from test_visual_contracts_v2 import _store_v2_plan
+from v2_fixtures import (
+    digest,
+    executable_layout_v2,
+    resolved_timeline_v2,
+    visual_plan_v2,
+)
+
 from atme.project_service import ProjectError
 from atme.render.v2_state import UnsupportedVisualAction, V2FrameError, evaluate_frame
 from atme.render.v2_svg import compose_svg_frame
@@ -14,14 +23,6 @@ from atme.store.contracts_v2 import (
     VisualPlanV2,
     validate_plan_evidence_completeness,
     validate_plan_layout,
-)
-from pydantic import ValidationError
-from test_visual_contracts_v2 import _store_v2_plan
-from v2_fixtures import (
-    digest,
-    executable_layout_v2,
-    resolved_timeline_v2,
-    visual_plan_v2,
 )
 
 

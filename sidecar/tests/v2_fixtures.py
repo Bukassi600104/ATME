@@ -34,7 +34,10 @@ def visual_plan_v2(project_revision=3):
         {**common_action("action-3", "instruction-3"), "verb": "insert_evidence",
          "evidence_asset_id": "asset-evidence", "destination_board_id": "board-main",
          "target_object_id": "object-evidence", "post_state": "evidence_visible",
-         "destination_state": "evidence_visible"},
+         "destination_state": "evidence_visible", "source_board_id": None,
+         "source_activation_id": None, "prior_destination_activation_id": None,
+         "destination_activation_id": None, "expected_object_states": None,
+         "expected_object_state_versions": None},
     ]
     fallbacks = [{"fallback_id": f"fallback-{n}", "affected_ids": [f"instruction-{n}"],
                   "reason_code": "asset_or_timing_failure", "degradation_class": "none",

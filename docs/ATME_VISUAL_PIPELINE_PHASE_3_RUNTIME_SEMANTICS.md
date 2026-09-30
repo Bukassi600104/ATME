@@ -376,17 +376,33 @@ same-board visual action during insertion/hold. World-size, minimum focus size,
 retained camera framing, and rectangular mask/clip containment are checked
 before frames can be returned. Rotation without declared evidence permission
 is rejected throughout the resolved timeline. Mask apertures that are not
-axis-aligned rectangles remain unsupported for evidence. `return_board` is
-still rejected; it needs explicit source-board, activation, and developed-state
-provenance rather than an inferred transition. This is only the pure source
-SVG/PNG path, not installed-app preview/export or MCP production routing.
+axis-aligned rectangles remain unsupported for evidence. This is only the pure
+source SVG/PNG path, not installed-app preview/export or MCP production routing.
+
+## Bounded board return continuity
+
+`return_board` is a cut at the start of an authored destination-board activation.
+It does not recreate, reset, or synthesize board objects. Its contract names the
+immediately preceding source activation and board, the most recent prior
+activation of the destination board, and the destination activation. It also
+declares the complete destination-board object-state and state-version snapshot
+as it stood when that prior activation ended. The runtime recomputes that
+snapshot from initial states and completed state-bearing actions; a mismatch,
+missing board object, stale version, off-board action, wrong activation lineage,
+or non-step return fails before a frame is produced. A return after an activation
+gap is valid, as is A→B→A. The destination board's prior semantic state and
+developed-return state must match the plan's board/beat continuity declarations.
+Subsequent authored actions may further develop the returned board. Older 2.0.0
+return actions without this provenance remain parseable but non-executable.
+This does not itself complete the claim-to-evidence-to-developed-abstraction
+golden cycle, nor does it enable installed preview/export.
 
 ## Still to define and implement before Phase 3 exit
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be
 fixed before their first runtime implementation: `morph`, `annotate`,
 `group`, `ungroup`, `split`, `count`,
-`return_board`, and sound state/events. `insert_evidence` has only the bounded
+sound state/events. `insert_evidence` and `return_board` have only the bounded
 semantics above. In particular,
 the contract needs explicit rules for morph compatibility, dynamic group ownership, split result
 mapping, isolate restoration, and ordered progressive disclosure. Audible mixing remains Phase 7;

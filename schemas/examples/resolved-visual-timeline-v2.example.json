@@ -5,10 +5,10 @@
   "project_revision": 5,
   "plan_id": "plan-rich",
   "plan_revision": 4,
-  "plan_sha256": "755c32b949e0d00ca7bd92b3ad21925aaaab69443906dd824c5a48537927861d",
+  "plan_sha256": "ed4654c09da37233741e2e136e1dbd7d755381298b7d0cbdef77181d25700eb5",
   "layout_id": "layout-rich",
   "layout_revision": 5,
-  "layout_sha256": "1246c9ed04b31d118a01090b1fc238dc94bdf3182dc3f91696d3ac0eb01988cc",
+  "layout_sha256": "0a1649e9116170669eb02bc7b5a6389e4cca42419ed02f202c7726568a9e4fc1",
   "cleaned_timeline_revision": 2,
   "cleaned_timeline_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "output_profile": {
@@ -242,7 +242,13 @@
         "evidence_asset_id": "asset-evidence",
         "destination_board_id": "board-main",
         "target_object_id": "object-evidence",
-        "destination_state": "evidence_visible"
+        "destination_state": "evidence_visible",
+        "source_board_id": null,
+        "source_activation_id": null,
+        "prior_destination_activation_id": null,
+        "destination_activation_id": null,
+        "expected_object_states": null,
+        "expected_object_state_versions": null
       },
       "start_ms": 4000,
       "end_ms": 4900,

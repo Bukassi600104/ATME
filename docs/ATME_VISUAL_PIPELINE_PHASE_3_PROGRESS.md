@@ -1,6 +1,6 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3U and bounded 3V contract/ingestion stages independent PASS;
+Status: Slices 3A–3U and bounded 3V/3W stages independent PASS;
 Phase 3 remains incomplete
 
 Date: 2026-09-30
@@ -22,6 +22,15 @@ Date: 2026-09-30
 
 ## Incomplete Phase 3 gates
 
+- Slice 3W adds an explicit source/prior/destination activation lineage and
+  complete retained object-state/version snapshot for `return_board`. New plan
+  writes and plan/layout pairing require this declaration; older incomplete
+  `2.0.0` documents still parse but cannot execute. The pure frame runtime
+  validates the snapshot and cuts to the reactivated board without recreating
+  objects; A→B→A and same-board activation-gap returns are covered. This is
+  bounded continuity mechanics, not the full evidence-to-developed-abstraction
+  golden cycle, installed preview/export, or final Phase 3 acceptance. Its
+  bounded independent re-audit passed; broader regression is being completed.
 - Slice 3V now preserves evidence-treatment intent in the v2 contract and has
   source-only evidence PNG ingestion and a separate immutable-byte resolver.
   The latter accepts only project-owned evidence assets with declared external
@@ -39,13 +48,13 @@ Date: 2026-09-30
   ancestors, sufficient on-screen size and focus, camera containment, and
   a non-clipping rectangular mask/clip if declared. Undeclared rotation is
   rejected across the full timeline. Other mask shapes and annotation targets
-  remain fail-closed for evidence. `return_board` remains fail-closed until
-  source-board/activation provenance and developed-state semantics are explicit.
+  remain fail-closed for evidence. Slice 3V did not execute `return_board`;
+  Slice 3W now requires explicit source/prior/destination activation lineage,
+  returnability policy, and a complete retained-state/version snapshot.
   Old incomplete 2.0.0 evidence remains loadable but non-executable. This
   compositor stage passed `pytest -q sidecar/tests -k v2 -x`, the full
   `pytest -q sidecar/tests -x` regression, and Ruff on changed Python files.
-  The final independent re-audit remains open because the auditor's retry hit
-  its usage limit. This slice has not been packaged into the installed sidecar, exposed via MCP,
+  Its bounded independent re-audit has since passed. This slice has not been packaged into the installed sidecar, exposed via MCP,
   or connected to desktop preview/export. Do not route 3U supporting images
   through the evidence trust path.
 - Slice 3U adds a bounded project-owned PNG render path. The project service

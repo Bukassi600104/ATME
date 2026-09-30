@@ -9,6 +9,14 @@ import re
 from copy import deepcopy
 
 import pytest
+from PIL import Image
+from v2_fixtures import (
+    digest,
+    executable_layout_v2,
+    resolved_timeline_v2,
+    visual_plan_v2,
+)
+
 from atme.project_service import ProjectService
 from atme.render.v2_state import V2FrameError, evaluate_frame
 from atme.render.v2_svg import (
@@ -18,13 +26,6 @@ from atme.render.v2_svg import (
 )
 from atme.store.contracts_v2 import ExecutableLayoutV2, ResolvedVisualTimelineV2
 from atme.store.db import JobStore
-from PIL import Image
-from v2_fixtures import (
-    digest,
-    executable_layout_v2,
-    resolved_timeline_v2,
-    visual_plan_v2,
-)
 
 
 def evidence_documents(tmp_path, *, crop=None, focus=None, darkening=None,
