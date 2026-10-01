@@ -1,9 +1,9 @@
 # Phase 3 — renderer and action runtime progress
 
-Status: Slices 3A–3U and bounded 3V/3W stages independent PASS;
+Status: Slices 3A–3U and bounded 3V/3W/3X stages independent PASS;
 Phase 3 remains incomplete
 
-Date: 2026-09-30
+Date: 2026-10-01
 
 ## Delivered in Slice 3A
 
@@ -22,6 +22,22 @@ Date: 2026-09-30
 
 ## Incomplete Phase 3 gates
 
+- Slice 3X adds an immutable stored `resolved_timeline` artifact with exact
+  plan/layout revision and hash, cleaned source-timeline, profile, style,
+  registry, authored-action, coverage, fallback, asset, and compilation-
+  fingerprint binding. Duplicates rebind ordinary project-asset references to
+  the copied project while retaining evidence-origin references. A private
+  source-only runner method composes stored-project frames from verified
+  project-owned image/evidence bytes using the same v2 compositor tested by
+  direct frame evaluation. It is a parity and integrity harness, not the
+  public project preview: MCP/HTTP project preview and export continue to
+  reject v2, renderer capabilities remain v1-only, and no installed desktop
+  rebuild is claimed. The resolved timeline is not yet exposed as a writable
+  MCP artifact; the Phase 4 deterministic compiler and full Phase 3 runtime
+  gate must precede production routing.
+  The independent source-only re-audit passed after rejecting raster objects
+  without a nonblank asset ID and requiring every referenced image/evidence
+  asset in the resolved inventory. Fifteen direct stored-project tests passed.
 - Slice 3W adds an explicit source/prior/destination activation lineage and
   complete retained object-state/version snapshot for `return_board`. New plan
   writes and plan/layout pairing require this declaration; older incomplete
@@ -214,8 +230,8 @@ Date: 2026-09-30
 - No audio events are produced by the kernel. The full 35-type primitive/container
   compositor, asset/media resolution, remaining canonical action verbs, camera/board composition,
   and real project preview/export dispatcher are still required.
-- The current application continues to report renderer v1 and rejects v2 layouts for project
-  preview/export. No installed desktop rebuild is claimed.
+- The current application continues to report renderer v1 and rejects v2 layouts for public
+  project preview/export. The Slice 3X source-only method does not alter this gate.
 - Real-project preview/export parity, frozen/offline execution, and representative production
   acceptance remain outstanding; proof-render parity from Phase 2 is not a substitute.
 
@@ -353,6 +369,12 @@ Date: 2026-09-30
   rejection, and fail-closed mask rendering. Thirty-three direct contract
   cases and Ruff passed. Mask composition was added in Slice 3S;
   this is not full Phase 3 or installed-app acceptance.
+- Slice 3X: independent bounded source-only audit PASS after exact resolved-
+  timeline persistence, verified project raster composition, duplicate-project
+  asset rebinding, and nonblank raster-asset enforcement. Fifteen direct
+  stored-project tests, the finalized v2-selected suite, Ruff, and the full
+  sidecar regression against finalized Slice 3X files passed with exit code 0.
+  Public preview/export and installed-app acceptance remain closed.
 - Independent Slice 3A decision: PASS. The auditor repeated the focused and v2-contract tests,
   Ruff, non-finite rejection, exact-boundary and chained-state checks, and confirmed that no v2
   production capability is falsely advertised.

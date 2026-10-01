@@ -26,6 +26,11 @@ This ledger is the phase gate. A requirement remains incomplete until its contra
 | R-14 | Deterministic SFX, music state, purposeful silence, transition punctuation, and narration priority | Existing audio path handles narration/media, not the complete editorial sound model | sound-event schema; mix fixtures; offline render; narration intelligibility checks | 7 | Missing |
 | R-15 | Contract, compiler, renderer, visual, parity, offline, migration, performance, installed-app, and human acceptance tests | Existing suite has strong mechanical coverage but no complete rich-production golden corpus | golden project corpus; installed acceptance report; visual diffs; full requirement sign-off | 0–12 | Partial |
 
+Slice 3X adds immutable resolved-timeline persistence and a private, verified
+stored-project v2 frame-parity harness. It does not satisfy R-13's production
+compiler or R-15's public preview/export and installed-app acceptance gates;
+MCP timeline authoring and renderer-v2 capability remain unavailable.
+
 ## Required golden workflows
 
 1. Approved script plus recording.

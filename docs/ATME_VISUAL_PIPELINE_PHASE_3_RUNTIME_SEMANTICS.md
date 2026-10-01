@@ -411,3 +411,6 @@ Phase 3 must at least expose deterministic sound events at the correct resolved 
 No v2 layout may be routed to project preview or export until the full primitive/action matrix,
 asset integrity, board/camera behavior, real-project preview/export parity, and frozen/offline
 regressions pass. The existing v1 renderer and Caleb-derived behavior remain unchanged.
+Slice 3X's `preview_v2_source` is a private source-level integration verifier for an exact
+stored layout/resolved-timeline pair. It does not change the public preview dispatcher,
+advertised renderer capability, installed desktop behavior, or export availability.
