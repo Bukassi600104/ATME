@@ -70,7 +70,11 @@ preview/export parity, compiler, or installed acceptance gates.
   sibling ordinals. This is fixed with separate authored-layer preservation and
   direct SVG snapshot-order tests. The layer/replay/morph/replacement suite passed
   155 cases; adjacent consumers passed 218; current hierarchy/ownership/replay
-  tests passed 119 and Ruff is clean. A fresh finalized full run remains required.
+  tests passed 119 and Ruff is clean. The finalized combined hierarchy/ownership/
+  replay/morph/replacement/visual-contract run passed 275 tests in 132.32 seconds,
+  with clean Ruff; all retained offline annotation pixel hashes remain identical.
+  The fresh full run against source `965d27c` is running, not yet confirmed PASS
+  (`test-artifacts/phase-3aa-final-full-sidecar.log`).
   Actual group/ungroup playback, returns and compositor acceptance remain open.
 
 - Slice 3Z adds an optional explicit annotation policy to `TargetAction`, preserving

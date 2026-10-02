@@ -147,7 +147,12 @@ and an opposed-layer/sibling SVG regression lock both meanings separately.
 The layer/replay/morph/replacement run passed 155 tests; adjacent renderer
 consumers passed 218. The updated hierarchy/ownership/replay set passed 119
 tests and Ruff. Independent bounded audits passed the replay, layer separation,
-and ownership boundary; the updated full suite is still required. No standalone
+and ownership boundary. The finalized combined hierarchy/ownership/replay/
+morph/replacement/visual-contract suite passed 275 tests in 132.32 seconds, with
+clean Ruff. Re-running the ten offline annotation frames and contact sheet
+preserved every retained byte hash. A fresh full run against source commit
+`965d27c` is running (`test-artifacts/phase-3aa-final-full-sidecar.log`); it is not
+yet a PASS. No standalone
 step or accepted schema implies chronological frame execution, installed preview,
 public export, or Phase 3 completion.
 
