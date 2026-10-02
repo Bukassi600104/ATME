@@ -45,11 +45,14 @@ production routing, or R-15's installed/public-preview/export quality acceptance
 
 Slice 3AA adds an audited immutable topology/world/scope foundation, shared static
 frame/camera/SVG hierarchy consumers, and initial complete authored group/ungroup
-receipt schemas with plan/layout checks. This advances R-01/R-02/R-08/R-10/R-13
-without claiming transition execution: resolved source binding, initial empty-shell
-ownership, dynamic replay/conflicts, retained-board hierarchy, and production
+receipt schemas with plan/layout checks, standalone step replay, owned initial
+empty-shell and initial resolved hierarchy receipts. This advances
+R-01/R-02/R-08/R-10/R-13 without claiming transition execution: chronological
+resolved source binding, dynamic replay/conflicts, retained-board hierarchy, and production
 parity remain incomplete. The auditor's failed scope/consumer cases now have
-regression tests. The full updated sidecar run remains required.
+regression tests. The first full updated run failed due to authored-layer/sibling
+ordinal conflation; that defect is fixed with both layer-preservation and explicit
+opposed-order SVG tests. A fresh finalized full sidecar run remains required.
 
 Slice 3Z advances R-02/R-08/R-10/R-11 with authored general annotation:
 exact action/beat-owned hidden leaves, ordered weighted construction, bound

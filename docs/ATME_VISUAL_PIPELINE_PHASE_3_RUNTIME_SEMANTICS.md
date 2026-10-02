@@ -228,8 +228,10 @@ Slice 3O permits authored `group` containers as non-painting stacking contexts.
 Object geometry remains in board/canvas coordinates. A child's own transform is
 applied around its authored bounds, then each ancestor group's transform is
 applied around that group's authored bounds, from immediate parent outward.
-Root objects sort by `(z_index, object_id)`; children of each group sort by the
-same key locally. A group subtree paints contiguously and cannot interleave
+Initial root/child order derives from `(z_index, object_id)` locally. The shared
+hierarchy stores unique sibling ordinals, and SVG uses those ordinals directly.
+Authored `z_index` remains unchanged: replacement/morph objects may share a
+layer even though their sibling positions differ. A group subtree paints contiguously and cannot interleave
 with an external sibling. Every child paints exactly once. Parent visibility
 gates all descendants; nested group opacity multiplies descendant visual
 opacity. Group position, scale, rotation, and fade use the existing ordinary
@@ -439,8 +441,9 @@ fixed before their first runtime implementation:
 `group`, `ungroup`, `split`, `count`,
 sound state/events. `insert_evidence` and `return_board` have only the bounded
 semantics above. In particular,
-the contract still needs explicit rules for dynamic group ownership, split result
-mapping, isolate restoration, and ordered progressive disclosure. Audible mixing remains Phase 7;
+dynamic group ownership/initial receipts and standalone replay are now defined
+below, but chronological execution remains required. Split result mapping and
+non-list progressive disclosure still need executable contracts. Audible mixing remains Phase 7;
 Phase 3 must at least expose deterministic sound events at the correct resolved times.
 
 No v2 layout may be routed to project preview or export until the full primitive/action matrix,
@@ -489,3 +492,30 @@ tested; public preview/export, compiler integration and installed acceptance are
 still closed. The bounded independent runtime re-audit passed, including actual
 offline frames and public v1 preview isolation. Full 3Z regression passed:
 980 passed, 5 preexisting Windows symlink skips, exit code 0 in 1340.67 seconds.
+
+## Bounded 3AA owned hierarchy and standalone step replay
+
+Initial empty groups must be visible, opaque, nonpainting and `ungrouped`, with
+one layout ownership row binding the real first group action and its exact full
+source-basis hash. Empty clips/masks and orphan/duplicate/swapped owners reject.
+Plan pairing binds action, shell and empty source membership; resolved pairing
+requires that owner to be the earliest completion on that shell. This is not a
+global earliest-action rule and does not prohibit prior unrelated work.
+
+Resolved policy-bearing hierarchy actions require the exact initial layout
+parent/order/local-transform basis plus canonical hash. The shared project/frame
+preflight validates that identity. A basis with no GroupAction is allowed as
+pair-validated structural provenance for static/return continuity, not executable
+data that may be ignored. Absent receipts preserve the legacy serialized shape.
+Group expected/post state affects the shell only, never the members' semantic
+strings. The standalone replay kernel binds the current completed source basis,
+applies only authored root locals and shell state, and increments every declared
+structural version. Hidden staged descendants retain their exact paint/state.
+Moved connector closures reject at plan/layout validation pending faithful
+inverse-parent connector semantics.
+
+The kernel is not imported into frame execution. Remaining: chronological
+action-boundary source proof and overlap/lifetime guards, dynamic FrameSnapshot
+routing and reseeking, camera/annotation/connector consumers, board-return
+hierarchy receipts, stored SVG/PNG integration and public/installed acceptance.
+Group/ungroup/split remain rejected by the current frame evaluator.

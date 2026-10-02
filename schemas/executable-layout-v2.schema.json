@@ -320,7 +320,6 @@
           "items": {
             "type": "string"
           },
-          "minItems": 1,
           "title": "Child Ids",
           "type": "array"
         },
@@ -893,7 +892,6 @@
           "items": {
             "type": "string"
           },
-          "minItems": 1,
           "title": "Child Ids",
           "type": "array"
         },
@@ -919,6 +917,33 @@
         "object_type"
       ],
       "title": "GroupContainer",
+      "type": "object"
+    },
+    "InitialEmptyGroupOwnership": {
+      "additionalProperties": false,
+      "properties": {
+        "shell_object_id": {
+          "minLength": 1,
+          "title": "Shell Object Id",
+          "type": "string"
+        },
+        "owner_group_action_id": {
+          "minLength": 1,
+          "title": "Owner Group Action Id",
+          "type": "string"
+        },
+        "owner_source_basis_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Owner Source Basis Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "shell_object_id",
+        "owner_group_action_id",
+        "owner_source_basis_sha256"
+      ],
+      "title": "InitialEmptyGroupOwnership",
       "type": "object"
     },
     "MarkObject": {
@@ -1237,7 +1262,6 @@
           "items": {
             "type": "string"
           },
-          "minItems": 1,
           "title": "Child Ids",
           "type": "array"
         },
@@ -2000,6 +2024,13 @@
         "$ref": "#/$defs/EvidenceTreatment"
       },
       "title": "Evidence Treatments",
+      "type": "array"
+    },
+    "initial_empty_group_ownership": {
+      "items": {
+        "$ref": "#/$defs/InitialEmptyGroupOwnership"
+      },
+      "title": "Initial Empty Group Ownership",
       "type": "array"
     }
   },

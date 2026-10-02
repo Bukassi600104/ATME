@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from atme.render.v2_world import world_bounds, world_matrix
 from atme.store.contracts_v2 import (
+    ConnectorObject,
     ContainerObject,
     GroupAction,
     MaskContainer,
@@ -101,12 +102,17 @@ class HierarchySnapshot:
             raise UnsupportedHierarchy("hierarchy sibling ordinals must be a complete unique permutation")
 
     def object_map(self, objects: dict) -> dict:
-        """Make transient geometry/paint objects without mutating stored layout."""
+        """Project ownership without changing authored layers or stored layout.
+
+        A sibling ordinal is unique paint order, not an authored layer: two
+        replacement/morph objects may intentionally share their z_index.
+        Paint consumers must read snapshot order instead of changing that layer.
+        """
         self.validate(objects)
         result = {}
         for node in self.nodes:
             obj = objects[node.object_id]
-            updates = {"parent_id": node.parent_id, "z_index": node.sibling_ordinal}
+            updates = {"parent_id": node.parent_id}
             if isinstance(obj, ContainerObject):
                 updates["child_ids"] = list(self.children(node.board_id, node.object_id))
             result[node.object_id] = obj.model_copy(update=updates, deep=True)
@@ -235,9 +241,11 @@ def validate_authored_hierarchy(action: GroupAction, objects: dict) -> tuple[Hie
             or any((shell.style.stroke, shell.style.fill, shell.style.text, shell.style.effect))):
         raise UnsupportedHierarchy("hierarchy shell must be a visible opaque nonpainting group")
     for snapshot in (before, after):
-        for object_id in objects:
+        for object_id, obj in objects.items():
             ancestors = set(snapshot.ancestors(object_id))
             if object_id in moved_roots or ancestors.intersection(moved_roots):
+                if isinstance(obj, ConnectorObject):
+                    raise UnsupportedHierarchy("hierarchy step cannot reparent a connector without inverse-parent semantics")
                 dependencies = {object_id, *ancestors, action.container_id}
                 if any(objects[key].object_type in {"clip", "mask", "evidence"}
                        or objects[key].clip_id is not None for key in dependencies):

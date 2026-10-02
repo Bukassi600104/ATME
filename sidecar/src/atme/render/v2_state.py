@@ -61,6 +61,7 @@ from atme.store.contracts_v2 import (
     _require_morph_contract,
     _require_return_board_policy,
     _require_return_contract,
+    validate_resolved_hierarchy,
 )
 
 
@@ -260,6 +261,10 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             or layout.asset_registry_version != timeline.asset_registry_version
             or layout.evidence_treatments != timeline.evidence_treatments):
         raise V2FrameError("resolved timeline and executable layout do not describe the same composition")
+    try:
+        validate_resolved_hierarchy(layout, timeline)
+    except ValueError as exc:
+        raise V2FrameError(str(exc)) from exc
     resolved_actions = {item.action.action_id: item for item in timeline.actions}
     treatments_by_action = {item.action_id: item for item in layout.evidence_treatments}
     layout_objects = hierarchy.object_map({item.object_id: item for item in layout.objects})

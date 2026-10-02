@@ -132,6 +132,13 @@ Exit: every R-01–R-15 item passes; no unresolved P0/P1 item remains; preview/e
 
 ## Phase gate protocol
 
+Phase 3AA checkpoint (2026-10-02): shared hierarchy, standalone authored replay,
+empty-shell ownership and initial resolved receipts have bounded verification.
+The first full updated run exposed a repaired layer/order projection regression;
+the finalized full rerun remains required. Dynamic grouping playback, compiler
+integration and all remaining Phase 3/4–12 requirements are still open. See the
+Phase 3 hierarchy design, remaining matrix and R-01–R-15 ledger for scope.
+
 For every phase the implementer records requirements claimed complete, modules changed, schema/migration effects, tests, generated fixtures, preview/export comparisons, and limitations. The independent auditor then inspects the actual artifacts and assigns Pass, Partial, Fail, or Regression.
 
 - Any P0 failure stops dependent work.

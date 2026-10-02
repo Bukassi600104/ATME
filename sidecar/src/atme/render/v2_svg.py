@@ -874,8 +874,9 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     children: dict[str | None, list] = {}
     for obj in objects.values():
         children.setdefault(obj.parent_id, []).append(obj)
+    paint_ordinals = {node.object_id: node.sibling_ordinal for node in snapshot.hierarchy.nodes}
     for siblings in children.values():
-        siblings.sort(key=lambda item: (item.z_index, item.object_id))
+        siblings.sort(key=lambda item: paint_ordinals[item.object_id])
     for state in snapshot.objects:
         obj = objects[state.object_id]
         if isinstance(obj, ContainerObject) and obj.object_type == "clip":

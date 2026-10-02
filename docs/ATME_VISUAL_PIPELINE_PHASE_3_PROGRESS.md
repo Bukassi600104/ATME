@@ -57,9 +57,21 @@ preview/export parity, compiler, or installed acceptance gates.
   remained unchanged. The added paint-order negative passed in the separate
   23/23 contract suite. Independent bounded re-audit passed static consumers
   and this initial receipt-contract stage (130 independently rerun consumer
-  tests and clean Ruff). Updated full 3AA sidecar regression remains required.
-  Resolved-boundary source binding, owned initial empty shells,
-  actual group/ungroup execution, returns and compositor acceptance remain open.
+  tests and clean Ruff). Standalone authored step replay and initial empty-shell
+  ownership/initial resolved basis contracts now have bounded independent audits.
+  Replay preserves hidden staged descendants, applies only authored root local
+  transforms and shell semantic state, and accounts for every structural version.
+  Ownership binds exact action/hash and per-shell earliest completion; the shared
+  project/frame gate validates initial layout parent/order/transform identity.
+  Group/ungroup remain non-executable in frame evaluation until chronological
+  source binding, conflicts, dynamic consumers and returns are complete.
+  The first updated full run failed (45 failed, 997 passed, five preexisting
+  symlink skips); projection had incorrectly replaced authored layers with dense
+  sibling ordinals. This is fixed with separate authored-layer preservation and
+  direct SVG snapshot-order tests. The layer/replay/morph/replacement suite passed
+  155 cases; adjacent consumers passed 218; current hierarchy/ownership/replay
+  tests passed 119 and Ruff is clean. A fresh finalized full run remains required.
+  Actual group/ungroup playback, returns and compositor acceptance remain open.
 
 - Slice 3Z adds an optional explicit annotation policy to `TargetAction`, preserving
   legacy no-policy serialization. New plan writes require authored hidden text/

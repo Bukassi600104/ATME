@@ -2,9 +2,10 @@
 
 Date: 2026-10-02
 
-Status: shared immutable topology foundation audited; static consumer integration
-and initial complete receipt contract implemented and bounded re-audit PASS. Transition
-action execution, empty-shell ownership, continuity and acceptance are not complete.
+Status: shared immutable topology/static consumers, complete transition receipts,
+standalone step replay, owned initial empty shells and initial resolved receipts
+implemented with bounded independent audits. Chronological action execution,
+dynamic consumers, continuity and production acceptance are not complete.
 This is not a replacement for the approved rebuild or the remaining runtime
 matrix. Group/ungroup remain non-executable until the whole path is verified.
 
@@ -81,8 +82,8 @@ The semantic-plan container check no longer mistakes a semantic declaration for
 an executable ContainerObject.
 
 Still required before execution: resolved-boundary source-basis equality with
-CURRENT completed transforms, unique ownership receipts for initial empty shells,
-chronological transition replay, action-aware camera/conflict handling, retained
+CURRENT completed transforms through chronological transition replay,
+action-aware camera/conflict handling, retained
 board parent/order expectations, and integrated preview/export parity. The new
 schema data and pure validators do not claim those gates complete. Split remains
 separate; the grouping policy rejects a split action rather than ignoring it.
@@ -110,6 +111,45 @@ frames and contact sheet produced byte-for-byte identical hashes. The independen
 auditor reran 130 consumer tests and Ruff and passed static consumer wiring and
 the initial receipt stage, not dynamic group execution. The full updated 3AA
 sidecar regression remains required; the earlier 980-test run proves 3Z only.
+
+### Replay and ownership contract follow-through
+
+The standalone `v2_hierarchy_replay.py` applies exact authored member-root local
+transforms, changes only the shell's semantic state, and increments the complete
+structural version closure. Its input frames, layout and receipts remain immutable.
+Readiness applies to member roots and their ancestor chains, not every descendant:
+hidden staged leaves preserve their state, paint and local transforms while their
+structural versions advance. Invalid numeric frame paint/transform data rejects.
+Translated/rotated/scaled multi-root grouping and nested-parent ungrouping have
+explicit authored compensation tests. Moved connector subtrees reject already at
+plan/layout validation, until inverse-parent connector semantics exist.
+
+Layout `initial_empty_group_ownership` binds each initially empty group to its
+real group action and exact source-basis hash. Empty clips/masks, orphan shells,
+duplicate owners and nonpainting/visibility/state violations reject. Plan binding
+and resolved per-shell earliest-completion checks reject swapped/later owners.
+Resolved `initial_hierarchy_basis` and its hash preserve exact layout parents,
+sibling ordinals and local transforms; both stored-project and direct frame
+preflight validate them. Policy-bearing GroupActions require the receipt and
+change only shell semantic state, leaving heterogeneous member states intact.
+Absent additive fields are omitted, preserving pre-change model dump hashes.
+A valid initial basis without a hierarchy action is allowed as explicit static
+hierarchy provenance; it is still pair-validated, never ignored. An owner's later
+complete source basis may differ from initial after authored prior actions;
+chronological replay, not a static equality shortcut, must prove that boundary.
+
+The first full 3AA run at `7ea4d0b` failed: 45 failed, 997 passed, five preexisting
+Windows symlink skips, in 1325.44 seconds. Every failure traced to projection
+overwriting shared authored `z_index` with unique sibling ordinals, breaking
+replacement/morph layer identity. The fix preserves authored layers and makes
+SVG use snapshot sibling ordinals directly. A reproduced layer-identity failure
+and an opposed-layer/sibling SVG regression lock both meanings separately.
+The layer/replay/morph/replacement run passed 155 tests; adjacent renderer
+consumers passed 218. The updated hierarchy/ownership/replay set passed 119
+tests and Ruff. Independent bounded audits passed the replay, layer separation,
+and ownership boundary; the updated full suite is still required. No standalone
+step or accepted schema implies chronological frame execution, installed preview,
+public export, or Phase 3 completion.
 
 ## Required acceptance
 

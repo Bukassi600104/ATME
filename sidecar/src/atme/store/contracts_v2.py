@@ -194,7 +194,9 @@ class VisualObject(ObjectBase):
 
 
 class ContainerObject(ObjectBase):
-    child_ids: list[str] = Field(min_length=1)
+    # Initial empty groups need an explicit owner receipt on the layout.
+    # Clip/mask/composition emptiness remains invalid at the scene-graph gate.
+    child_ids: list[str]
 
 
 class GroupContainer(ContainerObject):
@@ -1100,6 +1102,12 @@ class BoardActivation(StrictModel):
         return self
 
 
+class InitialEmptyGroupOwnership(StrictModel):
+    shell_object_id: str = Field(min_length=1)
+    owner_group_action_id: str = Field(min_length=1)
+    owner_source_basis_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
 class ExecutableLayoutV2(StrictModel):
     contract_version: Literal["2.0.0"]
     layout_id: str
@@ -1116,6 +1124,14 @@ class ExecutableLayoutV2(StrictModel):
     objects: list[ExecutableObject] = Field(min_length=1)
     activations: list[BoardActivation] = Field(min_length=1)
     evidence_treatments: list[EvidenceTreatment] = Field(default_factory=list)
+    initial_empty_group_ownership: list[InitialEmptyGroupOwnership] = Field(default_factory=list)
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_hierarchy_shape(self, handler):
+        result = handler(self)
+        if not self.initial_empty_group_ownership:
+            result.pop("initial_empty_group_ownership", None)
+        return result
 
     @model_validator(mode="after")
     def validate_scene_graph(self):
@@ -1126,6 +1142,19 @@ class ExecutableLayoutV2(StrictModel):
         _unique(self.boards, "board_id"); _unique(self.objects, "object_id"); _unique(self.activations, "activation_id")
         board_ids = {x.board_id for x in self.boards}; object_ids = {x.object_id for x in self.objects}
         object_map = {x.object_id: x for x in self.objects}
+        _unique(self.initial_empty_group_ownership, "shell_object_id")
+        _unique(self.initial_empty_group_ownership, "owner_group_action_id")
+        empty_containers = {obj.object_id: obj for obj in self.objects
+                            if isinstance(obj, ContainerObject) and not obj.child_ids}
+        if set(empty_containers) != {row.shell_object_id for row in self.initial_empty_group_ownership}:
+            raise ValueError("every initial empty group needs exactly one ownership receipt; nonempty objects cannot have one")
+        for shell in empty_containers.values():
+            if (shell.object_type != "group" or not shell.visible or shell.opacity != 1
+                    or shell.initial_state != "ungrouped" or shell.asset_id is not None
+                    or shell.anchors or shell.geometry.points or shell.geometry.corner_radius is not None
+                    or shell.clip_id is not None
+                    or any((shell.style.stroke, shell.style.fill, shell.style.text, shell.style.effect))):
+                raise ValueError("initial empty shell must be a visible opaque nonpainting ungrouped group")
         mask_sources = {obj.mask_source_object_id for obj in self.objects
                         if isinstance(obj, MaskContainer) and obj.mask_source_object_id is not None}
         for board in self.boards:
@@ -1329,6 +1358,16 @@ class ResolvedVisualTimelineV2(StrictModel):
     coverage: list[CoverageRecord] = Field(min_length=1)
     fallbacks: list[FallbackRecord]
     validation: ValidationState
+    initial_hierarchy_basis: HierarchyBasis | None = None
+    initial_hierarchy_basis_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_hierarchy_shape(self, handler):
+        result = handler(self)
+        for field in ("initial_hierarchy_basis", "initial_hierarchy_basis_sha256"):
+            if getattr(self, field) is None:
+                result.pop(field, None)
+        return result
 
     @model_validator(mode="after")
     def validate_timeline(self):
@@ -1347,6 +1386,24 @@ class ResolvedVisualTimelineV2(StrictModel):
         action_ids = []
         previous = 0
         states = {item.object_id: item.state for item in self.initial_object_states}
+        hierarchy_actions = [item.action for item in self.actions
+                             if isinstance(item.action, GroupAction) and item.action.hierarchy_policy is not None]
+        if (self.initial_hierarchy_basis is None) != (self.initial_hierarchy_basis_sha256 is None):
+            raise ValueError("initial hierarchy basis and hash must be supplied together")
+        if hierarchy_actions and self.initial_hierarchy_basis is None:
+            raise ValueError("authored hierarchy actions require an explicit initial hierarchy basis")
+        if self.initial_hierarchy_basis is not None:
+            initial_placements = {item.object_id: item for item in self.initial_hierarchy_basis.placements}
+            if (initial_placements.keys() != states.keys()
+                    or self.initial_hierarchy_basis.checksum() != self.initial_hierarchy_basis_sha256):
+                raise ValueError("initial hierarchy receipt must cover the exact object inventory and canonical hash")
+            for action in hierarchy_actions:
+                for basis in (action.hierarchy_policy.source_basis, action.hierarchy_policy.destination_basis):
+                    if (len(basis.placements) != len(initial_placements)
+                            or any(item.object_id not in initial_placements
+                                   or item.board_id != initial_placements[item.object_id].board_id
+                                   for item in basis.placements)):
+                        raise ValueError("hierarchy actions must preserve initial object and board inventory")
         resolved_actions: dict[str, ResolvedAction] = {}
         for resolved in self.actions:
             action_ids.append(resolved.action.action_id)
@@ -1412,6 +1469,8 @@ class ResolvedVisualTimelineV2(StrictModel):
             # A camera observes objects; it does not mutate their semantic state.
             state_targets = ([] if isinstance(action, CameraAction)
                              else [action.connector_id] if isinstance(action, ConnectionAction)
+                             else [action.container_id] if isinstance(action, GroupAction)
+                             and action.hierarchy_policy is not None
                              else targets)
             for target in state_targets:
                 if action.expected_state is not None and states[target] != action.expected_state:
@@ -1548,6 +1607,15 @@ def validate_plan_layout(plan_document: dict, layout_document: dict) -> None:
         if candidate.model_dump(mode="json") != board.model_dump(mode="json"):
             raise ValueError(f"layout board {board_id} changes its directing declaration")
     activations = {item.activation_id: item for item in layout.activations}
+    plan_actions = {item.action_id: item for item in plan.actions}
+    for owner in layout.initial_empty_group_ownership:
+        action = plan_actions.get(owner.owner_group_action_id)
+        if (not isinstance(action, GroupAction) or action.verb != "group"
+                or action.container_id != owner.shell_object_id or action.hierarchy_policy is None
+                or action.hierarchy_policy.source_basis_sha256 != owner.owner_source_basis_sha256
+                or any(item.parent_id == owner.shell_object_id
+                       for item in action.hierarchy_policy.source_basis.placements)):
+            raise ValueError("empty group ownership must bind its actual group action and empty source-basis hash")
     for action in plan.actions:
         if isinstance(action, GroupAction) and action.verb in {"group", "ungroup"}:
             from atme.render.v2_hierarchy import validate_authored_hierarchy
@@ -1706,6 +1774,37 @@ def validate_resolved_structure(plan: VisualPlanV2, layout: ExecutableLayoutV2,
         raise ValueError("resolved beat anchors must match the complete visual plan")
     if cleaned_duration_ms <= 0 or resolved.duration_ms != cleaned_duration_ms:
         raise ValueError("resolved duration must match the cleaned source timeline")
+    validate_resolved_hierarchy(layout, resolved)
+
+
+def validate_resolved_hierarchy(layout: ExecutableLayoutV2, resolved: ResolvedVisualTimelineV2) -> None:
+    """Bind the initial structural receipt and empty-shell owner at both entry paths.
+
+    This verifies initial identity, not later action-boundary source equality.
+    Earlier actions on unrelated shells may change the owner's complete basis;
+    chronological replay must prove those changes instead of assuming initial.
+    """
+    objects = {obj.object_id: obj for obj in layout.objects}
+    if layout.initial_empty_group_ownership and resolved.initial_hierarchy_basis is None:
+        raise ValueError("owned empty groups require an explicit resolved initial hierarchy")
+    if resolved.initial_hierarchy_basis is not None:
+        from atme.render.v2_hierarchy import HierarchySnapshot
+
+        hierarchy = HierarchySnapshot.from_objects(objects)
+        expected = HierarchyBasis(placements=[{
+            "object_id": node.object_id, "board_id": node.board_id, "parent_id": node.parent_id,
+            "sibling_ordinal": node.sibling_ordinal, "local_transform": objects[node.object_id].transform,
+        } for node in hierarchy.nodes])
+        if resolved.initial_hierarchy_basis != expected:
+            raise ValueError("resolved initial hierarchy must match exact layout parents, sibling order and local transforms")
+    for owner in layout.initial_empty_group_ownership:
+        candidates = [(item.end_ms, index, item.action) for index, item in enumerate(resolved.actions)
+                      if isinstance(item.action, GroupAction) and item.action.container_id == owner.shell_object_id]
+        action = min(candidates, key=lambda item: item[:2])[2] if candidates else None
+        if (action is None or action.action_id != owner.owner_group_action_id
+                or action.verb != "group" or action.hierarchy_policy is None
+                or action.hierarchy_policy.source_basis_sha256 != owner.owner_source_basis_sha256):
+            raise ValueError("empty group owner must be its earliest resolved hierarchy action with the exact source hash")
 
 
 def _require_hierarchy_contract(action: GroupAction) -> None:

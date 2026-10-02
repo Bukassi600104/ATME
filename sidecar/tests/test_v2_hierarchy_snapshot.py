@@ -61,6 +61,38 @@ def test_explicit_parent_order_snapshots_do_not_mutate_layout_and_roundtrip_exac
     assert objects == original
 
 
+def test_projection_keeps_authored_layer_identity_separate_from_dense_sibling_order():
+    from test_v2_replace_action import documents
+
+    layout, _ = documents()
+    objects = {obj.object_id: obj for obj in ExecutableLayoutV2.model_validate(layout).objects}
+    hierarchy = HierarchySnapshot.from_objects(objects)
+    projected = hierarchy.object_map(objects)
+    assert objects["object-system"].z_index == objects["object-replacement"].z_index
+    assert projected["object-system"].z_index == projected["object-replacement"].z_index
+    assert {key: obj.z_index for key, obj in projected.items()} == {key: obj.z_index for key, obj in objects.items()}
+    root_ids = hierarchy.children("board-main", None)
+    assert root_ids.index("object-system") != root_ids.index("object-replacement")
+
+
+def test_svg_uses_snapshot_sibling_order_even_when_it_opposes_authored_layers(monkeypatch):
+    import xml.etree.ElementTree as ET
+
+    import atme.render.v2_svg as svg_module
+
+    layout, timeline, objects, hierarchy = basis()
+    frame = evaluate_frame(layout, timeline, 5000)
+    reversed_children = HierarchySnapshot(tuple(
+        replace(node, sibling_ordinal=1 - node.sibling_ordinal) if node.parent_id == "object-group" else node
+        for node in hierarchy.nodes))
+    projected = reversed_children.object_map(objects)
+    assert projected["object-system"].z_index < projected["object-label"].z_index
+    monkeypatch.setattr(svg_module, "evaluate_frame", lambda *args: replace(frame, hierarchy=reversed_children))
+    root = ET.fromstring(compose_svg_frame(layout, timeline, 5000).svg)
+    group = next(node for node in root.iter() if node.attrib.get("data-object-id") == "object-group")
+    assert [child.attrib["data-object-id"] for child in group] == ["object-label", "object-system"]
+
+
 def test_changed_closure_includes_container_members_and_other_shifted_sibling_ordinals():
     _, _, objects, before = basis()
     after = ungrouped(before)
