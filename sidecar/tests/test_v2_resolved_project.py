@@ -8,9 +8,11 @@ from copy import deepcopy
 
 import pytest
 from PIL import Image
+from test_project_runner import wav_bytes
 from test_visual_contracts_v2 import _store_v2_plan
 from v2_fixtures import digest, executable_layout_v2, resolved_timeline_v2
 
+from atme.narrative_source import describe
 from atme.project_service import ProjectError, _resolved_compilation_fingerprint
 
 
@@ -18,6 +20,22 @@ def stored_v2_basis(tmp_path, *, real_evidence=False, real_image=False,
                     image_object_asset_id="valid"):
     service, project, plan = _store_v2_plan(tmp_path)
     project_id = project["project_id"]
+    imported = service.attach_wav(project_id, wav_bytes(seconds=10), project["revision"])
+    project = imported["project"]
+    placed = service.source_timeline.command(
+        project_id, "insert", {"media_id": imported["media"]["media_id"], "at_ms": 0},
+        project["revision"], 0,
+    )
+    project = placed["project"]
+    timing = placed["timeline"]
+    media = describe(service, project_id)["timing_authority"]["media"]
+    plan["project_revision"] = project["revision"]
+    plan["narrative_authority"].update(
+        timing_media_id=media["media_id"], timing_media_sha256=media["sha256"],
+        cleaned_timeline_revision=timing["timeline_revision"],
+        cleaned_timeline_fingerprint=digest(timing["document"]),
+    )
+    project = service.write(project_id, "storyboard", plan, project["revision"])
     asset = None
     image_asset = None
     real_evidence = real_evidence or real_image
@@ -154,6 +172,7 @@ def test_resolved_timeline_is_stored_as_a_versioned_project_artifact(tmp_path):
 
 
 @pytest.mark.parametrize("mutation", [
+    lambda d: d["initial_object_states"].pop(),
     lambda d: d.update(layout_sha256="0" * 64),
     lambda d: d.update(plan_revision=d["plan_revision"] - 1),
     lambda d: d.update(cleaned_timeline_fingerprint="0" * 64),
@@ -178,6 +197,28 @@ def test_resolved_timeline_requires_exact_compilation_fingerprint(tmp_path):
     timeline["compilation_fingerprint"] = "0" * 64
     with pytest.raises(ProjectError, match="production basis"):
         service.write(project["project_id"], "resolved_timeline", timeline, project["revision"])
+    service.store.close()
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda d: d["initial_object_states"].append({
+        "object_id": "unrelated", "state": "hidden", "state_version": 1, "visible": False,
+    }),
+    lambda d: d["initial_object_states"][0].update(visible=True),
+    lambda d: d["initial_object_states"][0].update(state="visible"),
+    lambda d: d["beat_anchors"].pop(),
+    lambda d: d["beat_anchors"].append({"beat_id": "unrelated", "start_ms": 1000}),
+    lambda d: d.update(duration_ms=d["duration_ms"] + 1000),
+    lambda d: d.update(duration_ms=d["duration_ms"] - 1000),
+])
+def test_resolved_timeline_rejects_incomplete_structure_or_authoritative_duration(tmp_path, mutation):
+    service, project, _, _, timeline = stored_v2_basis(tmp_path)
+    mutation(timeline)
+    timeline["compilation_fingerprint"] = _resolved_compilation_fingerprint(timeline)
+    with pytest.raises(ProjectError) as failure:
+        service.write(project["project_id"], "resolved_timeline", timeline, project["revision"])
+    assert failure.value.code == "invalid_artifact"
+    assert service.open(project["project_id"])["revision"] == project["revision"]
     service.store.close()
 
 

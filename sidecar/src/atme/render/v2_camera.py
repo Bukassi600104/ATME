@@ -215,7 +215,6 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                         and other.start_ms < resolved.end_ms
                         and resolved.start_ms < other.end_ms)
                        or (isinstance(other.action, ReplaceAction)
-                           and other.action.verb == "replace"
                            and dependency_ids.intersection({other.action.from_object_id,
                                                             other.action.to_object_id})
                            and other.start_ms < resolved.end_ms
@@ -251,7 +250,7 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                     opacity[target] = action.opacity
                 else:
                     transforms[target] = action.destination
-        elif isinstance(action, ReplaceAction) and action.verb == "replace":
+        elif isinstance(action, ReplaceAction):
             visible[action.from_object_id] = False
             revealed[action.from_object_id] = False
             opacity[action.from_object_id] = 0.0

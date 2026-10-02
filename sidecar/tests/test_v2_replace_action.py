@@ -7,15 +7,16 @@ from copy import deepcopy
 from io import BytesIO
 
 import pytest
-from atme.render.v2_state import V2FrameError, evaluate_frame
-from atme.render.v2_svg import compose_png_frame, compose_svg_frame
-from atme.store.contracts_v2 import VisualPlanV2
 from PIL import Image
 from pydantic import ValidationError
 from test_v2_camera_action import append_camera
 from test_v2_connector_svg import connector_documents
 from test_v2_svg import primitive_documents
 from v2_fixtures import digest, visual_plan_v2
+
+from atme.render.v2_state import V2FrameError, evaluate_frame
+from atme.render.v2_svg import compose_png_frame, compose_svg_frame
+from atme.store.contracts_v2 import VisualPlanV2
 
 
 def documents():
@@ -124,11 +125,13 @@ def test_invalid_future_replacement_fails_before_sampling(change, match):
         evaluate_frame(layout, timeline, 100)
 
 
-def test_morph_still_fails_closed():
+def test_legacy_morph_without_correspondence_still_fails_closed():
     layout, timeline = documents()
     timeline["actions"][-1]["action"]["verb"] = "morph"
-    timeline["actions"][-1]["action"]["expected_state"] = None
-    with pytest.raises(V2FrameError, match="no frame implementation"):
+    from atme.store.contracts_v2 import ResolvedVisualTimelineV2
+
+    assert ResolvedVisualTimelineV2.model_validate(timeline).actions[-1].action.expected_state == "visible"
+    with pytest.raises(V2FrameError, match="correspondence"):
         evaluate_frame(layout, timeline, 100)
 
 

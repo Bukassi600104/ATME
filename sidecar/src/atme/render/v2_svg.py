@@ -36,6 +36,7 @@ from atme.render.v2_emphasis import (
 )
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.render.v2_mask import UnsupportedMask, mask_source_region
+from atme.render.v2_morph import geometry_object
 from atme.render.v2_path import (
     MAX_COORDINATE,
     MAX_STROKE_LENGTH,
@@ -554,6 +555,7 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
                    raster_images: dict, evidence_treatments: dict) -> str:
     if not state.visible or state.opacity <= 0 or state.reveal_fraction <= 0:
         return ""
+    obj = geometry_object(obj, state.morph_geometry)
     transform = _object_transform(obj, state)
     bounds = obj.geometry.bounds
     if isinstance(obj, MarkObject):
@@ -564,8 +566,13 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
         fill = _color(obj.style.fill, style.colors, default="none")
         weight = (style.strokes.emphasis_px if obj.object_type == "highlight"
                   else style.strokes.regular_px) * scale
-        inner = _shape(obj, stroke, fill, weight,
-                       state.reveal_fraction if active_verb == "draw" else None)
+        if state.morph_geometry is not None:
+            inner = (f'<path data-geometry-action="morph" d="{state.morph_geometry.svg_d}" '
+                     f'fill="{fill}" stroke="{stroke}" stroke-width="{_n(weight)}" '
+                     f'stroke-linecap="round" stroke-linejoin="round"/>')
+        else:
+            inner = _shape(obj, stroke, fill, weight,
+                           state.reveal_fraction if active_verb == "draw" else None)
     elif isinstance(obj, TextObject):
         color = _color(obj.style.text, style.colors, default=style.colors["ink"])
         role = _text_role(obj, style)

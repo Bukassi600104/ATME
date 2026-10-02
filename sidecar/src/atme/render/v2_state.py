@@ -27,6 +27,13 @@ from atme.render.v2_emphasis import (
 )
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.render.v2_mask import UnsupportedMask, mask_source_region
+from atme.render.v2_morph import (
+    MorphGeometry,
+    UnsupportedMorph,
+    geometry_object,
+    interpolate_geometry,
+    validate_morph_geometry,
+)
 from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds, world_matrix
 from atme.store.contracts_v2 import (
     CameraAction,
@@ -47,6 +54,7 @@ from atme.store.contracts_v2 import (
     TransformAction,
     VisualObject,
     _action_object_references,
+    _require_morph_contract,
     _require_return_board_policy,
     _require_return_contract,
 )
@@ -116,6 +124,7 @@ class FrameObject:
     transform: FrameTransform
     emphasis_fraction: float = 0.0
     cross_out_fraction: float = 0.0
+    morph_geometry: MorphGeometry | None = None
 
 
 @dataclass(frozen=True)
@@ -550,27 +559,38 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             completed_visible[target] = True
             completed_reveal[target] = 1.0
             continue
-        if isinstance(item.action, ReplaceAction) and item.action.verb == "replace":
+        if isinstance(item.action, ReplaceAction):
             action = item.action
+            verb = action.verb
+            if verb == "morph":
+                try:
+                    _require_morph_contract(action)
+                    validate_morph_geometry(layout_objects[action.from_object_id],
+                                            layout_objects[action.to_object_id], action.morph_policy)
+                except ValueError as exc:
+                    raise V2FrameError(str(exc)) from exc
             source_id, destination_id = action.from_object_id, action.to_object_id
             source, destination = layout_objects[source_id], layout_objects[destination_id]
             if (source_id == destination_id or source_id in mask_sources
                     or destination_id in mask_sources
                     or source_id in connector_endpoints or destination_id in connector_endpoints):
-                raise V2FrameError(f"replace {action.action_id} needs distinct paintable objects")
+                raise V2FrameError(f"{verb} {action.action_id} needs distinct paintable objects")
             if not all(
                 isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
                 or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT
                 or isinstance(obj, VisualObject) and obj.object_type in _REPLACE_VISUAL_TYPES
                 for obj in (source, destination)
             ):
-                raise V2FrameError(f"replace {action.action_id} needs supported paintable leaves")
+                raise V2FrameError(f"{verb} {action.action_id} needs supported paintable leaves")
             if (source.board_id != action.board_id or destination.board_id != action.board_id
                     or source.parent_id != destination.parent_id
                     or source.z_index != destination.z_index
-                    or source.geometry.bounds != destination.geometry.bounds
-                    or completed_transform[source_id] != completed_transform[destination_id]):
-                raise V2FrameError(f"replace {action.action_id} needs co-located objects")
+                    or verb == "replace" and (
+                        source.geometry.bounds != destination.geometry.bounds
+                        or completed_transform[source_id] != completed_transform[destination_id])):
+                raise V2FrameError(f"{verb} {action.action_id} needs co-located objects"
+                                   if verb == "replace" else
+                                   f"morph {action.action_id} changes board, parent, or layer ownership")
             ancestor_ids = set(_ancestor_ids(source, layout_objects))
             if any(other is not item
                    and isinstance(other.action, (TargetAction, TransformAction))
@@ -578,12 +598,12 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                    and other.start_ms < item.end_ms
                    and item.start_ms < other.end_ms
                    for other in timeline.actions):
-                raise V2FrameError(f"replace {action.action_id} overlaps an ancestor edit")
+                raise V2FrameError(f"{verb} {action.action_id} overlaps an ancestor edit")
             if not any(activation.board_id == action.board_id
                        and activation.start_ms <= item.start_ms
                        and item.end_ms <= activation.end_ms
                        for activation in layout.activations):
-                raise V2FrameError(f"replace {action.action_id} needs one active board")
+                raise V2FrameError(f"{verb} {action.action_id} needs one active board")
             if (not completed_visible[source_id] or completed_reveal[source_id] < 1
                     or completed_opacity[source_id] <= 0 or source_id in highlighted_targets
                     or source_id in crossed_out_targets
@@ -591,21 +611,21 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                            or completed_opacity[ancestor_id] <= 0
                            or completed_reveal[ancestor_id] < 1
                            for ancestor_id in ancestor_ids)):
-                raise V2FrameError(f"replace {action.action_id} needs fully visible source")
+                raise V2FrameError(f"{verb} {action.action_id} needs fully visible source")
             if (initial[destination_id].state != "hidden"
                     or initial[destination_id].visible
                     or completed_visible[destination_id]
                     or completed_reveal[destination_id] != 0
                     or destination.opacity <= 0
                     or destination_id in last_target_end):
-                raise V2FrameError(f"replace {action.action_id} needs untouched hidden destination")
+                raise V2FrameError(f"{verb} {action.action_id} needs untouched hidden destination")
             if (item.start_ms < last_target_end.get(source_id, 0)
                     or item.start_ms < last_target_end.get(destination_id, 0)):
-                raise V2FrameError(f"replace {action.action_id} overlaps a participant action")
+                raise V2FrameError(f"{verb} {action.action_id} overlaps a participant action")
             last_target_end[source_id] = item.end_ms
             last_target_end[destination_id] = item.end_ms
-            last_target_verb[source_id] = "replace"
-            last_target_verb[destination_id] = "replace"
+            last_target_verb[source_id] = verb
+            last_target_verb[destination_id] = verb
             completed_visible[source_id] = False
             completed_reveal[source_id] = 0.0
             completed_opacity[source_id] = 0.0
@@ -906,7 +926,7 @@ def evaluate_frame(
             isinstance(action, (TransformAction, ConnectionAction, CameraAction))
             or isinstance(action, EvidenceAction)
             and action.verb in {"insert_evidence", "return_board"}
-            or isinstance(action, ReplaceAction) and action.verb == "replace"
+            or isinstance(action, ReplaceAction)
             or isinstance(action, TargetAction) and action.verb in {
                 "reveal", "write", "draw", "enter", "exit", "progressive_reveal", "highlight",
                 "cross_out",
@@ -942,6 +962,35 @@ def evaluate_frame(
         if isinstance(action, ReplaceAction):
             source = current[action.from_object_id]
             destination = current[action.to_object_id]
+            if action.verb == "morph":
+                source_obj = next(obj for obj in layout.objects if obj.object_id == source.object_id)
+                destination_obj = next(obj for obj in layout.objects if obj.object_id == destination.object_id)
+                try:
+                    geometry = (None if completed or progress == 0 else interpolate_geometry(
+                        source_obj, destination_obj, action.morph_policy, progress,
+                    ))
+                except UnsupportedMorph as exc:
+                    raise V2FrameError(str(exc)) from exc
+                transform = FrameTransform(
+                    position=FramePoint(_mix(source.transform.position.x, destination.transform.position.x, progress),
+                                        _mix(source.transform.position.y, destination.transform.position.y, progress)),
+                    scale_x=_mix(source.transform.scale_x, destination.transform.scale_x, progress),
+                    scale_y=_mix(source.transform.scale_y, destination.transform.scale_y, progress),
+                    rotation_degrees=_mix(source.transform.rotation_degrees,
+                                          destination.transform.rotation_degrees, progress),
+                    origin=FramePoint(_mix(source.transform.origin.x, destination.transform.origin.x, progress),
+                                      _mix(source.transform.origin.y, destination.transform.origin.y, progress)),
+                )
+                current[source.object_id] = replace(
+                    source, state="removed" if completed else source.state,
+                    visible=not completed, opacity=0 if completed else _mix(source.opacity, destination.opacity, progress),
+                    reveal_fraction=0 if completed else 1, transform=transform, morph_geometry=geometry,
+                )
+                current[destination.object_id] = replace(
+                    destination, state=action.post_state if completed else destination.state,
+                    visible=completed, reveal_fraction=1 if completed else 0,
+                )
+                continue
             current[action.from_object_id] = replace(
                 source,
                 state="removed" if completed else source.state,
@@ -1035,8 +1084,10 @@ def evaluate_frame(
         for obj in sorted(layout.objects, key=lambda item: (item.z_index, item.object_id))
     )
     transforms = {state.object_id: state.transform for state in ordered}
+    object_map = {obj.object_id: geometry_object(obj, current[obj.object_id].morph_geometry)
+                  for obj in layout.objects}
     try:
-        for obj in layout.objects:
+        for obj in object_map.values():
             world_bounds(obj, object_map, transforms)
     except UnsupportedWorldGeometry as exc:
         raise V2FrameError(str(exc)) from exc

@@ -1631,6 +1631,75 @@
       "title": "GroupAction",
       "type": "object"
     },
+    "MorphPolicy": {
+      "additionalProperties": false,
+      "description": "Authored correspondence; the renderer never guesses how shapes match.",
+      "properties": {
+        "mapping": {
+          "enum": [
+            "canonical_outline",
+            "ordered_vertices",
+            "matching_path_commands"
+          ],
+          "title": "Mapping",
+          "type": "string"
+        },
+        "point_count": {
+          "anyOf": [
+            {
+              "maximum": 257,
+              "minimum": 2,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Point Count"
+        },
+        "path_commands": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "M",
+                  "L",
+                  "Q",
+                  "C"
+                ],
+                "type": "string"
+              },
+              "maxItems": 256,
+              "minItems": 2,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path Commands"
+        },
+        "paint": {
+          "const": "shared_style",
+          "default": "shared_style",
+          "title": "Paint",
+          "type": "string"
+        },
+        "transforms": {
+          "const": "interpolate_all",
+          "default": "interpolate_all",
+          "title": "Transforms",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mapping"
+      ],
+      "title": "MorphPolicy",
+      "type": "object"
+    },
     "NarrativeAuthority": {
       "additionalProperties": false,
       "properties": {
@@ -1976,6 +2045,17 @@
         "to_object_id": {
           "title": "To Object Id",
           "type": "string"
+        },
+        "morph_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MorphPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [

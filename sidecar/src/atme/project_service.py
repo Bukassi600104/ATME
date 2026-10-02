@@ -591,6 +591,7 @@ class ProjectService:
             ResolvedVisualTimelineV2,
             VisualPlanV2,
             validate_plan_layout,
+            validate_resolved_structure,
         )
 
         plan_row = self.artifact(project_id, "storyboard")
@@ -608,6 +609,10 @@ class ProjectService:
         except ValueError as exc:
             raise ProjectError("invalid_artifact", "The stored v2 plan and layout no longer agree") from exc
         timing = self.source_timeline.get(project_id)
+        try:
+            validate_resolved_structure(plan, layout, resolved, timing["document"]["duration_ms"])
+        except ValueError as exc:
+            raise ProjectError("invalid_artifact", str(exc)) from exc
         profile = {"LONG_FORM_16_9": (1280, 720),
                    "SHORT_FORM_9_16": (720, 1280)}[row["profile"]]
         expected_basis = row["revision"] if basis_revision is None else basis_revision

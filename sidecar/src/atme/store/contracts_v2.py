@@ -317,14 +317,46 @@ class ConnectionAction(ActionBase):
     destination_anchor_id: str
 
 
+class MorphPolicy(StrictModel):
+    """Authored correspondence; the renderer never guesses how shapes match."""
+
+    mapping: Literal["canonical_outline", "ordered_vertices", "matching_path_commands"]
+    point_count: int | None = Field(default=None, ge=2, le=257)
+    path_commands: list[Literal["M", "L", "Q", "C"]] | None = Field(
+        default=None, min_length=2, max_length=256,
+    )
+    paint: Literal["shared_style"] = "shared_style"
+    transforms: Literal["interpolate_all"] = "interpolate_all"
+
+    @model_validator(mode="after")
+    def mapping_parameters(self):
+        if self.mapping == "ordered_vertices":
+            if self.point_count is None or self.path_commands is not None:
+                raise ValueError("ordered morph needs only an explicit point count")
+        elif self.mapping == "matching_path_commands":
+            if (self.point_count is not None or self.path_commands is None
+                    or self.path_commands[0] != "M" or "M" in self.path_commands[1:]):
+                raise ValueError("path morph needs one explicit continuous command sequence")
+        elif self.point_count is not None or self.path_commands is not None:
+            raise ValueError("canonical outline morph cannot carry ignored mapping parameters")
+        return self
+
+
 class ReplaceAction(ActionBase):
     verb: Literal["replace", "morph"]
     from_object_id: str
     to_object_id: str
+    # Older 2.0.0 morph declarations remain loadable, but cannot execute or
+    # pass a new storyboard write without a correspondence policy.
+    morph_policy: MorphPolicy | None = None
 
     @model_validator(mode="after")
     def bounded_replace_semantics(self):
+        if self.verb == "morph" and self.morph_policy is not None:
+            _require_morph_contract(self)
         if self.verb == "replace":
+            if self.morph_policy is not None:
+                raise ValueError("replace cannot carry a morph policy")
             if self.from_object_id == self.to_object_id:
                 raise ValueError("replace needs distinct source and destination objects")
             if self.expected_state is None:
@@ -1220,13 +1252,13 @@ class ResolvedVisualTimelineV2(StrictModel):
                     raise ValueError(f"action {action.action_id} targets an object without initial state")
                 if states[target] == "removed" and action.verb not in ("return_board",):
                     raise ValueError(f"action {action.action_id} resurrects removed object {target}")
-            if isinstance(action, ReplaceAction) and action.verb == "replace":
+            if isinstance(action, ReplaceAction):
                 if action.from_object_id == action.to_object_id:
-                    raise ValueError(f"replace {action.action_id} needs distinct objects")
+                    raise ValueError(f"{action.verb} {action.action_id} needs distinct objects")
                 if action.expected_state is None or states[action.from_object_id] != action.expected_state:
-                    raise ValueError(f"replace {action.action_id} source precondition failed")
+                    raise ValueError(f"{action.verb} {action.action_id} source precondition failed")
                 if states[action.to_object_id] != "hidden" or action.post_state != "visible":
-                    raise ValueError(f"replace {action.action_id} needs hidden-to-visible destination")
+                    raise ValueError(f"{action.verb} {action.action_id} needs hidden-to-visible destination")
                 states[action.from_object_id] = "removed"
                 states[action.to_object_id] = "visible"
                 resolved_actions[action.action_id] = resolved
@@ -1371,6 +1403,16 @@ def validate_plan_layout(plan_document: dict, layout_document: dict) -> None:
             raise ValueError(f"layout board {board_id} changes its directing declaration")
     activations = {item.activation_id: item for item in layout.activations}
     for action in plan.actions:
+        if isinstance(action, ReplaceAction) and action.verb == "morph":
+            from atme.render.v2_morph import validate_morph_geometry
+
+            _require_morph_contract(action)
+            source, destination = executable[action.from_object_id], executable[action.to_object_id]
+            if (source.board_id != action.board_id or destination.board_id != action.board_id
+                    or source.parent_id != destination.parent_id
+                    or source.z_index != destination.z_index):
+                raise ValueError("morph must preserve board, parent, and layer ownership")
+            validate_morph_geometry(source, destination, action.morph_policy)
         if not isinstance(action, EvidenceAction) or action.verb != "return_board":
             continue
         _require_return_contract(action)
@@ -1414,6 +1456,20 @@ def validate_plan_layout(plan_document: dict, layout_document: dict) -> None:
 def validate_plan_evidence_completeness(plan_document: dict) -> None:
     """Require executable evidence and return declarations for new plan writes."""
     plan = VisualPlanV2.model_validate(plan_document)
+    for action in plan.actions:
+        if isinstance(action, ReplaceAction) and action.verb == "morph":
+            _require_morph_contract(action)
+            objects = {obj.object_id: obj for obj in plan.objects}
+            source, destination = objects[action.from_object_id], objects[action.to_object_id]
+            family = ({"rectangle", "rounded_rectangle", "ellipse"}
+                      if action.morph_policy.mapping == "canonical_outline"
+                      else {"polygon", "line", "freehand"}
+                      if action.morph_policy.mapping == "ordered_vertices" else {"freehand"})
+            if (source.object_type not in family or destination.object_type not in family
+                    or action.morph_policy.mapping != "canonical_outline"
+                    and source.object_type != destination.object_type
+                    or source.board_id != action.board_id or destination.board_id != action.board_id):
+                raise ValueError("morph semantic objects do not match their correspondence policy")
     assets = {item.asset_id: item for item in plan.assets}
     actions = {item.action_id: item for item in plan.actions}
     evidence_objects = {item.object_id for item in plan.objects
@@ -1461,6 +1517,31 @@ def validate_plan_evidence_completeness(plan_document: dict) -> None:
                     or any(action.expected_object_state_versions[object_id] != version
                            for object_id, version in expected_versions.items())):
                 raise ValueError("return_board must match its board, continuity, and full object inventory")
+
+
+def _require_morph_contract(action: ReplaceAction) -> None:
+    if (action.morph_policy is None or action.from_object_id == action.to_object_id
+            or action.expected_state is None or action.post_state != "visible"
+            or action.easing == "step"):
+        raise ValueError("morph needs distinct objects, correspondence, source state, and continuous easing")
+
+
+def validate_resolved_structure(plan: VisualPlanV2, layout: ExecutableLayoutV2,
+                                resolved: ResolvedVisualTimelineV2,
+                                cleaned_duration_ms: int) -> None:
+    """Compiler output must initialize the complete layout and authoritative timing."""
+    objects = {obj.object_id: obj for obj in layout.objects}
+    states = {item.object_id: item for item in resolved.initial_object_states}
+    if objects.keys() != states.keys() or any(
+        obj.initial_state != states[object_id].state
+        or obj.visible != states[object_id].visible
+        for object_id, obj in objects.items()
+    ):
+        raise ValueError("resolved timeline must preserve every initial layout state and visibility")
+    if {beat.beat_id for beat in plan.beats} != {beat.beat_id for beat in resolved.beat_anchors}:
+        raise ValueError("resolved beat anchors must match the complete visual plan")
+    if cleaned_duration_ms <= 0 or resolved.duration_ms != cleaned_duration_ms:
+        raise ValueError("resolved duration must match the cleaned source timeline")
 
 
 def _require_return_contract(action: EvidenceAction) -> None:

@@ -397,14 +397,49 @@ return actions without this provenance remain parseable but non-executable.
 This does not itself complete the claim-to-evidence-to-developed-abstraction
 golden cycle, nor does it enable installed preview/export.
 
+## Bounded 3Y geometry morph execution
+
+`morph` now requires an explicit `morph_policy` on every newly written plan.
+The mapping is one of: exact canonical outlines for rectangle/rounded rectangle/
+ellipse; ordered equal-count vertices for polygons, two-point lines, and
+point-authored freehand; or identical M/L/Q/C command sequences for freehand
+curves. No automatic vertex matching, asset substitution, topology conversion,
+or crossfade is used. Correspondence that collapses the entire stroke is rejected.
+
+The two authored marks share style tokens, board, parent, and stacking position.
+They may have different bounds and transforms. During the interval only the
+source identity paints one interpolated path; all transform channels, opacity,
+and geometry bounds use the same eased progress and pivot. At exact completion
+the source becomes removed and the destination becomes visible. Later actions,
+replacement/morph chains, and developed-board returns retain that identity and
+state-version history. Random seeking reconstructs the same immutable result.
+Static group, clip, and alpha-mask parents are supported and pixel-tested.
+Morphing a mask source or connector endpoint, changing ownership, overlapping
+participant/ancestor actions, concurrent camera focus, ignored geometry fields,
+step easing, or incompatible correspondence fails before rendering. Camera
+focus after completion may follow the destination. Legacy `2.0.0` morphs without
+correspondence remain loadable but non-executable.
+
+Stored resolved timelines additionally require the exact plan/layout initial
+object inventory, states and visibility; exact beat-anchor inventory; and a
+positive duration equal to the authoritative cleaned source timeline. These
+structural checks are separate from action capability checks, so storage does
+not incorrectly claim all remaining verbs are executable. Generated plan and
+resolved-timeline schemas include the additive morph policy.
+
+The reproducible offline proof is `bench/verify_v2_morph.py` and its retained
+`docs/visual-acceptance/phase-3y-morph.png`/JSON. It exercises actual source
+compositor pixels and byte-identical re-seeking with socket connections denied;
+it is neither final creative-quality acceptance nor installed-app acceptance.
+
 ## Still to define and implement before Phase 3 exit
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be
-fixed before their first runtime implementation: `morph`, `annotate`,
+fixed before their first runtime implementation: `annotate`,
 `group`, `ungroup`, `split`, `count`,
 sound state/events. `insert_evidence` and `return_board` have only the bounded
 semantics above. In particular,
-the contract needs explicit rules for morph compatibility, dynamic group ownership, split result
+the contract still needs explicit rules for dynamic group ownership, split result
 mapping, isolate restoration, and ordered progressive disclosure. Audible mixing remains Phase 7;
 Phase 3 must at least expose deterministic sound events at the correct resolved times.
 

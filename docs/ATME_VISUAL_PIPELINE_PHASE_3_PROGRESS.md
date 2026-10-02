@@ -1,9 +1,27 @@
 # Phase 3 — renderer and action runtime progress
 
 Status: Slices 3A–3U and bounded 3V/3W/3X stages independent PASS;
+Slice 3Y implementation, bounded audit, and v2/legacy regression PASS;
+full sidecar regression in progress;
 Phase 3 remains incomplete
 
-Date: 2026-10-01
+Date: 2026-10-02
+
+## Next executable action slice
+
+The independent remaining-action audit prioritizes authored general visual
+annotation, then dynamic group/ungroup, authored split results, numeric count,
+and the deterministic sound-event ledger. Existing bare `annotate` text is
+not enough: execution needs exact preauthored annotation object IDs, target/
+leader anchors, reveal ordering, readable hold, persistence, and ownership.
+No renderer-generated copy or inferred geometry is permitted. Annotation of
+an evidence object must retain its attested annotation permission and must
+not weaken the separate source-contained EvidenceTreatment path. Group edits
+need reversible ownership/world-transform mappings; split needs explicit
+result-object correspondence; count needs numeric/format policies. Sound
+events are Phase 3 timing/state evidence; audible mixing remains Phase 7.
+None of these priorities removes the remaining primitive, performance,
+preview/export parity, compiler, or installed acceptance gates.
 
 ## Delivered in Slice 3A
 
@@ -21,6 +39,26 @@ Date: 2026-10-01
   malformed pairings, non-finite input, overlap, and unsupported actions.
 
 ## Incomplete Phase 3 gates
+
+- Slice 3Y adds deterministic authored geometry morphing, rather than crossfade:
+  exact canonical box/ellipse outlines, ordered polygon/line/freehand vertices,
+  and matching freehand M/L/Q/C commands. Shared style/ownership and explicit
+  correspondence are mandatory. One path interpolates geometry, bounds,
+  transform channels, and opacity; completion transfers persistent identity
+  to the authored destination. Tests cover pixels, easing, random seeks,
+  chains, return-state versions, camera handoff, transformed groups, static
+  clip/mask parents, portrait output, legacy loading, and stored-project parity.
+  Initial object inventory/state/visibility, beat anchors, and cleaned duration
+  are now checked against the authoritative stored plan and source timeline.
+  Independent bounded code audit passed after fixing generated schema inclusion
+  and legacy morph loadability. Finalized v2-selected and legacy render/checkpoint/
+  offline regressions passed: 524 passed, 5 skipped in 741.47 seconds. The skipped
+  cases are preexisting Windows symlink-dependent tests; no new morph test skipped.
+  Full sidecar regression is still running and is not yet claimed passed. Ruff,
+  exact generated-schema/model parity, and staged whitespace checks passed.
+  The retained offline contact sheet proves mechanics only, not the approved
+  final visual-quality rubric. Public v2 preview/export, compiler integration,
+  and installed-app acceptance remain incomplete.
 
 - Slice 3X adds an immutable stored `resolved_timeline` artifact with exact
   plan/layout revision and hash, cleaned source-timeline, profile, style,

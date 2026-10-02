@@ -26,6 +26,7 @@ class InvalidFreehandPath(ValueError):
 class FreehandPath:
     svg_d: str
     length: float
+    commands: tuple[tuple[str, tuple[float, ...]], ...] = ()
 
 
 def _n(value: float) -> str:
@@ -76,6 +77,7 @@ def parse_freehand_path(source: str, bounds: Bounds) -> FreehandPath:
     current = None
     total_length = 0.0
     serialized = []
+    commands = []
     while cursor < len(tokens):
         command = tokens[cursor]
         if command not in _ARITY:
@@ -108,10 +110,12 @@ def parse_freehand_path(source: str, bounds: Bounds) -> FreehandPath:
         if not math.isfinite(total_length) or total_length > MAX_STROKE_LENGTH:
             raise InvalidFreehandPath("freehand path length exceeds the supported range")
         serialized.append(f'{command} {" ".join(_n(value) for value in values)}')
+        commands.append((command, tuple(values)))
         segment_count += 1
         if segment_count > 256:
             raise InvalidFreehandPath("freehand path has too many segments")
         cursor += 1 + arity
     if segment_count < 2 or total_length <= 0:
         raise InvalidFreehandPath("freehand path must draw a nonzero continuous stroke")
-    return FreehandPath(svg_d=" ".join(serialized), length=total_length)
+    return FreehandPath(svg_d=" ".join(serialized), length=total_length,
+                        commands=tuple(commands))
