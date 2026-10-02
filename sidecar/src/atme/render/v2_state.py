@@ -26,6 +26,7 @@ from atme.render.v2_emphasis import (
     cross_out_paths,
     emphasis_path,
 )
+from atme.render.v2_hierarchy import HierarchySnapshot, UnsupportedHierarchy
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.render.v2_mask import UnsupportedMask, mask_source_region
 from atme.render.v2_morph import (
@@ -136,6 +137,7 @@ class FrameSnapshot:
     active_board_id: str | None
     objects: tuple[FrameObject, ...]
     camera: CameraViewport
+    hierarchy: HierarchySnapshot
 
     def object(self, object_id: str) -> FrameObject:
         for item in self.objects:
@@ -172,10 +174,12 @@ def _ancestor_ids(obj, object_map: dict) -> tuple[str, ...]:
     return tuple(ancestors)
 
 
-def validate_static_hierarchy(layout: ExecutableLayoutV2) -> None:
+def validate_static_hierarchy(layout: ExecutableLayoutV2, objects: dict | None = None) -> None:
     """Fail closed for hierarchy forms not yet supported by frame and paint paths."""
-    objects = {obj.object_id: obj for obj in layout.objects}
-    for obj in layout.objects:
+    if objects is None:
+        initial = {obj.object_id: obj for obj in layout.objects}
+        objects = HierarchySnapshot.from_objects(initial).object_map(initial)
+    for obj in objects.values():
         if obj.clip_id is not None:
             raise V2FrameError(f"v2 object {obj.object_id} has unsupported clip_id")
         if isinstance(obj, ContainerObject):
@@ -199,7 +203,7 @@ def validate_static_hierarchy(layout: ExecutableLayoutV2) -> None:
                     mask_source_region(source, source.transform)
                 except UnsupportedMask as exc:
                     raise V2FrameError(str(exc)) from exc
-    for obj in layout.objects:
+    for obj in objects.values():
         if obj.parent_id is not None and (
             not isinstance(objects[obj.parent_id], ContainerObject)
             or objects[obj.parent_id].object_type not in {"group", "clip", "mask"}
@@ -246,7 +250,7 @@ def _interpolate_transform(start: FrameTransform, end: Transform,
 
 
 def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
-                   layout_sha256: str) -> None:
+                   layout_sha256: str, hierarchy: HierarchySnapshot) -> None:
     if (layout.project_id != timeline.project_id or layout.layout_id != timeline.layout_id
             or layout.plan_id != timeline.plan_id or layout.plan_revision != timeline.plan_revision
             or layout.plan_sha256 != timeline.plan_sha256
@@ -258,8 +262,8 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
         raise V2FrameError("resolved timeline and executable layout do not describe the same composition")
     resolved_actions = {item.action.action_id: item for item in timeline.actions}
     treatments_by_action = {item.action_id: item for item in layout.evidence_treatments}
-    layout_objects = {item.object_id: item for item in layout.objects}
-    validate_static_hierarchy(layout)
+    layout_objects = hierarchy.object_map({item.object_id: item for item in layout.objects})
+    validate_static_hierarchy(layout, layout_objects)
     state_objects = {item.object_id for item in timeline.initial_object_states}
     if set(layout_objects) != state_objects:
         raise V2FrameError("the resolved timeline must initialize every layout object exactly once")
@@ -527,7 +531,7 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                         )
             try:
                 _annotation_phase_windows(item)
-                camera_plan = camera_segments(layout, timeline)
+                camera_plan = camera_segments(layout, timeline, hierarchy)
                 viewports = [evaluate_camera(layout, camera_plan, moment, activation.activation_id, _ease)
                              for moment in (item.start_ms, item.end_ms, hold_end - 1)]
                 validate_annotation_geometry(action, layout, layout_objects, completed_transform, viewports)
@@ -567,7 +571,7 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             try:
                 rect = world_bounds(obj, layout_objects, completed_transform)
                 matrix = world_matrix(obj, layout_objects, completed_transform)
-                camera_plan = camera_segments(layout, timeline)
+                camera_plan = camera_segments(layout, timeline, hierarchy)
             except (UnsupportedWorldGeometry, UnsupportedCamera) as exc:
                 raise V2FrameError(str(exc)) from exc
             for parent_id in ancestors:
@@ -976,9 +980,13 @@ def evaluate_frame(
     layout_sha256 = hashlib.sha256(layout_bytes).hexdigest()
     layout = ExecutableLayoutV2.model_validate(layout_document)
     timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
-    _validate_pair(layout, timeline, layout_sha256)
     try:
-        camera_plan = camera_segments(layout, timeline)
+        hierarchy = HierarchySnapshot.from_objects({obj.object_id: obj for obj in layout.objects})
+    except UnsupportedHierarchy as exc:
+        raise V2FrameError(str(exc)) from exc
+    _validate_pair(layout, timeline, layout_sha256, hierarchy)
+    try:
+        camera_plan = camera_segments(layout, timeline, hierarchy)
     except UnsupportedCamera as exc:
         raise V2FrameError(str(exc)) from exc
     if type(at_ms) is not int or not 0 <= at_ms < timeline.duration_ms:
@@ -1167,7 +1175,7 @@ def evaluate_frame(
     active_board = activation.board_id if activation else None
     camera = evaluate_camera(layout, camera_plan, at_ms,
                              activation.activation_id if activation else None, _ease)
-    object_map = {obj.object_id: obj for obj in layout.objects}
+    object_map = hierarchy.object_map({obj.object_id: obj for obj in layout.objects})
     ordered = tuple(
         replace(current[obj.object_id],
                 visible=current[obj.object_id].visible and obj.board_id == active_board
@@ -1177,11 +1185,11 @@ def evaluate_frame(
     )
     transforms = {state.object_id: state.transform for state in ordered}
     object_map = {obj.object_id: geometry_object(obj, current[obj.object_id].morph_geometry)
-                  for obj in layout.objects}
+                  for obj in object_map.values()}
     try:
         for obj in object_map.values():
             world_bounds(obj, object_map, transforms)
     except UnsupportedWorldGeometry as exc:
         raise V2FrameError(str(exc)) from exc
     return FrameSnapshot(at_ms=at_ms, active_board_id=active_board,
-                         objects=ordered, camera=camera)
+                         objects=ordered, camera=camera, hierarchy=hierarchy)

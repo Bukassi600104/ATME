@@ -17,7 +17,10 @@ installed preview/export or final creative-quality acceptance.
    Evidence cross-object annotation remains separate and unimplemented; never
    weaken its attestation or change source pixels to extend this general path.
 2. Group/ungroup: explicit member order, source/destination parent ownership,
-   reversible mappings and world-transform preservation.
+   reversible mappings and world-transform preservation. Slice 3AA has audited
+   topology/world/scope utilities, shared static frame consumers and initial full
+   before/after receipt models. Runtime source binding, empty-shell ownership,
+   structural replay/version/return integration and acceptance remain incomplete.
 3. Split: explicit authored result objects, correspondence, ownership and source
    removal. Do not infer fragments.
 4. Count: numeric range, unit, formatting, rounding/steps and a bound text object.

@@ -7,6 +7,8 @@ that the v1 renderer can execute it.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -413,10 +415,96 @@ class ReplaceAction(ActionBase):
         return self
 
 
+class HierarchyPlacement(StrictModel):
+    """An exact authored hierarchy node and local transform, not a destination hint."""
+
+    object_id: str = Field(min_length=1)
+    board_id: str = Field(min_length=1)
+    parent_id: str | None
+    sibling_ordinal: int = Field(ge=0, strict=True)
+    local_transform: Transform
+
+
+class HierarchyBasis(StrictModel):
+    """Complete canonical layout inventory, including root and empty-parent order."""
+
+    placements: list[HierarchyPlacement] = Field(min_length=1, max_length=4096)
+
+    @model_validator(mode="after")
+    def complete_canonical_topology(self):
+        ids = [item.object_id for item in self.placements]
+        if ids != sorted(set(ids)):
+            raise ValueError("hierarchy basis needs unique canonical object-ID order")
+        objects = {item.object_id: item for item in self.placements}
+        siblings = {}
+        for item in self.placements:
+            siblings.setdefault((item.board_id, item.parent_id), []).append(item.sibling_ordinal)
+            chain = {item.object_id}
+            parent_id = item.parent_id
+            while parent_id is not None:
+                parent = objects.get(parent_id)
+                if parent is None or parent.board_id != item.board_id or parent_id in chain:
+                    raise ValueError("hierarchy basis needs acyclic same-board known parents")
+                chain.add(parent_id)
+                if len(chain) > 9:
+                    raise ValueError("hierarchy basis exceeds eight ancestor levels")
+                parent_id = parent.parent_id
+        if any(sorted(ordinals) != list(range(len(ordinals))) for ordinals in siblings.values()):
+            raise ValueError("hierarchy basis must encode complete parent-order permutations")
+        return self
+
+    def checksum(self) -> str:
+        return hashlib.sha256(json.dumps(self.model_dump(mode="json"), sort_keys=True,
+                                         separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
+
+
+class HierarchyTransitionPolicy(StrictModel):
+    """Complete authored before/after receipt; no inferred membership or inverse."""
+
+    member_root_ids: list[str] = Field(min_length=1, max_length=256)
+    source_basis: HierarchyBasis
+    destination_basis: HierarchyBasis
+    source_basis_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    destination_basis_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    changed_object_ids: list[str] = Field(min_length=1, max_length=4096)
+    preserve_world_transform: Literal[True]
+
+    @model_validator(mode="after")
+    def exact_basis_receipt(self):
+        source = {item.object_id: item for item in self.source_basis.placements}
+        destination = {item.object_id: item for item in self.destination_basis.placements}
+        if (len(self.member_root_ids) != len(set(self.member_root_ids))
+                or set(self.member_root_ids) - source.keys()
+                or source.keys() != destination.keys()
+                or self.changed_object_ids != sorted(set(self.changed_object_ids))
+                or set(self.changed_object_ids) - source.keys()
+                or self.source_basis_sha256 != self.source_basis.checksum()
+                or self.destination_basis_sha256 != self.destination_basis.checksum()):
+            raise ValueError("hierarchy policy needs exact inventories and canonical basis checksums")
+        if any(source[key].board_id != destination[key].board_id for key in source):
+            raise ValueError("hierarchy policy cannot change board ownership")
+        return self
+
+
 class GroupAction(ActionBase):
     verb: Literal["group", "ungroup", "split"]
     target_ids: list[str] = Field(min_length=1)
     container_id: str | None = None
+    # Bare legacy actions remain readable/hash-compatible, never executable.
+    hierarchy_policy: HierarchyTransitionPolicy | None = None
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_shape(self, handler):
+        result = handler(self)
+        if self.hierarchy_policy is None:
+            result.pop("hierarchy_policy", None)
+        return result
+
+    @model_validator(mode="after")
+    def explicit_transition_semantics(self):
+        if self.hierarchy_policy is not None:
+            _require_hierarchy_contract(self)
+        return self
 
 
 class EvidenceAction(ActionBase):
@@ -948,8 +1036,7 @@ class VisualPlanV2(StrictModel):
                 raise ValueError(f"action {action.action_id} cannot animate a mask source")
             if isinstance(action, GroupAction) and action.container_id is not None:
                 container = object_map[action.container_id]
-                if (not isinstance(container, ContainerObject)
-                        or container.object_type != "group"
+                if (container.object_type != "group"
                         or container.board_id != action.board_id):
                     raise ValueError(
                         f"action {action.action_id} needs a same-board group container"
@@ -1462,6 +1549,10 @@ def validate_plan_layout(plan_document: dict, layout_document: dict) -> None:
             raise ValueError(f"layout board {board_id} changes its directing declaration")
     activations = {item.activation_id: item for item in layout.activations}
     for action in plan.actions:
+        if isinstance(action, GroupAction) and action.verb in {"group", "ungroup"}:
+            from atme.render.v2_hierarchy import validate_authored_hierarchy
+
+            validate_authored_hierarchy(action, executable)
         if isinstance(action, TargetAction) and action.verb == "annotate":
             _validate_annotation_plan_objects(action, {obj.object_id: obj for obj in plan.objects},
                                               next(beat for beat in plan.beats if action.action_id in beat.action_ids))
@@ -1521,6 +1612,12 @@ def validate_plan_evidence_completeness(plan_document: dict) -> None:
     """Require executable evidence and return declarations for new plan writes."""
     plan = VisualPlanV2.model_validate(plan_document)
     for action in plan.actions:
+        if isinstance(action, GroupAction) and action.verb in {"group", "ungroup"}:
+            _require_hierarchy_contract(action)
+            policy_objects = {item.object_id: item for item in action.hierarchy_policy.source_basis.placements}
+            if (policy_objects.keys() != {obj.object_id for obj in plan.objects}
+                    or any(obj.board_id != policy_objects[obj.object_id].board_id for obj in plan.objects)):
+                raise ValueError("hierarchy policy must cover the exact semantic-plan inventory and boards")
         if isinstance(action, TargetAction) and action.verb == "annotate":
             _validate_annotation_plan_objects(action, {obj.object_id: obj for obj in plan.objects},
                                               next(beat for beat in plan.beats if action.action_id in beat.action_ids))
@@ -1609,6 +1706,37 @@ def validate_resolved_structure(plan: VisualPlanV2, layout: ExecutableLayoutV2,
         raise ValueError("resolved beat anchors must match the complete visual plan")
     if cleaned_duration_ms <= 0 or resolved.duration_ms != cleaned_duration_ms:
         raise ValueError("resolved duration must match the cleaned source timeline")
+
+
+def _require_hierarchy_contract(action: GroupAction) -> None:
+    policy = action.hierarchy_policy
+    states = (("ungrouped", "grouped") if action.verb == "group" else ("grouped", "ungrouped"))
+    if (action.verb not in {"group", "ungroup"} or policy is None
+            or action.container_id is None or action.container_id in action.target_ids
+            or action.target_ids != policy.member_root_ids or action.easing != "step"
+            or (action.expected_state, action.post_state) != states):
+        raise ValueError("group/ungroup needs an exact authored step hierarchy policy and canonical group states")
+    source = {item.object_id: item for item in policy.source_basis.placements}
+    destination = {item.object_id: item for item in policy.destination_basis.placements}
+    container = source.get(action.container_id)
+    other = destination.get(action.container_id)
+    if (container is None or container.board_id != action.board_id or other is None
+            or container.parent_id != other.parent_id
+            or container.local_transform != other.local_transform):
+        raise ValueError("group shell placement and local transform must remain unchanged")
+    for object_id in action.target_ids:
+        before, after = source[object_id], destination[object_id]
+        expected_parents = ((container.parent_id, action.container_id) if action.verb == "group"
+                            else (action.container_id, container.parent_id))
+        if (before.board_id != action.board_id
+                or (before.parent_id, after.parent_id) != expected_parents):
+            raise ValueError("hierarchy members must transfer exactly between the shell and its sibling parent")
+    for basis, grouped in ((policy.source_basis, action.verb == "ungroup"),
+                           (policy.destination_basis, action.verb == "group")):
+        children = [item.object_id for item in sorted(basis.placements, key=lambda item: item.sibling_ordinal)
+                    if item.parent_id == action.container_id]
+        if children != (action.target_ids if grouped else []):
+            raise ValueError("hierarchy group shell needs the exact ordered member inventory")
 
 
 def _require_return_contract(action: EvidenceAction) -> None:

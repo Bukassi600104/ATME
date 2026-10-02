@@ -11,7 +11,7 @@ Date: 2026-10-02
 
 Slice 3Z implements authored general visual annotation and passed
 independent contract/runtime audits and full regression. Slice 3AA is now building
-the immutable hierarchy foundation; group/ungroup execution is not yet integrated. Next are
+the shared hierarchy and explicit transition receipt; group/ungroup execution is not yet integrated. Next are
 dynamic group/ungroup, authored split results, numeric count,
 and the deterministic sound-event ledger. Existing bare `annotate` text is
 not enough: execution needs exact preauthored annotation object IDs, target/
@@ -48,8 +48,18 @@ preview/export parity, compiler, or installed acceptance gates.
   and authored world-affine/bounds/corner preservation. Thirty-two focused
   tests and Ruff pass. The auditor's undeclared-parent, undeclared-transform and
   destination-only nested-root probes were reproduced as failing tests, fixed,
-  and independently rechecked. This utility is not wired into frame execution;
-  group/ungroup contract, runtime, returns and compositor acceptance remain open.
+  and independently rechecked. The shared snapshot is now wired into static
+  frame state, pair validation, every camera validation path, and SVG paint/
+  connector maps. Initial explicit complete before/after receipt models and
+  new-plan/layout validators are implemented with regenerated schemas and legacy
+  hash-compatible omission. The combined focused run passed 193 cases; 43 state/
+  legacy tests passed, and all ten retained offline annotation frame hashes
+  remained unchanged. The added paint-order negative passed in the separate
+  23/23 contract suite. Independent bounded re-audit passed static consumers
+  and this initial receipt-contract stage (130 independently rerun consumer
+  tests and clean Ruff). Updated full 3AA sidecar regression remains required.
+  Resolved-boundary source binding, owned initial empty shells,
+  actual group/ungroup execution, returns and compositor acceptance remain open.
 
 - Slice 3Z adds an optional explicit annotation policy to `TargetAction`, preserving
   legacy no-policy serialization. New plan writes require authored hidden text/

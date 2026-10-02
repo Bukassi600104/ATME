@@ -711,7 +711,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     snapshot = evaluate_frame(layout_document, timeline_document, at_ms)
     layout = ExecutableLayoutV2.model_validate(layout_document)
     timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
-    objects = {obj.object_id: obj for obj in layout.objects}
+    objects = snapshot.hierarchy.object_map({obj.object_id: obj for obj in layout.objects})
     annotation_leaders = {item.action.annotation_policy.leader_connector_id for item in timeline.actions
                           if isinstance(item.action, TargetAction) and item.action.annotation_policy is not None}
     for resolved in timeline.actions:
@@ -738,7 +738,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                     mark = objects[target]
                     if isinstance(mark, MarkObject):
                         _shape(mark, "#000000", "none", 1, draw_fraction=0.5)
-    unsupported = [obj for obj in layout.objects
+    unsupported = [obj for obj in objects.values()
                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_MARKS
                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_TEXT
                            or isinstance(obj, ConnectorObject) and obj.object_type == "arrow"
@@ -760,7 +760,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     scale_y = layout.output_profile.height / design.height
     if abs(scale_x - scale_y) > 1e-6:
         raise UnsupportedVisualObject("output profile cannot uniformly scale Paper & Ink design tokens")
-    for obj in layout.objects:
+    for obj in objects.values():
         if not isinstance(obj, ContainerObject):
             _preflight_object(obj, style, root, scale_x, objects,
                               annotation_pointer=obj.object_id in annotation_leaders)
@@ -771,13 +771,14 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                 and item.action.annotation_policy.leader_connector_id is not None):
             held = evaluate_frame(layout_document, timeline_document, item.end_ms)
             held_states = {state.object_id: state for state in held.objects}
-            leader = objects[item.action.annotation_policy.leader_connector_id]
+            held_objects = held.hierarchy.object_map({obj.object_id: obj for obj in layout.objects})
+            leader = held_objects[item.action.annotation_policy.leader_connector_id]
             stroke = _color(leader.style.stroke, style.colors, default=style.colors["ink"])
-            _connector_shape(leader, objects, held_states, stroke, style.strokes.regular_px * scale_x, None)
+            _connector_shape(leader, held_objects, held_states, stroke, style.strokes.regular_px * scale_x, None)
     resolved_assets = {asset.asset_id: asset for asset in timeline.resolved_assets}
     evidence_treatments = {item.object_id: item for item in layout.evidence_treatments}
     raster_images = {}
-    for obj in layout.objects:
+    for obj in objects.values():
         if not isinstance(obj, VisualObject) or obj.object_type != "image":
             continue
         asset = resolved_assets.get(obj.asset_id)
@@ -816,7 +817,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
                 or (raster.width, raster.height) != (asset.width, asset.height)):
             raise UnsupportedVisualObject(f"v2 image {obj.object_id} failed asset integrity")
         raster_images[obj.asset_id] = raster
-    for obj in layout.objects:
+    for obj in objects.values():
         if not isinstance(obj, VisualObject) or obj.object_type != "evidence":
             continue
         treatment = evidence_treatments.get(obj.object_id)
@@ -868,10 +869,10 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
              f'width="{_n(layout.canvas.width)}" height="{_n(layout.canvas.height)}" '
              f'fill="{style.colors["paper"]}"/>')]
     states = {state.object_id: state for state in snapshot.objects}
-    mask_sources = {obj.mask_source_object_id for obj in layout.objects
+    mask_sources = {obj.mask_source_object_id for obj in objects.values()
                     if isinstance(obj, MaskContainer)}
     children: dict[str | None, list] = {}
-    for obj in layout.objects:
+    for obj in objects.values():
         children.setdefault(obj.parent_id, []).append(obj)
     for siblings in children.values():
         siblings.sort(key=lambda item: (item.z_index, item.object_id))

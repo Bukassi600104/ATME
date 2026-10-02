@@ -7,6 +7,7 @@ from dataclasses import FrozenInstanceError, replace
 
 import pytest
 from test_v2_group_hierarchy import grouped_documents
+from v2_fixtures import digest
 
 from atme.render.v2_hierarchy import (
     HierarchyNode,
@@ -17,6 +18,7 @@ from atme.render.v2_hierarchy import (
     validate_world_preservation,
 )
 from atme.render.v2_state import UnsupportedVisualAction, evaluate_frame
+from atme.render.v2_svg import compose_png_frame, compose_svg_frame
 from atme.render.v2_world import world_bounds
 from atme.store.contracts_v2 import ExecutableLayoutV2
 
@@ -252,3 +254,125 @@ def test_world_tolerance_tracks_serialized_four_decimal_geometry(delta, accepted
     else:
         with pytest.raises(UnsupportedHierarchy, match="world affine"):
             validate_world_preservation(before, before, objects, transforms, destination, ("object-system",))
+
+
+@pytest.mark.parametrize("portrait", [False, True])
+def test_frame_owns_complete_immutable_hierarchy_and_random_seeks_do_not_mutate_source(portrait):
+    layout, timeline, _, expected = basis()
+    if portrait:
+        for document in (layout, timeline):
+            document["output_profile"] = {"profile_id": "SHORT_FORM_9_16", "width": 720, "height": 1280, "fps": 30}
+        layout["canvas"].update(width=720, height=1280)
+        timeline["layout_sha256"] = digest(layout)
+    original = deepcopy((layout, timeline))
+    frame = evaluate_frame(layout, timeline, 5000)
+    assert frame.hierarchy == expected
+    with pytest.raises(FrozenInstanceError):
+        frame.hierarchy.nodes[0].parent_id = None
+    pixels = compose_png_frame(layout, timeline, 5000).png
+    evaluate_frame(layout, timeline, 9000)
+    assert evaluate_frame(layout, timeline, 5000) == frame
+    assert compose_png_frame(layout, timeline, 5000).png == pixels
+    assert (layout, timeline) == original
+
+
+def test_state_camera_and_svg_consume_the_same_frame_hierarchy(monkeypatch):
+    import atme.render.v2_state as state_module
+    import atme.render.v2_svg as svg_module
+
+    layout, timeline, _, _ = basis()
+    observed = {}
+    original_camera = state_module.camera_segments
+    original_evaluate = svg_module.evaluate_frame
+    original_map = HierarchySnapshot.object_map
+
+    def camera(layout, timeline, hierarchy=None):
+        observed["camera"] = hierarchy
+        return original_camera(layout, timeline, hierarchy)
+
+    def evaluate(*args):
+        snapshot = original_evaluate(*args)
+        observed["frame"] = snapshot.hierarchy
+        return snapshot
+
+    def project(self, objects):
+        observed.setdefault("consumers", []).append(self)
+        return original_map(self, objects)
+
+    monkeypatch.setattr(state_module, "camera_segments", camera)
+    monkeypatch.setattr(svg_module, "evaluate_frame", evaluate)
+    monkeypatch.setattr(HierarchySnapshot, "object_map", project)
+    rendered = compose_svg_frame(layout, timeline, 5000)
+    assert 'data-object-id="object-group"' in rendered.svg
+    assert observed["camera"] is observed["frame"]
+    assert len(observed["consumers"]) >= 4
+    assert all(snapshot is observed["frame"] for snapshot in observed["consumers"])
+
+
+@pytest.mark.parametrize("fixture", ["annotation", "evidence"])
+def test_all_annotation_and_evidence_camera_checks_share_frame_hierarchy(monkeypatch, tmp_path, fixture):
+    from test_v2_annotation_contract import annotation_documents
+    from test_v2_evidence_compositor import evidence_documents
+
+    import atme.render.v2_state as state_module
+
+    if fixture == "annotation":
+        _, layout, timeline = annotation_documents()
+        service = None
+    else:
+        service, layout, timeline, _ = evidence_documents(tmp_path)
+    observed = []
+    original = state_module.camera_segments
+
+    def camera(layout, timeline, hierarchy=None):
+        observed.append(hierarchy)
+        return original(layout, timeline, hierarchy)
+
+    monkeypatch.setattr(state_module, "camera_segments", camera)
+    try:
+        frame = evaluate_frame(layout, timeline, 100)
+    finally:
+        if service is not None:
+            service.store.close()
+    assert len(observed) >= 2
+    assert all(snapshot is frame.hierarchy for snapshot in observed)
+
+
+def test_topology_checks_observe_projected_connector_ancestry_not_stored_layout():
+    from test_v2_connector_svg import connector_documents
+
+    from atme.render.v2_state import V2FrameError, validate_static_hierarchy
+
+    _, _, grouped_objects, grouped = basis()
+    connector_layout, _ = connector_documents()
+    connector = ExecutableLayoutV2.model_validate(connector_layout).objects[-1]
+    objects = dict(grouped_objects)
+    objects["object-group"].object_type = "clip"
+    objects[connector.object_id] = connector
+    group_layout, _, _, _ = basis()
+    group_layout["objects"][3]["object_type"] = "clip"
+    group_layout["objects"].append(connector.model_dump(mode="json"))
+    group_layout["boards"][0]["object_ids"].append(connector.object_id)
+    parsed = ExecutableLayoutV2.model_validate(group_layout)
+    with pytest.raises(V2FrameError, match="clipped-endpoint"):
+        validate_static_hierarchy(parsed, HierarchySnapshot.from_objects(objects).object_map(objects))
+    after = HierarchySnapshot(tuple(sorted(
+        ungrouped(grouped).nodes + (HierarchyNode(connector.object_id, connector.board_id, None, 4),),
+        key=lambda node: node.object_id)))
+    validate_static_hierarchy(parsed, after.object_map(objects))
+
+
+def test_svg_paint_tree_consumes_a_supplied_projection_without_enabling_group_actions(monkeypatch):
+    import xml.etree.ElementTree as ET
+
+    import atme.render.v2_svg as svg_module
+
+    layout, timeline, _, before = basis()
+    frame = evaluate_frame(layout, timeline, 5000)
+    projected = replace(frame, hierarchy=ungrouped(before))
+    monkeypatch.setattr(svg_module, "evaluate_frame", lambda *args: projected)
+    root = ET.fromstring(compose_svg_frame(layout, timeline, 5000).svg)
+    group = next(node for node in root.iter() if node.attrib.get("data-object-id") == "object-group")
+    assert list(group) == []
+    assert sum(node.attrib.get("data-object-id") == "object-system" for node in root.iter()) == 1
+    assert sum(node.attrib.get("data-object-id") == "object-label" for node in root.iter()) == 1

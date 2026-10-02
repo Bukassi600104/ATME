@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from atme.render.v2_hierarchy import HierarchySnapshot
 from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds
 from atme.store.contracts_v2 import (
     CameraAction,
@@ -151,9 +152,12 @@ def _destination(layout, source: CameraViewport, target: CameraViewport,
                           action.action_id, action.movement_purpose)
 
 
-def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2):
+def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
+                    hierarchy: HierarchySnapshot | None = None):
     """Validate all camera actions and return immutable start/end viewport segments."""
-    objects = {obj.object_id: obj for obj in layout.objects}
+    initial = {obj.object_id: obj for obj in layout.objects}
+    hierarchy = hierarchy if hierarchy is not None else HierarchySnapshot.from_objects(initial)
+    objects = hierarchy.object_map(initial)
     visible = {item.object_id: item.visible for item in timeline.initial_object_states}
     opacity = {obj.object_id: obj.opacity for obj in layout.objects}
     revealed = {object_id: value for object_id, value in visible.items()}

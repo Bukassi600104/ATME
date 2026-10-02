@@ -1160,6 +1160,17 @@
           ],
           "default": null,
           "title": "Container Id"
+        },
+        "hierarchy_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HierarchyTransitionPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -1175,6 +1186,126 @@
         "target_ids"
       ],
       "title": "GroupAction",
+      "type": "object"
+    },
+    "HierarchyBasis": {
+      "additionalProperties": false,
+      "description": "Complete canonical layout inventory, including root and empty-parent order.",
+      "properties": {
+        "placements": {
+          "items": {
+            "$ref": "#/$defs/HierarchyPlacement"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "title": "Placements",
+          "type": "array"
+        }
+      },
+      "required": [
+        "placements"
+      ],
+      "title": "HierarchyBasis",
+      "type": "object"
+    },
+    "HierarchyPlacement": {
+      "additionalProperties": false,
+      "description": "An exact authored hierarchy node and local transform, not a destination hint.",
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent Id"
+        },
+        "sibling_ordinal": {
+          "minimum": 0,
+          "title": "Sibling Ordinal",
+          "type": "integer"
+        },
+        "local_transform": {
+          "$ref": "#/$defs/Transform"
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "parent_id",
+        "sibling_ordinal",
+        "local_transform"
+      ],
+      "title": "HierarchyPlacement",
+      "type": "object"
+    },
+    "HierarchyTransitionPolicy": {
+      "additionalProperties": false,
+      "description": "Complete authored before/after receipt; no inferred membership or inverse.",
+      "properties": {
+        "member_root_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Member Root Ids",
+          "type": "array"
+        },
+        "source_basis": {
+          "$ref": "#/$defs/HierarchyBasis"
+        },
+        "destination_basis": {
+          "$ref": "#/$defs/HierarchyBasis"
+        },
+        "source_basis_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Basis Sha256",
+          "type": "string"
+        },
+        "destination_basis_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Destination Basis Sha256",
+          "type": "string"
+        },
+        "changed_object_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "title": "Changed Object Ids",
+          "type": "array"
+        },
+        "preserve_world_transform": {
+          "const": true,
+          "title": "Preserve World Transform",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "member_root_ids",
+        "source_basis",
+        "destination_basis",
+        "source_basis_sha256",
+        "destination_basis_sha256",
+        "changed_object_ids",
+        "preserve_world_transform"
+      ],
+      "title": "HierarchyTransitionPolicy",
       "type": "object"
     },
     "MorphPolicy": {

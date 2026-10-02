@@ -2,8 +2,9 @@
 
 Date: 2026-10-02
 
-Status: shared immutable topology foundation implemented; transition contract,
-action execution, compositor integration and acceptance are not complete.
+Status: shared immutable topology foundation audited; static consumer integration
+and initial complete receipt contract implemented and bounded re-audit PASS. Transition
+action execution, empty-shell ownership, continuity and acceptance are not complete.
 This is not a replacement for the approved rebuild or the remaining runtime
 matrix. Group/ungroup remain non-executable until the whole path is verified.
 
@@ -54,16 +55,37 @@ audit was PARTIAL. The independent re-audit passed all 32 cases and Ruff and
 manually confirmed all three original fail-open probes now reject. This PASS
 is restricted to the standalone foundation, not action/compositor integration.
 
-This foundation is not yet used by frame execution. Next integration must make
-the evaluated hierarchy part of the immutable frame snapshot and use it in state,
-SVG child trees, world geometry, camera bounds, connector anchors, annotation
-geometry and retained-pointer dependencies. Separate ad-hoc parent resolution
-in those consumers is not acceptable. World mappings that the current transform
+FrameSnapshot now owns the shared initial hierarchy. Pair validation and all
+annotation/evidence camera checks receive that same snapshot; state visibility,
+world bounds, camera geometry and SVG paint/connector maps project it rather than
+rebuilding their own parent inventory. Synthetic non-executable projection tests
+check connector ancestry and the paint tree; annotation/evidence identity tests
+cover paths the first integration test missed. This is static wiring, not yet an
+evaluated group/ungroup transition. World mappings that the current transform
 representation cannot express must reject explicitly; do not approximate shear
 or flatten descendants. Any retained representational limit must remain visible
 in coverage and the runtime matrix, not be treated as completion of richer plans.
 
 ## State and conflicts
+
+The initial contract now carries complete canonical `HierarchyBasis` before/after
+placements and local transforms on `GroupAction.hierarchy_policy`, with hashes of
+their normalized finite JSON, ordered member roots, derived structural-version
+IDs, and explicit world preservation. A complete basis unambiguously includes all
+parent child orders (including root and empty parents); there is no contradictory
+compact second mapping. Old bare actions preserve their original serialized shape.
+New plan/layout gates reject missing policies. Layout geometry validates exact
+scope, world preservation, full structural change receipt, opaque nonpainting
+shell, effective leaf paint order, and aperture/evidence ownership constraints.
+The semantic-plan container check no longer mistakes a semantic declaration for
+an executable ContainerObject.
+
+Still required before execution: resolved-boundary source-basis equality with
+CURRENT completed transforms, unique ownership receipts for initial empty shells,
+chronological transition replay, action-aware camera/conflict handling, retained
+board parent/order expectations, and integrated preview/export parity. The new
+schema data and pure validators do not claim those gates complete. Split remains
+separate; the grouping policy rejects a split action rather than ignoring it.
 
 Track exact hierarchy/state-version changes, including affected subtree and
 sibling-order changes. Developed-board returns need an explicit complete parent/
@@ -77,6 +99,17 @@ the same conflict analysis. No implicit clip/mask/evidence reparenting or source
 ownership change is permitted. Preserve existing public v1 preview/export and
 Caleb-derived behavior. The private stored v2 runner is the first integration
 proof; public/installed routing remains a later gate.
+
+## Current bounded verification
+
+The combined hierarchy/receipt/annotation/evidence/camera/connector run passed
+193 tests in 71.62 seconds; adding the leaf-paint-order negative produced a
+separate 23/23 contract PASS. Forty-three state/legacy render tests passed in
+182.29 seconds. Ruff is clean. Re-running the ten retained offline annotation
+frames and contact sheet produced byte-for-byte identical hashes. The independent
+auditor reran 130 consumer tests and Ruff and passed static consumer wiring and
+the initial receipt stage, not dynamic group execution. The full updated 3AA
+sidecar regression remains required; the earlier 980-test run proves 3Z only.
 
 ## Required acceptance
 

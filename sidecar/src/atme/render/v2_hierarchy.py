@@ -10,7 +10,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from atme.render.v2_world import world_bounds, world_matrix
-from atme.store.contracts_v2 import ContainerObject, MaskContainer
+from atme.store.contracts_v2 import (
+    ContainerObject,
+    GroupAction,
+    MaskContainer,
+    _require_hierarchy_contract,
+)
 
 
 class UnsupportedHierarchy(ValueError):
@@ -204,3 +209,40 @@ def validate_world_preservation(before: HierarchySnapshot, after: HierarchySnaps
             for y in (bounds.y, bounds.y + bounds.height):
                 if any(abs(a-b) > 1e-4 for a, b in zip(old.point(x, y), new.point(x, y), strict=True)):
                     raise UnsupportedHierarchy(f"hierarchy mapping changes world corners for {object_id}")
+
+
+def validate_authored_hierarchy(action: GroupAction, objects: dict) -> tuple[HierarchySnapshot, HierarchySnapshot]:
+    """Validate the complete authored receipt against actual layout geometry.
+
+    This does not execute a transition or bind its source to a resolved action
+    boundary. Those chronological state/conflict checks remain runtime gates.
+    """
+    _require_hierarchy_contract(action)
+    policy = action.hierarchy_policy
+    before, after = (HierarchySnapshot(tuple(HierarchyNode(item.object_id, item.board_id, item.parent_id,
+                                                          item.sibling_ordinal) for item in basis.placements))
+                     for basis in (policy.source_basis, policy.destination_basis))
+    transforms = [{item.object_id: item.local_transform for item in basis.placements}
+                  for basis in (policy.source_basis, policy.destination_basis)]
+    moved_roots = tuple(action.target_ids)
+    validate_world_preservation(before, after, objects, *transforms, moved_roots)
+    if changed_hierarchy_objects(before, after, objects) != tuple(policy.changed_object_ids):
+        raise UnsupportedHierarchy("hierarchy receipt omits or invents structural version changes")
+    shell = objects[action.container_id]
+    if (shell.object_type != "group" or not shell.visible or shell.opacity != 1
+            or shell.asset_id is not None or shell.anchors or shell.geometry.points
+            or shell.geometry.corner_radius is not None or shell.clip_id is not None
+            or any((shell.style.stroke, shell.style.fill, shell.style.text, shell.style.effect))):
+        raise UnsupportedHierarchy("hierarchy shell must be a visible opaque nonpainting group")
+    for snapshot in (before, after):
+        for object_id in objects:
+            ancestors = set(snapshot.ancestors(object_id))
+            if object_id in moved_roots or ancestors.intersection(moved_roots):
+                dependencies = {object_id, *ancestors, action.container_id}
+                if any(objects[key].object_type in {"clip", "mask", "evidence"}
+                       or objects[key].clip_id is not None for key in dependencies):
+                    raise UnsupportedHierarchy("hierarchy transition cannot cross aperture or evidence ownership")
+    for board_id in {obj.board_id for obj in objects.values()}:
+        if before.paint_order(objects, board_id) != after.paint_order(objects, board_id):
+            raise UnsupportedHierarchy("hierarchy transition changes effective leaf paint order")
+    return before, after
