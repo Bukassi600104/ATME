@@ -1,0 +1,95 @@
+# Phase 3 remaining runtime matrix
+
+Date: 2026-10-02
+
+Scope: independent read-only cross-reference after Slice 3Y, against the
+approved rebuild and R-01–R-15. This records gaps, not a new editor redesign or
+permission to add unrelated NLE capabilities. A source compositor PASS is not
+installed preview/export or final creative-quality acceptance.
+
+## Remaining action semantics
+
+1. General visual annotation: authored annotation objects, exact target/leader
+   anchors, reveal ordering, readable hold and persistence. Existing bare text
+   does not execute. Keep attested evidence self-annotation separate; annotations
+   aimed at evidence must respect its permissions and never change source pixels.
+2. Group/ungroup: explicit member order, source/destination parent ownership,
+   reversible mappings and world-transform preservation.
+3. Split: explicit authored result objects, correspondence, ownership and source
+   removal. Do not infer fragments.
+4. Count: numeric range, unit, formatting, rounding/steps and a bound text object.
+5. Non-list progressive disclosure: authored part inventory/order and state.
+6. Deterministic sound-event ledger: immutable asset identity, times, bus/role,
+   gain/fades, loop/state changes, narration priority and purposeful silence.
+   Actual mixing/export remains Phase 7.
+
+## Remaining primitive and composition gaps
+
+- Bracket marks: authored side/orientation, stroke construction and bounds.
+- Callout/code text: callout geometry and exact leader binding; pinned mono
+  text, exact lines and explicit plain-code/token semantics. Declared types
+  currently fail compositor preflight.
+- Free-source pointers and network relationships: distinct source-point/target-
+  anchor contracts; do not substitute a self-loop for an attention pointer.
+- Comparison, browser, application, server, database, folder, composition and
+  instance: accepted vocabulary lacks faithful executable treatment. Add original
+  illustration families or structured composites, never generic-box fallbacks.
+- Charts: static chart artwork is not a truthful data-bound chart. Require
+  series, labels, units/domain, scale, highlights and construction timing.
+- Characters: add enough authored pose/gesture/state variants and semantic
+  anchors to execute approved plans. Separate layered objects may supply motion;
+  a general rig or facial-animation system is not implied.
+- Illustration families: icon/pictogram/device/document/terminal artwork needs
+  the content, labels, state variants and semantic anchors required by each plan.
+  Internal-part animation for every asset is not a universal requirement; use
+  authored layers where sufficient, rather than introducing a general rig.
+- Lists: flat strings lack stable authored item IDs, state and anchors for
+  item-specific actions. Keep exact item order and whole-item progressive
+  disclosure. Nesting/rearrangement/grouping is needed only when explicitly
+  requested by the storyboard, not as a general list-editor expansion.
+- Anchors: placed illustration anchors are not yet bound to the registry's
+  semantic metadata. Add registry/part parity, world positions and clear clip/
+  mask visibility rules; arbitrary normalized coordinates alone are insufficient.
+- Supporting images: bounded upright PNG placement lacks authored crop/fit/focal
+  point and permitted transformations. Keep evidence's stronger attested path.
+- Evidence: readable cards and retained board return exist, but cross-object
+  annotation and the full evidence-to-developed-abstraction golden cycle do not.
+  Any richer aperture must preserve readability and declared permissions.
+- Hierarchy: static groups/clips/alpha masks work. Dynamic membership and external
+  clip references do not. Remaining accepted hierarchy semantics must execute or
+  be explicitly rejected; advanced general-purpose masking is not added by this
+  audit.
+- Style effects: effect references currently reject. Define purposeful authored
+  Paper & Ink treatments and token consumption; do not introduce unrelated grading
+  or keyframe-graph features.
+- Reusable composition/instance: definitions, parameter binding, overrides and
+  deterministic expansion are not implemented.
+- Source video/presenter/screen recording: asset kinds exist but there is no v2
+  media object with source ranges, deterministic frame decoding, authored crop/
+  reframe and Paper & Ink overlay composition. This is a critical talking-head
+  production gap, not satisfied by static thumbnails.
+- Captions: no v2 caption-track composition, authoritative timed text, line
+  breaking, safe-zone/collision handling or public preview/export parity.
+  This is an overall production-integration gap; implementation follows the
+  approved compiler/quality/studio/format phase ownership, not an automatic
+  requirement to finish the entire caption system inside this primitive slice.
+- Portrait: profile scaling does not satisfy independently composed 9:16 visual
+  hierarchy and density. Director/compiler recomposition remains Phase 4/11 work;
+  Phase 3 must faithfully render both authored profiles.
+
+## Sequence and acceptance
+
+Continue with general annotation, then the remaining actions. Prioritize pointer/
+registry-anchor binding; callout/bracket/code and structured technical frames;
+data-driven charts; presenter media/captions; richer character/illustration state;
+then reusable compositions and remaining purposeful hierarchy/style semantics.
+This ordering does not waive any other required primitive.
+
+For every applicable addition prove exact plan→layout→resolved preservation,
+project-owned/checksummed assets and provenance, ownership/world bounds/anchors,
+hierarchy/action/camera interactions, deterministic random seeks, pixels,
+stored-project integrity, offline operation, both profiles and v1/Caleb isolation.
+Phase 3 still needs public preview/export parity, bounded compositor determinism/
+performance evidence and its complete supported primitive/action matrix. Full
+long-project/cache/resource budgets remain Phase 11. Later compiler, quality,
+MCP, studio, format, packaging and human acceptance gates remain unchanged.
