@@ -11,6 +11,7 @@ import hashlib
 import json
 from dataclasses import dataclass, replace
 
+from atme.render.v2_annotation import validate_annotation_geometry
 from atme.render.v2_camera import (
     CameraViewport,
     UnsupportedCamera,
@@ -54,6 +55,8 @@ from atme.store.contracts_v2 import (
     TransformAction,
     VisualObject,
     _action_object_references,
+    _annotation_object_ids,
+    _annotation_phase_windows,
     _require_morph_contract,
     _require_return_board_policy,
     _require_return_contract,
@@ -337,6 +340,8 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                                  (previous.to_object_id, previous.post_state))
                 elif isinstance(previous, ConnectionAction):
                     mutations = ((previous.connector_id, previous.post_state),)
+                elif isinstance(previous, TargetAction) and previous.annotation_policy is not None:
+                    mutations = ((object_id, "visible") for object_id in _annotation_object_ids(previous))
                 else:
                     mutations = ((object_id, previous.post_state)
                                  for object_id in _action_object_references(previous))
@@ -460,6 +465,81 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
         for object_id, obj in layout_objects.items()
     }
     for item in timeline.actions:
+        if isinstance(item.action, TargetAction) and item.action.annotation_policy is not None:
+            action = item.action
+            target_id = action.target_ids[0]
+            note_ids = _annotation_object_ids(action)
+            participants = {target_id, *note_ids}
+            ancestors = {ancestor for object_id in participants
+                         for ancestor in _ancestor_ids(layout_objects[object_id], layout_objects)}
+            dependencies = participants | ancestors
+            hold_end = item.end_ms + action.annotation_policy.readable_hold_ms
+            activation = next((a for a in layout.activations if a.board_id == action.board_id
+                               and a.start_ms <= item.start_ms and hold_end <= a.end_ms), None)
+            if activation is None:
+                raise V2FrameError(f"annotation {action.action_id} reading hold outlasts its board")
+            if (not completed_visible[target_id] or completed_reveal[target_id] != 1
+                    or completed_opacity[target_id] <= 0
+                    or any(not completed_visible[parent] or completed_opacity[parent] <= 0
+                           or completed_reveal[parent] != 1 for parent in ancestors)):
+                raise V2FrameError(f"annotation {action.action_id} needs fully visible target and parents")
+            if any(object_id in last_target_end or completed_visible[object_id]
+                   or completed_reveal[object_id] != 0 or completed_opacity[object_id] <= 0
+                   for object_id in note_ids):
+                raise V2FrameError(f"annotation {action.action_id} needs untouched hidden notes")
+            if any(completed_opacity[object_id] != 1 for object_id in dependencies):
+                raise V2FrameError(f"annotation {action.action_id} needs opaque participants for reading")
+            for other in timeline.actions:
+                if other is item or isinstance(other.action, SoundAction):
+                    continue
+                board_effect = (other.action.board_id == action.board_id and (
+                    isinstance(other.action, CameraAction)
+                    or isinstance(other.action, TargetAction) and other.action.verb == "isolate"))
+                if (other.start_ms < hold_end and item.start_ms < other.end_ms
+                        and (board_effect or dependencies.intersection(_action_object_references(other.action)))):
+                    raise V2FrameError(f"annotation {action.action_id} needs uninterrupted construction and hold")
+            leader_id = action.annotation_policy.leader_connector_id
+            if leader_id is not None:
+                leader = layout_objects[leader_id]
+                endpoint_ids = {leader.source_object_id, leader.destination_object_id}
+                live_dependencies = {leader_id, *endpoint_ids, *(ancestor for endpoint in endpoint_ids
+                    for ancestor in _ancestor_ids(layout_objects[endpoint], layout_objects))}
+                removal = next((other for other in timeline.actions
+                                if isinstance(other.action, TargetAction) and other.action.verb == "exit"
+                                and other.action.target_ids == [leader_id]
+                                and other.start_ms >= hold_end), None)
+                live_end = removal.end_ms if removal is not None else timeline.duration_ms
+                for other in timeline.actions:
+                    if (other is item or other is removal or other.start_ms >= live_end
+                            or other.end_ms <= hold_end
+                            or isinstance(other.action, (CameraAction, SoundAction))
+                            or isinstance(other.action, EvidenceAction) and other.action.verb == "return_board"):
+                        continue
+                    if isinstance(other.action, TargetAction) and other.action.annotation_policy is not None:
+                        mutations = _annotation_object_ids(other.action)
+                    elif isinstance(other.action, ConnectionAction):
+                        mutations = [other.action.connector_id]
+                    else:
+                        mutations = _action_object_references(other.action)
+                    if live_dependencies.intersection(mutations):
+                        raise V2FrameError(
+                            f"retained annotation pointer {leader_id} requires completed explicit removal before endpoint edits"
+                        )
+            try:
+                _annotation_phase_windows(item)
+                camera_plan = camera_segments(layout, timeline)
+                viewports = [evaluate_camera(layout, camera_plan, moment, activation.activation_id, _ease)
+                             for moment in (item.start_ms, item.end_ms, hold_end - 1)]
+                validate_annotation_geometry(action, layout, layout_objects, completed_transform, viewports)
+            except ValueError as exc:
+                raise V2FrameError(str(exc)) from exc
+            for object_id in participants:
+                last_target_end[object_id] = hold_end
+            for object_id in note_ids:
+                last_target_verb[object_id] = "annotate"
+                completed_visible[object_id] = True
+                completed_reveal[object_id] = 1.0
+            continue
         if isinstance(item.action, EvidenceAction) and item.action.verb == "insert_evidence":
             action = item.action
             target = action.target_object_id
@@ -927,6 +1007,7 @@ def evaluate_frame(
             or isinstance(action, EvidenceAction)
             and action.verb in {"insert_evidence", "return_board"}
             or isinstance(action, ReplaceAction)
+            or isinstance(action, TargetAction) and action.annotation_policy is not None
             or isinstance(action, TargetAction) and action.verb in {
                 "reveal", "write", "draw", "enter", "exit", "progressive_reveal", "highlight",
                 "cross_out",
@@ -949,6 +1030,17 @@ def evaluate_frame(
             action.easing,
         )
         completed = at_ms >= resolved.end_ms
+        if isinstance(action, TargetAction) and action.annotation_policy is not None:
+            for phase, start, end in _annotation_phase_windows(resolved):
+                if at_ms < start:
+                    continue
+                fraction = _ease((at_ms - start) / (end - start), action.easing)
+                before = current[phase.object_id]
+                current[phase.object_id] = replace(
+                    before, state="visible" if at_ms >= end else before.state,
+                    visible=fraction > 0, reveal_fraction=fraction,
+                )
+            continue
         if isinstance(action, EvidenceAction):
             before = current[action.target_object_id]
             current[action.target_object_id] = replace(

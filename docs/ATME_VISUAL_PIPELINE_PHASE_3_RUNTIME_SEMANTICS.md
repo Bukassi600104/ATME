@@ -435,7 +435,7 @@ it is neither final creative-quality acceptance nor installed-app acceptance.
 ## Still to define and implement before Phase 3 exit
 
 The remaining verbs are deliberately rejected by Slice 3A. Their executable semantics must be
-fixed before their first runtime implementation: `annotate`,
+fixed before their first runtime implementation:
 `group`, `ungroup`, `split`, `count`,
 sound state/events. `insert_evidence` and `return_board` have only the bounded
 semantics above. In particular,
@@ -449,3 +449,42 @@ regressions pass. The existing v1 renderer and Caleb-derived behavior remain unc
 Slice 3X's `preview_v2_source` is a private source-level integration verifier for an exact
 stored layout/resolved-timeline pair. It does not change the public preview dispatcher,
 advertised renderer capability, installed desktop behavior, or export availability.
+
+## Bounded 3Z authored general annotation
+
+An explicit `annotation_policy` binds one already visible, unchanged target to
+preauthored hidden text/mark leaves and an optional exact annotation-to-target
+pointer. Evidence is excluded from this general path; its attested treatment
+remains separate. New writes require exact beat/action coverage, same-board
+ownership, phase/type compatibility, and named pointer anchors. A bare legacy
+`annotate` remains readable but non-executable. No annotation text, mark geometry,
+asset, or anchor is invented by the renderer.
+
+Positive integer phase weights divide the resolved construction window using
+cumulative integer boundaries, so proportional weights have identical timing.
+Collapsed sub-millisecond phases reject. Every phase uses local authored easing:
+text is grapheme-written and marks/pointers are stroke-drawn. A pointer phase
+follows its fully constructed source note. At completion the notes/leader persist;
+the referenced target's state, paint and version do not change. Board return
+increments only constructed-note/leader versions, never the read-only target.
+
+Construction and the declared reading hold must fit one board activation.
+Participants and ancestors must be effectively visible/revealed as appropriate
+and fully opaque. Target, note, ancestor, isolation and camera edits cannot
+interrupt that interval. Static group ancestry is supported; clipped/masked
+annotation participants reject in this bounded treatment. Effective recursive
+paint order, world bounds, transformed anchors and pinned text screen size are
+checked; complete pointer route/head paint is preflighted even for earlier frames.
+After the hold, a note without a pointer may be exited and camera focus may move.
+A retained pointer reserves its own geometry and endpoint/ancestor dependencies
+until a solo explicit pointer exit has fully completed; endpoint edits cannot
+overlap that removal. This prevents early-valid timelines failing on later seeks.
+
+`bench/verify_v2_annotation.py` retains ten source SVG-to-PNG phase frames across
+both profiles with network calls denied and byte-identical re-seeks. These are
+mechanical fixtures, not final Caleb-informed composition or creative-quality
+acceptance. The fixed text-size floor and explicit reading duration do not replace
+Phase 5's final attention/readability rubric. Private stored-project parity is
+tested; public preview/export, compiler integration and installed acceptance are
+still closed. The bounded independent runtime re-audit passed, including actual
+offline frames and public v1 preview isolation; full 3Z regression is in progress.

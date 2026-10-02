@@ -9,8 +9,10 @@ class UnsupportedConnector(ValueError):
     """An authored connector cannot be executed by the bounded arrow runtime."""
 
 
-def validate_static_arrow(obj: ConnectorObject, objects: dict) -> None:
-    if obj.object_type != "arrow" or obj.role != "semantic_connector":
+def validate_static_arrow(obj: ConnectorObject, objects: dict, *, annotation_pointer: bool = False) -> None:
+    if obj.object_type != "arrow" or obj.role not in (
+        {"semantic_connector", "pointer"} if annotation_pointer else {"semantic_connector"}
+    ):
         raise UnsupportedConnector(f"v2 connector {obj.object_id} has unsupported network/pointer semantics")
     if not obj.source_object_id or not obj.source_anchor_id:
         raise UnsupportedConnector(f"v2 arrow {obj.object_id} needs a named source anchor")

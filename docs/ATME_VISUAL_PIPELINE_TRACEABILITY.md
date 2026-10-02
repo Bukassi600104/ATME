@@ -43,6 +43,14 @@ production routing, or R-15's installed/public-preview/export quality acceptance
 
 ## Required golden workflows
 
+Slice 3Z advances R-02/R-08/R-10/R-11 with authored general annotation:
+exact action/beat-owned hidden leaves, ordered weighted construction, bound
+pointer anchors, immutable target state/version, readable hold and retained
+pointer lifecycle. Direct SVG/PNG and stored-project tests prove source runtime
+mechanics; independent contract/runtime audits passed and full regression is pending.
+Cross-object evidence treatment, final creative/readability quality, compiler
+production routing, and R-15 public/installed acceptance remain open.
+
 1. Approved script plus recording.
 2. Recording-only narrative and timing authority.
 3. Talking-head source video with linked audio.

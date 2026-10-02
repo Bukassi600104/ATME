@@ -17,6 +17,7 @@ from atme.store.contracts_v2 import (
     ResolvedVisualTimelineV2,
     TargetAction,
     TransformAction,
+    _annotation_object_ids,
 )
 
 
@@ -236,6 +237,10 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
             segments.append((resolved, activation.activation_id, viewport, destination))
             viewport = destination
         elif isinstance(action, TargetAction):
+            if action.annotation_policy is not None:
+                for target in _annotation_object_ids(action):
+                    visible[target] = True
+                    revealed[target] = True
             for target in action.target_ids:
                 if action.verb == "exit":
                     visible[target] = False

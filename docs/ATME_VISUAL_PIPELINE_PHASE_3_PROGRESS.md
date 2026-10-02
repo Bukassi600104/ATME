@@ -1,16 +1,17 @@
 # Phase 3 — renderer and action runtime progress
 
 Status: Slices 3A–3U and bounded 3V/3W/3X stages independent PASS;
-Slice 3Y implementation, bounded audit, and v2/legacy regression PASS;
-full sidecar regression in progress;
+Slice 3Y implementation, bounded audit, and full sidecar regression PASS;
+Slice 3Z bounded annotation contract/runtime audits PASS; full regression in progress;
 Phase 3 remains incomplete
 
 Date: 2026-10-02
 
 ## Next executable action slice
 
-The independent remaining-action audit prioritizes authored general visual
-annotation, then dynamic group/ungroup, authored split results, numeric count,
+The current Slice 3Z implements authored general visual annotation and passed
+independent contract/runtime audits; its full regression remains open. Next are
+dynamic group/ungroup, authored split results, numeric count,
 and the deterministic sound-event ledger. Existing bare `annotate` text is
 not enough: execution needs exact preauthored annotation object IDs, target/
 leader anchors, reveal ordering, readable hold, persistence, and ownership.
@@ -40,6 +41,31 @@ preview/export parity, compiler, or installed acceptance gates.
 
 ## Incomplete Phase 3 gates
 
+- Slice 3Z adds an optional explicit annotation policy to `TargetAction`, preserving
+  legacy no-policy serialization. New plan writes require authored hidden text/
+  mark leaves, exact action/beat coverage, construction order/weights, a target
+  reference, optional named pointer anchors, and a retained reading hold. The
+  resolved timeline constructs only the notes/leader; the target remains unchanged.
+  The source compositor writes graphemes/draws strokes with phase-local easing,
+  rather than generating copy or wiping a target rectangle. Hold, effective
+  visibility/opacity, group paint order, world geometry, pinned text size, and
+  pointer route/head guards fail closed. A retained pointer must be explicitly
+  removed before an endpoint or its ancestor may change. Only note/leader state
+  versions increment on board return. Evidence targets cannot bypass attested
+  EvidenceTreatment. Forty contract and 42 runtime cases pass, including exact
+  boundaries, pixels, random seeks, group geometry, camera handoff, offline both-
+  profile frames, stored-project parity, and pointer lifecycle. Independent
+  contract and runtime re-audits passed, including the corrected retained-pointer
+  lifecycle and existing public v1 draft-preview isolation. Fourteen targeted
+  legacy render/checkpoint/offline tests and Ruff passed. The fresh entire
+  sidecar regression against finalized 3Z code is running
+  (`test-artifacts/phase-3z-full-sidecar.log`); it is not yet claimed passed.
+  The earlier v2-selected run started before the final pointer correction and
+  included one faulty head-bound test fixture, since fixed; it is superseded
+  and not finalized regression evidence. Public preview/export and installed app remain
+  unchanged. The retained contact sheet proves mechanics, not the final visual
+  quality rubric or independently designed portrait storytelling.
+
 - Slice 3Y adds deterministic authored geometry morphing, rather than crossfade:
   exact canonical box/ellipse outlines, ordered polygon/line/freehand vertices,
   and matching freehand M/L/Q/C commands. Shared style/ownership and explicit
@@ -54,7 +80,9 @@ preview/export parity, compiler, or installed acceptance gates.
   and legacy morph loadability. Finalized v2-selected and legacy render/checkpoint/
   offline regressions passed: 524 passed, 5 skipped in 741.47 seconds. The skipped
   cases are preexisting Windows symlink-dependent tests; no new morph test skipped.
-  Full sidecar regression is still running and is not yet claimed passed. Ruff,
+  Full sidecar regression passed: 898 passed, 5 skipped in 1770.36 seconds,
+  exit code 0 (`test-artifacts/phase-3y-full-sidecar.log`). This is the finalized
+  3Y baseline, not verification of the later 3Z annotation changes. Ruff,
   exact generated-schema/model parity, and staged whitespace checks passed.
   The retained offline contact sheet proves mechanics only, not the approved
   final visual-quality rubric. Public v2 preview/export, compiler integration,

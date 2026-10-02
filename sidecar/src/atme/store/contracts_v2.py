@@ -9,7 +9,14 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    model_serializer,
+    model_validator,
+)
 
 
 class StrictModel(BaseModel):
@@ -278,6 +285,34 @@ class ActionBase(StrictModel):
     coverage_id: str = Field(min_length=1)
 
 
+class AnnotationPhase(StrictModel):
+    object_id: str = Field(min_length=1)
+    mode: Literal["draw", "write"]
+    weight: int = Field(ge=1, le=10000)
+
+
+class AnnotationPolicy(StrictModel):
+    """Ordered construction of authored objects; never renderer-generated copy."""
+
+    annotation_object_ids: list[str] = Field(min_length=1, max_length=32)
+    leader_connector_id: str | None = Field(default=None, min_length=1)
+    phases: list[AnnotationPhase] = Field(min_length=1, max_length=33)
+    readable_hold_ms: int = Field(ge=1, le=60000)
+    retention: Literal["retain"] = "retain"
+
+    @model_validator(mode="after")
+    def exact_phase_inventory(self):
+        ids = self.annotation_object_ids + ([self.leader_connector_id] if self.leader_connector_id else [])
+        phase_ids = [phase.object_id for phase in self.phases]
+        if len(ids) != len(set(ids)) or len(phase_ids) != len(set(phase_ids)) or set(ids) != set(phase_ids):
+            raise ValueError("annotation phases must construct every authored object exactly once")
+        if self.leader_connector_id and next(
+            phase.mode for phase in self.phases if phase.object_id == self.leader_connector_id
+        ) != "draw":
+            raise ValueError("annotation leader requires a draw phase")
+        return self
+
+
 class TargetAction(ActionBase):
     verb: Literal[
         "reveal", "write", "draw", "enter", "exit", "highlight", "dim", "isolate",
@@ -285,9 +320,21 @@ class TargetAction(ActionBase):
     ]
     target_ids: list[str] = Field(min_length=1)
     annotation: str | None = None
+    # Optional parsing preserves old bare annotate documents. New writes and
+    # execution require explicit authored objects and ordered construction.
+    annotation_policy: AnnotationPolicy | None = None
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_shape(self, handler):
+        result = handler(self)
+        if self.annotation_policy is None:
+            result.pop("annotation_policy", None)
+        return result
 
     @model_validator(mode="after")
     def exit_is_permanent_removal(self):
+        if self.annotation_policy is not None:
+            _require_annotation_contract(self)
         if self.verb == "exit" and self.post_state != "removed":
             raise ValueError("exit must declare the canonical removed post-state")
         return self
@@ -1263,6 +1310,18 @@ class ResolvedVisualTimelineV2(StrictModel):
                 states[action.to_object_id] = "visible"
                 resolved_actions[action.action_id] = resolved
                 continue
+            if isinstance(action, TargetAction) and action.annotation_policy is not None:
+                if states[action.target_ids[0]] != "visible":
+                    raise ValueError("annotation requires an unchanged visible target")
+                for object_id in _annotation_object_ids(action):
+                    if states[object_id] != "hidden":
+                        raise ValueError("annotation requires hidden authored objects")
+                    states[object_id] = "visible"
+                _annotation_phase_windows(resolved)
+                if resolved.end_ms + action.annotation_policy.readable_hold_ms > self.duration_ms:
+                    raise ValueError("annotation phases or reading hold exceed resolved timing")
+                resolved_actions[action.action_id] = resolved
+                continue
             # A camera observes objects; it does not mutate their semantic state.
             state_targets = ([] if isinstance(action, CameraAction)
                              else [action.connector_id] if isinstance(action, ConnectionAction)
@@ -1403,6 +1462,11 @@ def validate_plan_layout(plan_document: dict, layout_document: dict) -> None:
             raise ValueError(f"layout board {board_id} changes its directing declaration")
     activations = {item.activation_id: item for item in layout.activations}
     for action in plan.actions:
+        if isinstance(action, TargetAction) and action.verb == "annotate":
+            _validate_annotation_plan_objects(action, {obj.object_id: obj for obj in plan.objects},
+                                              next(beat for beat in plan.beats if action.action_id in beat.action_ids))
+            _validate_annotation_plan_objects(action, executable)
+            _validate_annotation_layout(action, executable)
         if isinstance(action, ReplaceAction) and action.verb == "morph":
             from atme.render.v2_morph import validate_morph_geometry
 
@@ -1457,6 +1521,9 @@ def validate_plan_evidence_completeness(plan_document: dict) -> None:
     """Require executable evidence and return declarations for new plan writes."""
     plan = VisualPlanV2.model_validate(plan_document)
     for action in plan.actions:
+        if isinstance(action, TargetAction) and action.verb == "annotate":
+            _validate_annotation_plan_objects(action, {obj.object_id: obj for obj in plan.objects},
+                                              next(beat for beat in plan.beats if action.action_id in beat.action_ids))
         if isinstance(action, ReplaceAction) and action.verb == "morph":
             _require_morph_contract(action)
             objects = {obj.object_id: obj for obj in plan.objects}
@@ -1685,10 +1752,123 @@ def _validate_action_references(action, objects, assets, boards):
         raise ValueError(f"action {action.action_id} references unknown sound asset")
 
 
+def _annotation_phase_windows(resolved):
+    phases = resolved.action.annotation_policy.phases
+    total = sum(phase.weight for phase in phases)
+    elapsed = 0
+    result = []
+    for phase in phases:
+        start = resolved.start_ms + (resolved.end_ms - resolved.start_ms) * elapsed // total
+        elapsed += phase.weight
+        end = resolved.start_ms + (resolved.end_ms - resolved.start_ms) * elapsed // total
+        if end <= start:
+            raise ValueError("annotation weights collapse a construction phase")
+        result.append((phase, start, end))
+    return tuple(result)
+
+
+def _validate_annotation_plan_objects(action, objects, beat=None):
+    _require_annotation_contract(action)
+    target = objects[action.target_ids[0]]
+    if target.board_id != action.board_id or target.object_type in {
+        "evidence", "group", "mask", "clip", "composition", "instance", "network",
+    }:
+        raise ValueError("general annotation cannot cross boards or bypass evidence treatment")
+    for phase in action.annotation_policy.phases:
+        obj = objects[phase.object_id]
+        allowed = {"text"} if phase.mode == "write" else {
+            "freehand", "line", "rectangle", "rounded_rectangle", "ellipse", "polygon", "underline",
+        }
+        if phase.object_id == action.annotation_policy.leader_connector_id:
+            allowed = {"arrow"}
+        if (obj.board_id != action.board_id or obj.initial_state != "hidden"
+                or obj.object_type not in allowed or obj.asset_id is not None
+                or getattr(obj, "visible", False) or getattr(obj, "opacity", 1) <= 0):
+            raise ValueError("annotation phase needs a hidden authored compatible leaf on its board")
+        if beat is not None and (obj.beat_id != beat.beat_id
+                                 or action.coverage_id not in obj.coverage_ids
+                                 or not set(obj.coverage_ids).issubset(beat.coverage_ids)):
+            raise ValueError("annotation objects must preserve action beat and coverage ownership")
+        if isinstance(obj, TextObject) and (not obj.text or not obj.text.strip() or obj.items):
+            raise ValueError("annotation needs exact nonblank authored text")
+        if isinstance(obj, ConnectorObject):
+            if (obj.role != "pointer" or obj.source_object_id not in action.annotation_policy.annotation_object_ids
+                    or obj.destination_object_id != target.object_id or not obj.source_anchor_id
+                    or obj.source_object_id == obj.destination_object_id
+                    or obj.source_anchor_id not in {anchor.anchor_id for anchor in objects[obj.source_object_id].anchors}
+                    or obj.destination_anchor_id not in {anchor.anchor_id for anchor in target.anchors}):
+                raise ValueError("annotation leader needs exact annotation-to-target pointer anchors")
+            ordered_ids = [phase.object_id for phase in action.annotation_policy.phases]
+            if ordered_ids.index(obj.source_object_id) >= ordered_ids.index(obj.object_id):
+                raise ValueError("annotation leader must follow construction of its source note")
+            from atme.render.v2_connector import validate_static_arrow
+
+            validate_static_arrow(obj, objects, annotation_pointer=True)
+
+
+def _validate_annotation_layout(action, objects):
+    children = {}
+    for obj in sorted(objects.values(), key=lambda obj: (obj.z_index, obj.object_id)):
+        if obj.board_id == action.board_id:
+            children.setdefault(obj.parent_id, []).append(obj)
+    mask_sources = {obj.mask_source_object_id for obj in objects.values() if isinstance(obj, MaskContainer)}
+    order = []
+
+    def walk(parent_id):
+        for obj in children.get(parent_id, ()):
+            if isinstance(obj, ContainerObject):
+                walk(obj.object_id)
+            elif obj.object_id not in mask_sources:
+                order.append(obj.object_id)
+
+    walk(None)
+    target_id = action.target_ids[0]
+    if target_id not in order or any(
+        object_id not in order or order.index(object_id) <= order.index(target_id)
+        for object_id in _annotation_object_ids(action)
+    ):
+        raise ValueError("annotation must paint above its target in the effective stacking hierarchy")
+    if action.annotation_policy.leader_connector_id:
+        from atme.render.v2_world import world_anchor
+
+        leader = objects[action.annotation_policy.leader_connector_id]
+        endpoints = (objects[leader.source_object_id], objects[leader.destination_object_id])
+        for obj in endpoints:
+            parent = obj.parent_id
+            while parent:
+                if objects[parent].object_type != "group":
+                    raise ValueError("annotation pointer endpoints require unclipped group ancestry")
+                parent = objects[parent].parent_id
+        transforms = {object_id: obj.transform for object_id, obj in objects.items()}
+        start = world_anchor(endpoints[0], leader.source_anchor_id, objects, transforms)
+        end = world_anchor(endpoints[1], leader.destination_anchor_id, objects, transforms)
+        bounds = leader.geometry.bounds
+        if start == end or any(not (bounds.x <= x <= bounds.x + bounds.width
+                                   and bounds.y <= y <= bounds.y + bounds.height) for x, y in (start, end)):
+            raise ValueError("annotation pointer world endpoints must fit its authored route bounds")
+
+
+def _annotation_object_ids(action):
+    policy = action.annotation_policy
+    return policy.annotation_object_ids + ([policy.leader_connector_id] if policy.leader_connector_id else [])
+
+
+def _require_annotation_contract(action):
+    if (action.verb != "annotate" or action.annotation_policy is None
+            or len(action.target_ids) != 1 or action.annotation is not None
+            or action.expected_state != "visible" or action.post_state != "visible"
+            or action.easing == "step"):
+        raise ValueError("annotation needs authored objects, one visible target, and continuous construction")
+    if action.target_ids[0] in _annotation_object_ids(action):
+        raise ValueError("annotation cannot construct its own target")
+
+
 def _action_object_references(action):
     refs: list[str] = []
     if isinstance(action, (TargetAction, TransformAction, GroupAction, CameraAction)):
         refs.extend(action.target_ids)
+        if isinstance(action, TargetAction) and action.annotation_policy is not None:
+            refs.extend(_annotation_object_ids(action))
         if isinstance(action, GroupAction) and action.container_id is not None:
             refs.append(action.container_id)
     elif isinstance(action, ConnectionAction):

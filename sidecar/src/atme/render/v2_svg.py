@@ -58,6 +58,7 @@ from atme.store.contracts_v2 import (
     TextObject,
     TransformAction,
     VisualObject,
+    _annotation_phase_windows,
 )
 
 
@@ -646,7 +647,7 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
 
 
 def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObject,
-                      style, root: Path, scale: float, objects: dict) -> None:
+                      style, root: Path, scale: float, objects: dict, *, annotation_pointer: bool = False) -> None:
     _xml_escape(obj.object_id)
     if (obj.clip_id or obj.style.effect
             or obj.asset_id and not (isinstance(obj, VisualObject)
@@ -668,7 +669,7 @@ def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObj
     elif isinstance(obj, ConnectorObject):
         _color(obj.style.stroke, style.colors, default=style.colors["ink"])
         try:
-            validate_static_arrow(obj, objects)
+            validate_static_arrow(obj, objects, annotation_pointer=annotation_pointer)
         except UnsupportedConnector as exc:
             raise UnsupportedVisualObject(str(exc)) from exc
     elif isinstance(obj, TextObject):
@@ -711,8 +712,15 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     layout = ExecutableLayoutV2.model_validate(layout_document)
     timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
     objects = {obj.object_id: obj for obj in layout.objects}
+    annotation_leaders = {item.action.annotation_policy.leader_connector_id for item in timeline.actions
+                          if isinstance(item.action, TargetAction) and item.action.annotation_policy is not None}
     for resolved in timeline.actions:
         action = resolved.action
+        if isinstance(action, TargetAction) and action.annotation_policy is not None:
+            for phase, _, _ in _annotation_phase_windows(resolved):
+                mark = objects[phase.object_id]
+                if phase.mode == "draw" and isinstance(mark, MarkObject):
+                    _shape(mark, "#000000", "none", 1, draw_fraction=0.5)
         if (isinstance(action, TargetAction) and action.verb == "progressive_reveal"
                 and any(not isinstance(objects[target], TextObject)
                         or objects[target].object_type != "list" for target in action.target_ids)):
@@ -754,7 +762,18 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
         raise UnsupportedVisualObject("output profile cannot uniformly scale Paper & Ink design tokens")
     for obj in layout.objects:
         if not isinstance(obj, ContainerObject):
-            _preflight_object(obj, style, root, scale_x, objects)
+            _preflight_object(obj, style, root, scale_x, objects,
+                              annotation_pointer=obj.object_id in annotation_leaders)
+    # Preflight complete pointer paint even when the requested frame precedes
+    # annotation construction. Invalid routes/heads must not become late failures.
+    for item in timeline.actions:
+        if (isinstance(item.action, TargetAction) and item.action.annotation_policy is not None
+                and item.action.annotation_policy.leader_connector_id is not None):
+            held = evaluate_frame(layout_document, timeline_document, item.end_ms)
+            held_states = {state.object_id: state for state in held.objects}
+            leader = objects[item.action.annotation_policy.leader_connector_id]
+            stroke = _color(leader.style.stroke, style.colors, default=style.colors["ink"])
+            _connector_shape(leader, objects, held_states, stroke, style.strokes.regular_px * scale_x, None)
     resolved_assets = {asset.asset_id: asset for asset in timeline.resolved_assets}
     evidence_treatments = {item.object_id: item for item in layout.evidence_treatments}
     raster_images = {}
@@ -839,6 +858,11 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
             if isinstance(resolved.action, ConnectionAction) else ()
         )
     }
+    for item in timeline.actions:
+        if isinstance(item.action, TargetAction) and item.action.annotation_policy is not None:
+            for phase, start, end in _annotation_phase_windows(item):
+                if start <= at_ms < end:
+                    active_verbs[phase.object_id] = phase.mode
     definitions = []
     body = [(f'<rect x="{_n(layout.canvas.x)}" y="{_n(layout.canvas.y)}" '
              f'width="{_n(layout.canvas.width)}" height="{_n(layout.canvas.height)}" '

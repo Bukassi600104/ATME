@@ -21,6 +21,93 @@
       "title": "AbsoluteTrigger",
       "type": "object"
     },
+    "AnnotationPhase": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "draw",
+            "write"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "weight": {
+          "maximum": 10000,
+          "minimum": 1,
+          "title": "Weight",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "object_id",
+        "mode",
+        "weight"
+      ],
+      "title": "AnnotationPhase",
+      "type": "object"
+    },
+    "AnnotationPolicy": {
+      "additionalProperties": false,
+      "description": "Ordered construction of authored objects; never renderer-generated copy.",
+      "properties": {
+        "annotation_object_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Annotation Object Ids",
+          "type": "array"
+        },
+        "leader_connector_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Leader Connector Id"
+        },
+        "phases": {
+          "items": {
+            "$ref": "#/$defs/AnnotationPhase"
+          },
+          "maxItems": 33,
+          "minItems": 1,
+          "title": "Phases",
+          "type": "array"
+        },
+        "readable_hold_ms": {
+          "maximum": 60000,
+          "minimum": 1,
+          "title": "Readable Hold Ms",
+          "type": "integer"
+        },
+        "retention": {
+          "const": "retain",
+          "default": "retain",
+          "title": "Retention",
+          "type": "string"
+        }
+      },
+      "required": [
+        "annotation_object_ids",
+        "phases",
+        "readable_hold_ms"
+      ],
+      "title": "AnnotationPolicy",
+      "type": "object"
+    },
     "BeatStartTrigger": {
       "additionalProperties": false,
       "properties": {
@@ -2120,6 +2207,17 @@
           ],
           "default": null,
           "title": "Annotation"
+        },
+        "annotation_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnnotationPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [

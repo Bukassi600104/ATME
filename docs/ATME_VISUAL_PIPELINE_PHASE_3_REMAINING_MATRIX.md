@@ -9,10 +9,12 @@ installed preview/export or final creative-quality acceptance.
 
 ## Remaining action semantics
 
-1. General visual annotation: authored annotation objects, exact target/leader
-   anchors, reveal ordering, readable hold and persistence. Existing bare text
-   does not execute. Keep attested evidence self-annotation separate; annotations
-   aimed at evidence must respect its permissions and never change source pixels.
+1. General visual annotation: Slice 3Z now has explicit authored leaves, exact
+   target/leader anchors, weighted sequential construction, hold/persistence,
+   and pointer lifecycle guards. Bounded contract/runtime re-audits passed;
+   finalized full regression remains open. Bare legacy text still cannot execute.
+   Evidence cross-object annotation remains separate and unimplemented; never
+   weaken its attestation or change source pixels to extend this general path.
 2. Group/ungroup: explicit member order, source/destination parent ownership,
    reversible mappings and world-transform preservation.
 3. Split: explicit authored result objects, correspondence, ownership and source
@@ -79,7 +81,7 @@ installed preview/export or final creative-quality acceptance.
 
 ## Sequence and acceptance
 
-Continue with general annotation, then the remaining actions. Prioritize pointer/
+Finish the full annotation regression, then continue the remaining actions. Prioritize pointer/
 registry-anchor binding; callout/bracket/code and structured technical frames;
 data-driven charts; presenter media/captions; richer character/illustration state;
 then reusable compositions and remaining purposeful hierarchy/style semantics.
