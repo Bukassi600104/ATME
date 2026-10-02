@@ -47,7 +47,8 @@ Slice 3Z advances R-02/R-08/R-10/R-11 with authored general annotation:
 exact action/beat-owned hidden leaves, ordered weighted construction, bound
 pointer anchors, immutable target state/version, readable hold and retained
 pointer lifecycle. Direct SVG/PNG and stored-project tests prove source runtime
-mechanics; independent contract/runtime audits passed and full regression is pending.
+mechanics; independent contract/runtime audits and full regression passed
+(980 passed, 5 preexisting Windows symlink skips, exit code 0).
 Cross-object evidence treatment, final creative/readability quality, compiler
 production routing, and R-15 public/installed acceptance remain open.
 

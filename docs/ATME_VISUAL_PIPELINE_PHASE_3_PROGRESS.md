@@ -2,15 +2,16 @@
 
 Status: Slices 3A–3U and bounded 3V/3W/3X stages independent PASS;
 Slice 3Y implementation, bounded audit, and full sidecar regression PASS;
-Slice 3Z bounded annotation contract/runtime audits PASS; full regression in progress;
+Slice 3Z bounded annotation contract/runtime audits and full regression PASS;
 Phase 3 remains incomplete
 
 Date: 2026-10-02
 
 ## Next executable action slice
 
-The current Slice 3Z implements authored general visual annotation and passed
-independent contract/runtime audits; its full regression remains open. Next are
+Slice 3Z implements authored general visual annotation and passed
+independent contract/runtime audits and full regression. Slice 3AA is now building
+the immutable hierarchy foundation; group/ungroup execution is not yet integrated. Next are
 dynamic group/ungroup, authored split results, numeric count,
 and the deterministic sound-event ledger. Existing bare `annotate` text is
 not enough: execution needs exact preauthored annotation object IDs, target/
@@ -58,8 +59,10 @@ preview/export parity, compiler, or installed acceptance gates.
   contract and runtime re-audits passed, including the corrected retained-pointer
   lifecycle and existing public v1 draft-preview isolation. Fourteen targeted
   legacy render/checkpoint/offline tests and Ruff passed. The fresh entire
-  sidecar regression against finalized 3Z code is running
-  (`test-artifacts/phase-3z-full-sidecar.log`); it is not yet claimed passed.
+  sidecar regression against finalized 3Z code passed: 980 passed, 5 skipped
+  in 1340.67 seconds, exit code 0 (`test-artifacts/phase-3z-full-sidecar.log`).
+  These are the preexisting Windows symlink skips; no annotation case skipped.
+  This run predates the standalone 3AA hierarchy foundation and does not verify it.
   The earlier v2-selected run started before the final pointer correction and
   included one faulty head-bound test fixture, since fixed; it is superseded
   and not finalized regression evidence. Public preview/export and installed app remain

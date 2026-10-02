@@ -487,4 +487,5 @@ acceptance. The fixed text-size floor and explicit reading duration do not repla
 Phase 5's final attention/readability rubric. Private stored-project parity is
 tested; public preview/export, compiler integration and installed acceptance are
 still closed. The bounded independent runtime re-audit passed, including actual
-offline frames and public v1 preview isolation; full 3Z regression is in progress.
+offline frames and public v1 preview isolation. Full 3Z regression passed:
+980 passed, 5 preexisting Windows symlink skips, exit code 0 in 1340.67 seconds.

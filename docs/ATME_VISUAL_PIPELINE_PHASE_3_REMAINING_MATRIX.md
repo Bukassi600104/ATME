@@ -12,7 +12,8 @@ installed preview/export or final creative-quality acceptance.
 1. General visual annotation: Slice 3Z now has explicit authored leaves, exact
    target/leader anchors, weighted sequential construction, hold/persistence,
    and pointer lifecycle guards. Bounded contract/runtime re-audits passed;
-   finalized full regression remains open. Bare legacy text still cannot execute.
+   finalized full regression passed (980 passed, 5 preexisting symlink skips).
+   Bare legacy text still cannot execute.
    Evidence cross-object annotation remains separate and unimplemented; never
    weaken its attestation or change source pixels to extend this general path.
 2. Group/ungroup: explicit member order, source/destination parent ownership,
@@ -81,7 +82,7 @@ installed preview/export or final creative-quality acceptance.
 
 ## Sequence and acceptance
 
-Finish the full annotation regression, then continue the remaining actions. Prioritize pointer/
+Continue the remaining actions after the passed full annotation regression. Prioritize pointer/
 registry-anchor binding; callout/bracket/code and structured technical frames;
 data-driven charts; presenter media/captions; richer character/illustration state;
 then reusable compositions and remaining purposeful hierarchy/style semantics.
