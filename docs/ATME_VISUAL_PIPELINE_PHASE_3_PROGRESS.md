@@ -42,6 +42,15 @@ preview/export parity, compiler, or installed acceptance gates.
 
 ## Incomplete Phase 3 gates
 
+- Slice 3AA has an independently audited shared immutable hierarchy foundation:
+  complete canonical parent/order snapshots, cycle/depth and inventory guards,
+  structural version closure including shifted siblings, exact scope checks,
+  and authored world-affine/bounds/corner preservation. Thirty-two focused
+  tests and Ruff pass. The auditor's undeclared-parent, undeclared-transform and
+  destination-only nested-root probes were reproduced as failing tests, fixed,
+  and independently rechecked. This utility is not wired into frame execution;
+  group/ungroup contract, runtime, returns and compositor acceptance remain open.
+
 - Slice 3Z adds an optional explicit annotation policy to `TargetAction`, preserving
   legacy no-policy serialization. New plan writes require authored hidden text/
   mark leaves, exact action/beat coverage, construction order/weights, a target
