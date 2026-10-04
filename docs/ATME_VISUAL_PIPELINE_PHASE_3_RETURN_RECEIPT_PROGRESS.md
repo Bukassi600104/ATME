@@ -90,7 +90,12 @@ use the causal resolved-order prefix while retaining complete structural and
 attested metadata. The independent bounded source audit and fresh 25-suite
 regression PASS (528 tests, 406.44s, session `62255`); scoped Ruff and exact
 source/test integration comparison PASS. Fresh full main sidecar session `67141`
-is RUNNING on frozen `cc1a6a4`; no full result is claimed yet. Previous receipt
+PASSED frozen `cc1a6a4`: 1,281 passed, five preexisting Windows symlink skips,
+1768.25 seconds, terminal exit 0. Retained log
+`test-artifacts/phase-3aa-lifecycle-full-sidecar.log`, SHA256
+`CBE1DAFFDC60F174D3ADB4434A5F4E9C7C221A22CD84C4E0D1BFE880F6E453F1`.
+Main source/tests stayed frozen. This does not certify the later paired
+Group/annotation slice. Previous receipt
 full `79529` remains PASS but does not cover this migration. See the lifecycle
 progress report for reproduction logs and immutable offline frame hashes.
 Group+annotation/private blanket removal, connector/isolate, public/stored pixels,

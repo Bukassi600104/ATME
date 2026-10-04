@@ -5,7 +5,9 @@ Date: 2026-10-04
 Status: integrated bounded source implementation; corrected consumer-history/call-site
 bounded independent source re-audit PASS; fresh combined regression PASS;
 exact integration `cc1a6a4` from isolated `21eda61` PASS; full main session
-`67141` RUNNING on frozen source, with no full result claimed yet.
+`67141` PASS on frozen `cc1a6a4`: 1,281 passed, five preexisting Windows symlink
+skips, 1768.25 seconds, terminal exit 0. The later paired Group/annotation slice
+needs separate full evidence.
 Independent exact-integration audit PASS. This is not complete Group+annotation,
 public Group, Phase 3, installed-app or creative-quality acceptance. The earlier
 receipt source `821acd3` is the baseline, not proof of the new integrated source.
@@ -104,7 +106,7 @@ receipt source `821acd3` is the baseline, not proof of the new integrated source
 
 ## Still required
 
-Fresh full integration evidence; real paired
+Real paired
 Group+annotation construction/hold/retention positives and negatives; coherent
 private gate removal only after those dependencies are proven; post-Group
 replacement/morph/connector and hierarchy-aware isolate follow-through; stored
@@ -112,3 +114,8 @@ Group SVG/PNG, both profiles, seek/offline/public/compiler/installed acceptance.
 All other Phase 3 primitives/actions and R-01–R-15/Phase 4–12 requirements remain.
 No v1/Caleb behavior, semantic schema, public capability or installed-app change
 is claimed. No release or production-readiness claim is made here.
+
+Full main log: `sidecar/test-artifacts/phase-3aa-lifecycle-full-sidecar.log`,
+SHA256 `CBE1DAFFDC60F174D3ADB4434A5F4E9C7C221A22CD84C4E0D1BFE880F6E453F1`.
+Source/test tree remained exact to `cc1a6a4` at completion. No skips were added
+by this slice and no test assertions were weakened.
