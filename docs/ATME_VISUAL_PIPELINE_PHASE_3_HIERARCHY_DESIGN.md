@@ -236,9 +236,11 @@ in 1298.45 seconds (`test-artifacts/phase-3aa-consumers-final-full-sidecar.log`)
 Six diagnostic-precedence regressions and three obsolete camera spies were
 repaired at `365c3a0`: 399 combined tests and 117 independent cases pass with
 clean scoped Ruff. The four missing-fixture skips in the isolated checkout are
-not baseline symlink skips. Fresh full session `83170` runs frozen repaired main
-source with those VO fixtures present, log
-`test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`; not yet full PASS.
+not baseline symlink skips. Fresh full session `83170` PASSED frozen repaired
+main source `365c3a0`: 1,187 passed, five preexisting symlink skips, 1399.88 seconds,
+exit 0. The four VO fixture cases ran. Log:
+`test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`. Imported source/tests
+remained unchanged throughout; the earlier failed run stays failure evidence.
 The initial attempt
 `34056` stopped for a reproduced missing local Python environment; a local
 environment junction restores all 30 resource-bundle tests. Frozen source/tests

@@ -573,9 +573,11 @@ Repair `365c3a0` restores six history-independent readiness diagnostic boundarie
 without moving temporal checks, and updates three obsolete camera spies to prove
 one shared replay/plan. Combined verification passes 399; independent verification
 passes 117 and scoped Ruff. Four missing-VO-fixture skips in the isolated checkout
-are not baseline symlink skips. Fresh full session `83170` runs frozen repaired
-main source with those fixtures present, log
-`test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`; not yet full PASS.
+are not baseline symlink skips. Fresh full session `83170` PASSED frozen repaired
+main source `365c3a0`: 1,187 passed, five preexisting symlink skips, 1399.88 seconds,
+exit 0, with those VO cases run. Log:
+`test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`; imported source/tests
+remained frozen throughout. Return receipt work remains separate and open.
 No schema,
 v1/Caleb renderer or installed application changes are claimed.
 

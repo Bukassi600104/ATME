@@ -166,10 +166,12 @@ retaining captured-start/history checks, and makes the spies assert one replay
 and one camera plan. Four new model-valid negatives forbid clock construction.
 The combined repair run passed 399 tests in 118.94 seconds; the independent
 auditor reran 117 in 23.27 seconds, reviewed semantics and passed scoped Ruff.
-Fresh full session `83170` is RUNNING against frozen repaired main source, where
-the original VO fixtures exist. Log:
-`test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`. No imported
-source/tests will change during this run. Neither earlier full PASS covers it.
+Fresh full session `83170` PASSED against frozen repaired main source `365c3a0`:
+1,187 passed, five preexisting Windows symlink skips, 1399.88 seconds, exit 0.
+The original four VO integration fixtures ran instead of skipping. Log:
+`test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`. Imported source/tests
+remained frozen throughout. This supersedes neither the failed evidence nor the
+earlier independently frozen chronology result; it proves the repaired consumers.
 Return receipt implementation is isolated in a managed worktree, not delivered
 or merged; public Group remains closed.
 

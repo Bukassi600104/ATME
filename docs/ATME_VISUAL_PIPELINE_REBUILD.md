@@ -151,8 +151,11 @@ Full session `91184` FAILED at publication source `9ec3bb4`: 9 failed,
 restores six diagnostic-precedence boundaries and updates three obsolete camera
 spies: 399 combined tests, 117 independent tests and scoped Ruff pass. Four
 isolated missing-VO-fixture skips are not baseline symlink skips. Fresh full
-session `83170` runs frozen repaired main source with those fixtures present,
-log `test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`; not full PASS yet.
+session `83170` PASSED frozen repaired main source `365c3a0`: 1,187 passed,
+five preexisting symlink skips, 1399.88 seconds, exit 0, with those VO cases run.
+Log `test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`; imported
+source/tests remained frozen. This is repaired-consumer regression acceptance,
+not full Phase 3 or installed-app acceptance.
 Initial attempt `34056` stopped for a reproduced missing isolated Python
 environment; all 30 resource-bundle tests pass after the local environment repair.
 Dynamic grouping annotation/evidence lifetimes, exact board-return receipts,
