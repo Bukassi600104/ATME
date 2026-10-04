@@ -460,6 +460,24 @@ class HierarchyBasis(StrictModel):
                                          separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
 
 
+class ReturnHierarchyReceipt(StrictModel):
+    """Compiler proof of one retained board; not semantic plan intent."""
+
+    action_id: str = Field(min_length=1)
+    destination_board_id: str = Field(min_length=1)
+    destination_activation_id: str = Field(min_length=1)
+    hierarchy_basis: HierarchyBasis
+    hierarchy_basis_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+    @model_validator(mode="after")
+    def exact_board_basis(self):
+        if (any(item.board_id != self.destination_board_id
+                for item in self.hierarchy_basis.placements)
+                or self.hierarchy_basis.checksum() != self.hierarchy_basis_sha256):
+            raise ValueError("return hierarchy receipt needs one complete board and canonical hash")
+        return self
+
+
 class HierarchyTransitionPolicy(StrictModel):
     """Complete authored before/after receipt; no inferred membership or inverse."""
 
@@ -1264,11 +1282,32 @@ class ResolvedAction(StrictModel):
     start_ms: int = Field(ge=0)
     end_ms: int = Field(gt=0)
     resolved_trigger: ResolvedTrigger
+    return_hierarchy_receipt: ReturnHierarchyReceipt | None = None
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_return_shape(self, handler):
+        result = handler(self)
+        if self.return_hierarchy_receipt is None:
+            result.pop("return_hierarchy_receipt", None)
+        return result
 
     @model_validator(mode="after")
     def interval(self):
         if self.end_ms <= self.start_ms:
             raise ValueError("actions use non-empty half-open intervals")
+        receipt = self.return_hierarchy_receipt
+        if receipt is not None:
+            action = self.action
+            if not isinstance(action, EvidenceAction) or action.verb != "return_board":
+                raise ValueError("only return_board may carry a return hierarchy receipt")
+            if (receipt.action_id != action.action_id
+                    or receipt.destination_board_id != action.destination_board_id
+                    or receipt.destination_activation_id != action.destination_activation_id
+                    or {item.object_id for item in receipt.hierarchy_basis.placements}
+                    != set(action.expected_object_states or {})
+                    or set(action.expected_object_states or {})
+                    != set(action.expected_object_state_versions or {})):
+                raise ValueError("return hierarchy receipt changes action, activation or exact retained inventory")
         return self
 
 
@@ -1785,6 +1824,14 @@ def validate_resolved_hierarchy(layout: ExecutableLayoutV2, resolved: ResolvedVi
     chronological replay must prove those changes instead of assuming initial.
     """
     objects = {obj.object_id: obj for obj in layout.objects}
+    for item in resolved.actions:
+        receipt = item.return_hierarchy_receipt
+        if receipt is not None:
+            owned = {key for key, obj in objects.items() if obj.board_id == receipt.destination_board_id}
+            if ({placement.object_id for placement in receipt.hierarchy_basis.placements} != owned
+                    or set(item.action.expected_object_states or {}) != owned
+                    or set(item.action.expected_object_state_versions or {}) != owned):
+                raise ValueError("return hierarchy receipt must cover the exact layout board inventory")
     if layout.initial_empty_group_ownership and resolved.initial_hierarchy_basis is None:
         raise ValueError("owned empty groups require an explicit resolved initial hierarchy")
     if resolved.initial_hierarchy_basis is not None:

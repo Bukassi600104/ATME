@@ -1817,6 +1817,17 @@
         },
         "resolved_trigger": {
           "$ref": "#/$defs/ResolvedTrigger"
+        },
+        "return_hierarchy_receipt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReturnHierarchyReceipt"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -2071,6 +2082,44 @@
         "exact"
       ],
       "title": "ResolvedTrigger",
+      "type": "object"
+    },
+    "ReturnHierarchyReceipt": {
+      "additionalProperties": false,
+      "description": "Compiler proof of one retained board; not semantic plan intent.",
+      "properties": {
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "destination_board_id": {
+          "minLength": 1,
+          "title": "Destination Board Id",
+          "type": "string"
+        },
+        "destination_activation_id": {
+          "minLength": 1,
+          "title": "Destination Activation Id",
+          "type": "string"
+        },
+        "hierarchy_basis": {
+          "$ref": "#/$defs/HierarchyBasis"
+        },
+        "hierarchy_basis_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Hierarchy Basis Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "destination_board_id",
+        "destination_activation_id",
+        "hierarchy_basis",
+        "hierarchy_basis_sha256"
+      ],
+      "title": "ReturnHierarchyReceipt",
       "type": "object"
     },
     "SoundAction": {

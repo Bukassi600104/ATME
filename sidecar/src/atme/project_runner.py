@@ -357,6 +357,7 @@ class ProjectRunner:
         try:
             self.service._validate_resolved_timeline(
                 project_id, timeline, row, basis_revision=timeline_record["revision"] - 1,
+                require_return_receipts=False,
             )
         except ProjectError:
             raise

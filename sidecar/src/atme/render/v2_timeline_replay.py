@@ -3,8 +3,8 @@
 This is the shared clock/state kernel, not a replacement production gate. Callers
 must retain plan/layout/asset/geometry validation. Public frames still reject
 GroupActions until camera, annotation lifetime and retained-board consumers use
-this same clock. Group/annotation and Group/return combinations reject here until
-their additional receipts/dependencies have been integrated.
+this same clock. Group/annotation combinations reject until their dependencies
+are integrated. Group/return requires an exact retained-board hierarchy receipt.
 
 At a timestamp: ordinary completions, structural completions in resolved order,
 then starts. An active operator always samples its captured start pose. A Group
@@ -31,6 +31,7 @@ from atme.render.v2_hierarchy_replay import (
     completed_hierarchy_basis,
 )
 from atme.render.v2_morph import interpolate_geometry
+from atme.render.v2_return import UnsupportedReturn, validate_return_sample
 from atme.store.contracts_v2 import (
     CameraAction,
     ConnectionAction,
@@ -276,10 +277,14 @@ def _validate_operators(actions: tuple) -> None:
             raise ReplayError(f"action {action.action_id} has no chronological operator for {action.verb}")
     if any(isinstance(item.action, GroupAction) for item in actions) and any(
         isinstance(item.action, TargetAction) and item.action.annotation_policy is not None
-        or isinstance(item.action, EvidenceAction) and item.action.verb == "return_board"
         for item in actions
     ):
         raise ReplayError("hierarchy annotation lifetimes and retained-board receipts require consumer integration")
+    if any(isinstance(item.action, GroupAction) for item in actions) and any(
+        isinstance(item.action, EvidenceAction) and item.action.verb == "return_board"
+        and item.return_hierarchy_receipt is None for item in actions
+    ):
+        raise ReplayError("hierarchy returns require an exact retained-board receipt")
 
 
 def _owned_write_ids(action, frames: dict) -> set[str]:
@@ -306,7 +311,8 @@ def _validate_owned_overlaps(actions: tuple, frames: dict) -> None:
                 raise ReplayError(f"overlapping actions on {min(overlap)} need an explicit composition rule")
 
 
-def _assert_start_state(action, sample: dict, versions: dict) -> None:
+def _assert_start_state(resolved, sample: dict, versions: dict, hierarchy) -> None:
+    action = resolved.action
     if isinstance(action, TransformAction) and action.verb != "fade":
         # Channel purity depends on the captured chronological source, not the
         # initial layout (a prior Group can change its local coordinate system).
@@ -333,10 +339,10 @@ def _assert_start_state(action, sample: dict, versions: dict) -> None:
     if isinstance(action, (GroupAction, CameraAction)):
         return
     if isinstance(action, EvidenceAction) and action.verb == "return_board":
-        owned = {key for key, frame in sample.items() if frame.board_id == action.destination_board_id}
-        if ({key: sample[key].state for key in owned} != action.expected_object_states
-                or {key: versions[key] for key in owned} != action.expected_object_state_versions):
-            raise ReplayError(f"return_board {action.action_id} changes retained board state")
+        try:
+            validate_return_sample(resolved, hierarchy, sample, versions)
+        except UnsupportedReturn as exc:
+            raise ReplayError(str(exc)) from exc
         return
     targets = ((action.from_object_id,) if isinstance(action, ReplaceAction) else
                (action.connector_id,) if isinstance(action, ConnectionAction) else
@@ -436,7 +442,7 @@ def replay_chronology(objects: dict, hierarchy: HierarchySnapshot, frames: dict,
         action = resolved.action
         if phase == 2:
             sample = _sample_active(committed, tuple(active.values()), time, objects)
-            _assert_start_state(action, sample, versions)
+            _assert_start_state(resolved, sample, versions, hierarchy)
             active[index] = CapturedAction(index, action_json[index], _ordered(sample))
         elif phase == 0:
             capture = active.pop(index)

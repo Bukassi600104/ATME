@@ -34,6 +34,7 @@ from atme.render.v2_morph import (
     geometry_object,
     validate_morph_geometry,
 )
+from atme.render.v2_return import UnsupportedReturn, validate_return_sample
 from atme.render.v2_timeline_replay import (
     ChronologicalReplay,
     ReplayError,
@@ -664,13 +665,10 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
         completed_reveal = {key: frame.reveal_fraction for key, frame in sampled.items()}
         completed_transform = {key: frame.transform for key, frame in sampled.items()}
         if isinstance(item.action, EvidenceAction) and item.action.verb == "return_board":
-            action = item.action
-            owned = {key for key, obj in layout_objects.items()
-                     if obj.board_id == action.destination_board_id}
-            if ({key: sampled[key].state for key in owned} != action.expected_object_states
-                    or {key: version for key, version in sample.state_versions if key in owned}
-                    != action.expected_object_state_versions):
-                raise V2FrameError(f"return_board {action.action_id} changes retained board state")
+            try:
+                validate_return_sample(item, sample.hierarchy, sampled, dict(sample.state_versions))
+            except UnsupportedReturn as exc:
+                raise V2FrameError(str(exc)) from exc
             continue
         if isinstance(item.action, TargetAction) and item.action.annotation_policy is not None:
             action = item.action
@@ -995,6 +993,34 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
     except (UnsupportedCamera, ReplayError) as exc:
         raise V2FrameError(str(exc)) from exc
     return replay, camera_plan
+
+
+def validate_resolved_return_history(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
+                                     *, layout_sha256: str) -> None:
+    """Validate compiler return receipts on write without opening public Group rendering.
+
+    Replay is the same immutable chronological kernel used by frames. A receipt
+    is proved at its captured start, never compared to the initial board pose.
+    This is a storage validator, not a renderer capability advertisement.
+    """
+    hierarchy = HierarchySnapshot.from_objects({obj.object_id: obj for obj in layout.objects})
+    # The caller hashes the exact stored document, not a default-expanded dump.
+    context = _validate_pair_static(layout, timeline, layout_sha256, hierarchy)
+    return_indices = [index for index, item in enumerate(timeline.actions)
+                      if isinstance(item.action, EvidenceAction) and item.action.verb == "return_board"]
+    if not return_indices:
+        return
+    # Same-time starts follow resolved order. An action after the last return is
+    # not its causal history, even if their millisecond timestamps are equal.
+    causal_actions = tuple(timeline.actions[:return_indices[-1] + 1])
+    try:
+        replay_chronology(
+            context.objects, hierarchy, {obj.object_id: obj for obj in context.frames},
+            {key: state.state_version for key, state in context.initial.items()}, causal_actions,
+            tuple((a.board_id, a.start_ms, a.end_ms) for a in layout.activations), timeline.duration_ms,
+        )
+    except ReplayError as exc:
+        raise V2FrameError(str(exc)) from exc
 
 
 def evaluate_frame(

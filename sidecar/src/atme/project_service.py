@@ -555,7 +555,7 @@ class ProjectService:
                                            "Executable layout does not preserve semantic-plan intent",
                                            [{"path": "/", "message": str(exc)}]) from exc
                 elif kind == "resolved_timeline":
-                    self._validate_resolved_timeline(project_id, document, row)
+                    self._validate_resolved_timeline(project_id, document, row, require_return_receipts=True)
             elif kind == "layout":
                 from atme.external_inputs import validate_external_inputs
                 try:
@@ -584,9 +584,11 @@ class ProjectService:
             conn.execute("UPDATE project_state SET revision=? WHERE job_id=?", (revision, project_id))
         return revision
 
-    def _validate_resolved_timeline(self, project_id, document, row, *, basis_revision=None):
+    def _validate_resolved_timeline(self, project_id, document, row, *, basis_revision=None,
+                                    require_return_receipts):
         """Pair one immutable compiler result with the exact current plan/layout/timing."""
         from atme.store.contracts_v2 import (
+            EvidenceAction,
             ExecutableLayoutV2,
             ResolvedVisualTimelineV2,
             VisualPlanV2,
@@ -604,6 +606,11 @@ class ProjectService:
         plan = VisualPlanV2.model_validate(plan_doc)
         layout = ExecutableLayoutV2.model_validate(layout_doc)
         resolved = ResolvedVisualTimelineV2.model_validate(document)
+        if require_return_receipts and any(
+            isinstance(item.action, EvidenceAction) and item.action.verb == "return_board"
+            and item.return_hierarchy_receipt is None for item in resolved.actions
+        ):
+            raise ProjectError("invalid_artifact", "New board returns require an exact retained hierarchy receipt")
         try:
             validate_plan_layout(plan_doc, layout_doc)
         except ValueError as exc:
@@ -639,6 +646,16 @@ class ProjectService:
                 or resolved.fallbacks != plan.fallbacks
                 or resolved.evidence_treatments != layout.evidence_treatments):
             raise ProjectError("invalid_artifact", "Resolved timeline changes authored actions or coverage")
+        if require_return_receipts and any(
+            isinstance(item.action, EvidenceAction) and item.action.verb == "return_board"
+            for item in resolved.actions
+        ):
+            from atme.render.v2_state import validate_resolved_return_history
+
+            try:
+                validate_resolved_return_history(layout, resolved, layout_sha256=_visual_digest(layout_doc))
+            except ValueError as exc:
+                raise ProjectError("invalid_artifact", str(exc)) from exc
         resolved_asset_ids = {item.asset_id for item in resolved.resolved_assets}
         raster_objects = [obj for obj in layout.objects
                           if obj.object_type in {"image", "evidence"}]
