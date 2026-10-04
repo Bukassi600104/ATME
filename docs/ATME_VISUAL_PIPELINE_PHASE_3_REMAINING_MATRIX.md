@@ -135,3 +135,20 @@ Phase 3 still needs public preview/export parity, bounded compositor determinism
 performance evidence and its complete supported primitive/action matrix. Full
 long-project/cache/resource budgets remain Phase 11. Later compiler, quality,
 MCP, studio, format, packaging and human acceptance gates remain unchanged.
+
+## Sampled lifecycle integration checkpoint — 2026-10-04
+
+Integrated source `cc1a6a4` is exact to isolated `21eda61`: shared annotation,
+evidence and nonterminal paint-slot observers now run in both frames and new
+resolved writes. No-return writes prove full consumer history; return writes
+use the causal resolved-order prefix while retaining complete structural and
+attested metadata. The independent bounded source audit and fresh 25-suite
+regression PASS (528 tests, 406.44s, session `62255`); scoped Ruff and exact
+source/test integration comparison PASS. Fresh full main sidecar session `67141`
+is RUNNING on frozen `cc1a6a4`; no full result is claimed yet. Previous receipt
+full `79529` remains PASS but does not cover this migration. See the lifecycle
+progress report for reproduction logs and immutable offline frame hashes.
+Group+annotation/private blanket removal, connector/isolate, public/stored pixels,
+compiler/installed and all remaining Phase 3/4–12 gates remain open. V1, Caleb,
+semantic authority, schemas and public capabilities are unchanged.
+

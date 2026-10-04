@@ -3,7 +3,9 @@
 Date: 2026-10-04
 
 Status: isolated source implementation; corrected consumer-history/call-site
-bounded independent source re-audit PASS; fresh combined regression PASS.
+bounded independent source re-audit PASS; fresh combined regression PASS;
+exact integration `cc1a6a4` from isolated `21eda61` PASS; full main session
+`67141` RUNNING on frozen source, with no full result claimed yet.
 This is not complete Group+annotation, public Group, Phase 3, installed-app or
 creative-quality acceptance. Main receipt source `821acd3` remains separate.
 
@@ -101,7 +103,7 @@ creative-quality acceptance. Main receipt source `821acd3` remains separate.
 
 ## Still required
 
-Exact integration review and fresh full integration evidence; real paired
+Independent exact-integration review and fresh full integration evidence; real paired
 Group+annotation construction/hold/retention positives and negatives; coherent
 private gate removal only after those dependencies are proven; post-Group
 replacement/morph/connector and hierarchy-aware isolate follow-through; stored
