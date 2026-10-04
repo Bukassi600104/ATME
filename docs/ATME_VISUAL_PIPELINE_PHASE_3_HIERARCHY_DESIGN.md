@@ -81,9 +81,10 @@ shell, effective leaf paint order, and aperture/evidence ownership constraints.
 The semantic-plan container check no longer mistakes a semantic declaration for
 an executable ContainerObject.
 
-Still required before execution: resolved-boundary source-basis equality with
-CURRENT completed transforms through chronological transition replay,
-action-aware camera/conflict handling, retained
+The standalone chronology kernel now proves exact resolved-boundary source-basis
+equality with CURRENT sampled transforms while preserving unrelated active
+baselines. Still required before public Group execution: action-aware dynamic
+camera/conflict handling, retained
 board parent/order expectations, and integrated preview/export parity. The new
 schema data and pure validators do not claim those gates complete. Split remains
 separate; the grouping policy rejects a split action rather than ignoring it.
@@ -150,11 +151,35 @@ tests and Ruff. Independent bounded audits passed the replay, layer separation,
 and ownership boundary. The finalized combined hierarchy/ownership/replay/
 morph/replacement/visual-contract suite passed 275 tests in 132.32 seconds, with
 clean Ruff. Re-running the ten offline annotation frames and contact sheet
-preserved every retained byte hash. A fresh full run against source commit
-`965d27c` is running (`test-artifacts/phase-3aa-final-full-sidecar.log`); it is not
-yet a PASS. No standalone
+preserved every retained byte hash. The frozen full run against source commit
+`965d27c` passed: 1,099 tests, five preexisting Windows symlink skips, 1241.91
+seconds, exit 0 (`test-artifacts/phase-3aa-final-full-sidecar.log`). No standalone
 step or accepted schema implies chronological frame execution, installed preview,
 public export, or Phase 3 completion.
+
+### Shared clock integration stage
+
+The ordinary source evaluator now uses `v2_timeline_replay.py` after unchanged
+pair validation; Group remains explicitly rejected by that evaluator. The clock
+orders ordinary completions, Group completions by resolved index, then starts.
+Each active action retains a serialized immutable contract and captured start
+frame tuple. Group validates the full sampled boundary basis but commits only
+member-root locals, shell semantic state, hierarchy and structural versions.
+Do not confuse ordinal-only version changes with geometric conflict dependencies.
+Same-object owned-write overlaps reject; unrelated shifted siblings can animate
+through Group without double interpolation. Shell alpha remains exactly one;
+positive faded roots/ancestors are not normalized. Group must have an actual
+active destination sample, not end at project/activation exhaustion.
+
+The frozen pre-route full regression is baseline evidence only. Independent
+snapshot/pixel goldens come from the exact hash-pinned old evaluator, retain the
+input documents/hashes, and include evidence insertion/return and all camera
+verbs. The final bounded independent source/docs audit passed 76 replay tests
+and Ruff; the finalized combined renderer run passed 274 tests. The ten offline
+annotation frames/contact sheet remain byte-identical. A fresh full suite for
+the changed chronology route remains required. Dynamic camera source evaluation, retained-pointer lifetimes,
+full board-return hierarchy receipts, stored grouping SVG/PNG proof and installed
+production acceptance remain incomplete. No new schema or v1 behavior changed.
 
 ## Required acceptance
 

@@ -31,10 +31,13 @@ from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.render.v2_mask import UnsupportedMask, mask_source_region
 from atme.render.v2_morph import (
     MorphGeometry,
-    UnsupportedMorph,
     geometry_object,
-    interpolate_geometry,
     validate_morph_geometry,
+)
+from atme.render.v2_timeline_replay import (
+    ReplayError,
+    replay_chronology,
+    supports_operator,
 )
 from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds, world_matrix
 from atme.store.contracts_v2 import (
@@ -1013,168 +1016,25 @@ def evaluate_frame(
         )
         for obj in layout.objects
     }
+    # Preserve the public unsupported-action boundary while the structural
+    # camera/annotation/return consumers are still being integrated.
     for resolved in timeline.actions:
         action = resolved.action
-        supported = (
-            isinstance(action, (TransformAction, ConnectionAction, CameraAction))
-            or isinstance(action, EvidenceAction)
-            and action.verb in {"insert_evidence", "return_board"}
-            or isinstance(action, ReplaceAction)
-            or isinstance(action, TargetAction) and action.annotation_policy is not None
-            or isinstance(action, TargetAction) and action.verb in {
-                "reveal", "write", "draw", "enter", "exit", "progressive_reveal", "highlight",
-                "cross_out",
-                "dim",
-                "isolate",
-            }
-        )
-        if not supported:
+        if isinstance(action, GroupAction) or not supports_operator(action):
             raise UnsupportedVisualAction(
                 f"v2 action {action.action_id} uses {action.verb}, which has no frame implementation"
             )
-        if isinstance(action, CameraAction):
-            continue
-        if isinstance(action, EvidenceAction) and action.verb == "return_board":
-            continue
-        if at_ms < resolved.start_ms:
-            continue
-        progress = _ease(
-            (at_ms - resolved.start_ms) / (resolved.end_ms - resolved.start_ms),
-            action.easing,
+    try:
+        replay = replay_chronology(
+            {obj.object_id: obj for obj in layout.objects}, hierarchy, current,
+            {key: item.state_version for key, item in initial.items()}, tuple(timeline.actions),
+            tuple((item.board_id, item.start_ms, item.end_ms) for item in layout.activations), timeline.duration_ms,
         )
-        completed = at_ms >= resolved.end_ms
-        if isinstance(action, TargetAction) and action.annotation_policy is not None:
-            for phase, start, end in _annotation_phase_windows(resolved):
-                if at_ms < start:
-                    continue
-                fraction = _ease((at_ms - start) / (end - start), action.easing)
-                before = current[phase.object_id]
-                current[phase.object_id] = replace(
-                    before, state="visible" if at_ms >= end else before.state,
-                    visible=fraction > 0, reveal_fraction=fraction,
-                )
-            continue
-        if isinstance(action, EvidenceAction):
-            before = current[action.target_object_id]
-            current[action.target_object_id] = replace(
-                before,
-                state=action.post_state if completed else before.state,
-                visible=True,
-                opacity=before.opacity * (1.0 if completed else progress),
-                reveal_fraction=1.0,
-            )
-            continue
-        if isinstance(action, ReplaceAction):
-            source = current[action.from_object_id]
-            destination = current[action.to_object_id]
-            if action.verb == "morph":
-                source_obj = next(obj for obj in layout.objects if obj.object_id == source.object_id)
-                destination_obj = next(obj for obj in layout.objects if obj.object_id == destination.object_id)
-                try:
-                    geometry = (None if completed or progress == 0 else interpolate_geometry(
-                        source_obj, destination_obj, action.morph_policy, progress,
-                    ))
-                except UnsupportedMorph as exc:
-                    raise V2FrameError(str(exc)) from exc
-                transform = FrameTransform(
-                    position=FramePoint(_mix(source.transform.position.x, destination.transform.position.x, progress),
-                                        _mix(source.transform.position.y, destination.transform.position.y, progress)),
-                    scale_x=_mix(source.transform.scale_x, destination.transform.scale_x, progress),
-                    scale_y=_mix(source.transform.scale_y, destination.transform.scale_y, progress),
-                    rotation_degrees=_mix(source.transform.rotation_degrees,
-                                          destination.transform.rotation_degrees, progress),
-                    origin=FramePoint(_mix(source.transform.origin.x, destination.transform.origin.x, progress),
-                                      _mix(source.transform.origin.y, destination.transform.origin.y, progress)),
-                )
-                current[source.object_id] = replace(
-                    source, state="removed" if completed else source.state,
-                    visible=not completed, opacity=0 if completed else _mix(source.opacity, destination.opacity, progress),
-                    reveal_fraction=0 if completed else 1, transform=transform, morph_geometry=geometry,
-                )
-                current[destination.object_id] = replace(
-                    destination, state=action.post_state if completed else destination.state,
-                    visible=completed, reveal_fraction=1 if completed else 0,
-                )
-                continue
-            current[action.from_object_id] = replace(
-                source,
-                state="removed" if completed else source.state,
-                visible=not completed,
-                opacity=source.opacity * (1.0 - progress),
-                reveal_fraction=0.0 if completed else source.reveal_fraction,
-            )
-            current[action.to_object_id] = replace(
-                destination,
-                state=action.post_state if completed else destination.state,
-                visible=progress > 0 or completed,
-                opacity=destination.opacity * progress,
-                reveal_fraction=1.0 if progress > 0 or completed else 0.0,
-            )
-            continue
-        if isinstance(action, TargetAction) and action.verb == "isolate":
-            for object_id in action.target_ids:
-                focus = current[object_id]
-                if not focus.visible or focus.opacity <= 0 or focus.reveal_fraction < 1:
-                    raise V2FrameError(f"isolate {action.action_id} has no visible focus")
-            if not completed:
-                focus_ids = set(action.target_ids)
-                ratio = _dim_ratio(progress)
-                eligible_context = 0
-                for object_id, context in current.items():
-                    if (context.board_id == action.board_id and object_id not in focus_ids
-                            and context.visible and context.opacity > 0
-                            and context.reveal_fraction >= 1):
-                        eligible_context += 1
-                        current[object_id] = replace(context, opacity=context.opacity * ratio)
-                if not eligible_context:
-                    raise V2FrameError(f"isolate {action.action_id} has no visible secondary context")
-            continue
-        targets = (action.connector_id,) if isinstance(action, ConnectionAction) else action.target_ids
-        for object_id in targets:
-            before = current[object_id]
-            state = action.post_state if completed else before.state
-            if isinstance(action, ConnectionAction):
-                if before.opacity <= 0:
-                    raise V2FrameError(f"connection {action.action_id} has an invisible connector")
-                fraction = progress if action.verb == "connect" else 1.0 - progress
-                after = replace(before, state=state, visible=not completed or action.verb == "connect",
-                                reveal_fraction=fraction)
-            elif isinstance(action, TargetAction):
-                if action.verb == "exit":
-                    after = replace(before, state=state, visible=not completed,
-                                    opacity=_mix(before.opacity, 0.0, progress))
-                elif action.verb == "enter":
-                    after = replace(before, state=state, visible=True,
-                                    opacity=_mix(0.0, 1.0, progress) * before.opacity,
-                                    reveal_fraction=1.0)
-                elif action.verb == "highlight":
-                    if not before.visible or before.opacity <= 0 or before.reveal_fraction < 1:
-                        raise V2FrameError(f"highlight {action.action_id} has no visible target")
-                    after = replace(before, state=state, emphasis_fraction=progress)
-                elif action.verb == "cross_out":
-                    if not before.visible or before.opacity <= 0 or before.reveal_fraction < 1:
-                        raise V2FrameError(f"cross_out {action.action_id} has no visible target")
-                    after = replace(before, state=state, cross_out_fraction=progress)
-                elif action.verb == "dim":
-                    if not before.visible or before.opacity <= 0 or before.reveal_fraction < 1:
-                        raise V2FrameError(f"dim {action.action_id} has no visible context")
-                    after = replace(before, state=state,
-                                    opacity=before.opacity * (1.0 if completed else _dim_ratio(progress)))
-                else:
-                    after = replace(before, state=state, visible=True,
-                                    reveal_fraction=progress)
-            elif action.verb == "fade":
-                after = replace(before, state=state,
-                                visible=before.visible or (action.opacity or 0.0) > 0,
-                                opacity=_mix(before.opacity, action.opacity, progress))
-            else:
-                after = replace(
-                    before, state=state,
-                    transform=_interpolate_transform(before.transform, action.destination,
-                                                     progress, action.verb),
-                )
-            current[object_id] = after
-
+        sample = replay.at(at_ms)
+    except ReplayError as exc:
+        raise V2FrameError(str(exc)) from exc
+    current = {item.object_id: item for item in sample.objects}
+    hierarchy = sample.hierarchy
     activation = next((item for item in layout.activations
                        if item.start_ms <= at_ms < item.end_ms), None)
     active_board = activation.board_id if activation else None

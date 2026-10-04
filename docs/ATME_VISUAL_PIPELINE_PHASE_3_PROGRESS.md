@@ -5,7 +5,7 @@ Slice 3Y implementation, bounded audit, and full sidecar regression PASS;
 Slice 3Z bounded annotation contract/runtime audits and full regression PASS;
 Phase 3 remains incomplete
 
-Date: 2026-10-02
+Date: 2026-10-04
 
 ## Next executable action slice
 
@@ -73,9 +73,45 @@ preview/export parity, compiler, or installed acceptance gates.
   tests passed 119 and Ruff is clean. The finalized combined hierarchy/ownership/
   replay/morph/replacement/visual-contract run passed 275 tests in 132.32 seconds,
   with clean Ruff; all retained offline annotation pixel hashes remain identical.
-  The fresh full run against source `965d27c` is running, not yet confirmed PASS
-  (`test-artifacts/phase-3aa-final-full-sidecar.log`).
+  The frozen full run against source `965d27c` passed: 1,099 passed, five
+  preexisting Windows symlink skips, 1241.91 seconds, exit 0
+  (`test-artifacts/phase-3aa-final-full-sidecar.log`). This predates the new
+  chronological replay route and does not prove that later source change.
   Actual group/ungroup playback, returns and compositor acceptance remain open.
+
+### Slice 3AA chronological replay follow-through (2026-10-04)
+
+`v2_timeline_replay.py` separates committed local frame state, immutable action
+start baselines, sampled boundary poses, hierarchy and versions. Ordinary ends
+commit first, structural ends then apply in resolved order, and starts capture
+the resulting state. Group reads the complete sampled source basis but commits
+only its authored root transforms, shell state and structural version closure.
+Ordinal-only shifted siblings may keep unrelated motion; their captured baseline
+is never overwritten by a partial Group sample. Overlapping operator write sets
+reject instead of becoming last-writer behavior. Positive completed member alpha
+and legacy dim/isolate revision history are preserved.
+
+Ordinary `evaluate_frame` sampling now uses this shared clock after all existing
+pair validation. Public Group remains explicitly unsupported until dynamic
+camera, annotation lifetime and retained-board hierarchy consumers are complete.
+This removes the duplicate start-ordered sampling loop, not the v1/Caleb renderer.
+No contracts, schemas, public dispatcher or installed application changed here.
+
+The first independent oracle run found two numeric JSON-type mismatches in enter
+and replacement reveal fractions; exact legacy float literals now replace those
+integers. The hash-pinned pre-route `965d27c` evaluator generates retained full
+snapshot goldens, with exact input documents/hashes, evidence insertion/return,
+all five camera verbs, and representative SVG/PNG byte hashes. These independent
+goldens are distinct from wrapper-plumbing comparisons that use the new clock
+on both sides. The final independent bounded source/docs audit passed: 76 replay
+tests in 33.85 seconds and clean Ruff. The finalized combined renderer run passed
+274 tests in 136.45 seconds, exit 0
+(`test-artifacts/phase-3aa-chronology-final-focused.log`). The oracle retains
+27 operator families, 669 complete-frame hashes and 18 SVG/PNG byte-hash pairs.
+The ten offline annotation frames/contact sheet again retained their original
+hashes. A fresh full regression remains required for this changed ordinary route;
+the frozen 1,099-test baseline is not its acceptance. Dynamic Group consumers and
+full Phase 3 acceptance remain open.
 
 - Slice 3Z adds an optional explicit annotation policy to `TargetAction`, preserving
   legacy no-policy serialization. New plan writes require authored hidden text/

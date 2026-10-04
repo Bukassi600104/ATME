@@ -132,10 +132,16 @@ Exit: every R-01–R-15 item passes; no unresolved P0/P1 item remains; preview/e
 
 ## Phase gate protocol
 
-Phase 3AA checkpoint (2026-10-02): shared hierarchy, standalone authored replay,
+Phase 3AA checkpoint (2026-10-04): shared hierarchy, standalone authored replay,
 empty-shell ownership and initial resolved receipts have bounded verification.
 The first full updated run exposed a repaired layer/order projection regression;
-the finalized full rerun remains required. Dynamic grouping playback, compiler
+the frozen `965d27c` rerun passed (1,099 tests, five preexisting skips). Ordinary
+frame sampling now uses a shared chronological replay kernel; its bounded
+independent source/docs audit passed 76 tests, the combined renderer run passed
+274 tests, and the offline annotation proof remained byte-identical. Its pinned
+pre-route oracle and fresh full regression are separate gates; the latter remains
+pending. Dynamic grouping
+camera/annotation/board-return integration, production playback, compiler
 integration and all remaining Phase 3/4–12 requirements are still open. See the
 Phase 3 hierarchy design, remaining matrix and R-01–R-15 ledger for scope.
 

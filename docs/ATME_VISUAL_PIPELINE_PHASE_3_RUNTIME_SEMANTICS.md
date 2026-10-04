@@ -514,8 +514,35 @@ structural version. Hidden staged descendants retain their exact paint/state.
 Moved connector closures reject at plan/layout validation pending faithful
 inverse-parent connector semantics.
 
-The kernel is not imported into frame execution. Remaining: chronological
-action-boundary source proof and overlap/lifetime guards, dynamic FrameSnapshot
-routing and reseeking, camera/annotation/connector consumers, board-return
+The structural step is not enabled in frame execution. Ordinary frame sampling
+now uses the shared chronology kernel described below. Remaining: dynamic
+Group consumer/conflict and lifetime guards, FrameSnapshot production
+routing, camera/annotation/connector consumers, board-return
 hierarchy receipts, stored SVG/PNG integration and public/installed acceptance.
 Group/ungroup/split remain rejected by the current frame evaluator.
+
+### Shared immutable chronology kernel
+
+`v2_timeline_replay.py` retains committed local FrameObjects, current hierarchy,
+state versions, and active actions with immutable serialized contracts and start
+baselines. Each timestamp applies ordinary completions, structural completions
+in resolved-index order, then starts. Intervals remain half-open. Random seeks
+sample the appropriate immutable checkpoint rather than previous playback state.
+Group reads the full sampled boundary (including unrelated still-active motion)
+and commits only member-root local transforms, shell state, hierarchy and exact
+structural versions. Do not persist unrelated partial poses or rebase an active
+operator. Shifted-sibling version IDs are not automatically geometry conflicts.
+Owned-write overlaps reject. Positive completed fades and dim/isolate legacy
+version increments remain intact. Group requires an active visible destination
+sample and cannot end at activation/project exhaustion under this bounded rule.
+
+Ordinary `evaluate_frame` uses this kernel after existing pair validation and an
+explicit unsupported/Group gate. Camera planning still uses its prior ordinary
+consumer until dynamic hierarchy integration; Group+annotation and Group+return
+combinations reject in the standalone clock until their complete lifetime and
+hierarchy receipts are implemented. This is not public Group, compiler, installed
+preview/export or phase completion. The independent bounded source/docs audit
+passed 76 replay tests and Ruff; the finalized combined renderer run passed 274
+tests. Frozen pre-route full regression and the independent hash-pinned pre-route
+oracle (27 families, 669 snapshots, 18 SVG/PNG pairs) prove separate scopes;
+a fresh full suite is still required for the changed ordinary route.

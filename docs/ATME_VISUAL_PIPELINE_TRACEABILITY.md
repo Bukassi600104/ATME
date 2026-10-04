@@ -47,12 +47,21 @@ Slice 3AA adds an audited immutable topology/world/scope foundation, shared stat
 frame/camera/SVG hierarchy consumers, and initial complete authored group/ungroup
 receipt schemas with plan/layout checks, standalone step replay, owned initial
 empty-shell and initial resolved hierarchy receipts. This advances
-R-01/R-02/R-08/R-10/R-13 without claiming transition execution: chronological
-resolved source binding, dynamic replay/conflicts, retained-board hierarchy, and production
+R-01/R-02/R-08/R-10/R-13 without claiming public transition execution: dynamic
+consumer/conflict integration, retained-board hierarchy, and production
 parity remain incomplete. The auditor's failed scope/consumer cases now have
 regression tests. The first full updated run failed due to authored-layer/sibling
 ordinal conflation; that defect is fixed with both layer-preservation and explicit
-opposed-order SVG tests. A fresh finalized full sidecar run remains required.
+opposed-order SVG tests. The frozen `965d27c` full suite passed (1,099 tests, five
+preexisting Windows symlink skips). The later shared chronology kernel advances
+exact boundary source binding, active-baseline preservation and version history;
+ordinary source frames use it after existing pair validation. An independent
+pre-route snapshot/pixel oracle covers 27 families, 669 snapshots and 18 SVG/PNG
+pairs. Its bounded independent source/docs audit passed 76 tests; the finalized
+combined renderer run passed 274 tests, with unchanged offline annotation pixels.
+A fresh full regression for that later route is still required separately.
+Group camera/annotation/return and installed acceptance remain
+open; the historical baseline is not proof for the new route.
 
 Slice 3Z advances R-02/R-08/R-10/R-11 with authored general annotation:
 exact action/beat-owned hidden leaves, ordered weighted construction, bound
