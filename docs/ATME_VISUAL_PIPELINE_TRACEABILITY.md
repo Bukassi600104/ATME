@@ -151,3 +151,17 @@ progress report for reproduction logs and immutable offline frame hashes.
 Group+annotation/private blanket removal, connector/isolate, public/stored pixels,
 compiler/installed and all remaining Phase 3/4–12 gates remain open. V1, Caleb,
 semantic authority, schemas and public capabilities are unchanged.
+
+## Paired Group/annotation integration checkpoint — 2026-10-04
+
+Source `2c21c2c` integrates audited isolated `7b93db0` exactly: private Group/
+ungroup, construction/hold/retained-pointer lifetimes and the shared sampled
+SVG/PNG path have bounded independent PASS (37 cases), combined PASS (617 tests,
+672.25s), scoped Ruff PASS and 40 deterministic offline paired frames. Ten prior
+annotation frame/report hashes remain unchanged. Fresh full main session `56029`
+is RUNNING on frozen `2c21c2c`; the earlier 1,281-test full PASS at `cc1a6a4` does
+not cover this later slice. Public Group and causal stored Group+annotation
+admission remain closed; real stored/duplicate/return receipts and connector/
+isolate follow-through remain required. This is private mechanical proof, not
+Caleb-style creative acceptance, Phase 3 completion or an installed release.
+See the paired Group/annotation progress report and its next stored-project map.

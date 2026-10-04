@@ -24,9 +24,10 @@ installed preview/export or final creative-quality acceptance.
    kernel binds sampled Group boundary poses and preserves immutable active
    baselines; ordinary frame sampling uses it. At `58947e9`, static/temporal pair
    validation and camera planning share exact captured pre-action samples. The
-   private group-camera consumer proof passes, but public Group execution,
-   dynamic annotation/evidence lifetimes, final return-receipt integration evidence, effective
-   paint-order guards and production acceptance remain incomplete.
+   private group-camera consumer proof passes. Later integrated lifecycle and
+   paired Group/annotation checkpoints below prove bounded sampled annotation/
+   evidence and paint-order consumers; stored Group+annotation/duplicate receipt
+   proof, post-Group connector/isolate and public/production acceptance remain open.
    The first full 3AA regression exposed a repaired authored-layer/sibling-order
    conflation; the frozen `965d27c` full suite passed (1,099 tests, five preexisting
    skips). The later chronology route passed its bounded independent 76-test
@@ -156,3 +157,17 @@ progress report for reproduction logs and immutable offline frame hashes.
 Group+annotation/private blanket removal, connector/isolate, public/stored pixels,
 compiler/installed and all remaining Phase 3/4–12 gates remain open. V1, Caleb,
 semantic authority, schemas and public capabilities are unchanged.
+
+## Paired Group/annotation integration checkpoint — 2026-10-04
+
+Source `2c21c2c` integrates audited isolated `7b93db0` exactly: private Group/
+ungroup, construction/hold/retained-pointer lifetimes and the shared sampled
+SVG/PNG path have bounded independent PASS (37 cases), combined PASS (617 tests,
+672.25s), scoped Ruff PASS and 40 deterministic offline paired frames. Ten prior
+annotation frame/report hashes remain unchanged. Fresh full main session `56029`
+is RUNNING on frozen `2c21c2c`; the earlier 1,281-test full PASS at `cc1a6a4` does
+not cover this later slice. Public Group and causal stored Group+annotation
+admission remain closed; real stored/duplicate/return receipts and connector/
+isolate follow-through remain required. This is private mechanical proof, not
+Caleb-style creative acceptance, Phase 3 completion or an installed release.
+See the paired Group/annotation progress report and its next stored-project map.
