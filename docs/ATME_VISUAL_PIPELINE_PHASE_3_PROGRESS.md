@@ -153,13 +153,25 @@ existing main environment fixes that path without changing test assertions.
 All 30 resource-bundle tests then passed in 9.34 seconds. The test import
 normalization was also copied into the isolated checkout before restarting.
 
-Fresh finalized full regression is RUNNING, not PASS: terminal session `91184`, frozen
-isolated checkout `C:/Users/USER/AppData/Local/Temp/atme-phase3x-source-sync`,
-log `test-artifacts/phase-3aa-consumers-final-full-sidecar.log`. Source commit
-`9ec3bb4` has all five changed source/test files Git-identical to main
-`58947e9`; explicit cross-check returned exit 0. No imported source/tests will
-change during the run. Do not
-reuse the earlier `37b0504` full PASS as evidence for these consumer changes.
+Finalized full session `91184` FAILED: 9 failed, 1,170 passed, 9 skipped,
+1298.45 seconds, exit 1. The retained log is
+`test-artifacts/phase-3aa-consumers-final-full-sidecar.log`. Frozen isolated
+source `9ec3bb4` matched main `58947e9`. Six failures exposed static diagnostic
+precedence regressions; three spies still assumed the old camera API/redundant
+planning. Four skips were missing ignored VO fixtures in that checkout, not the
+five preexisting Windows symlink skips. This is not full PASS evidence.
+
+Repair commit `365c3a0` restores history-independent readiness diagnostics while
+retaining captured-start/history checks, and makes the spies assert one replay
+and one camera plan. Four new model-valid negatives forbid clock construction.
+The combined repair run passed 399 tests in 118.94 seconds; the independent
+auditor reran 117 in 23.27 seconds, reviewed semantics and passed scoped Ruff.
+Fresh full session `83170` is RUNNING against frozen repaired main source, where
+the original VO fixtures exist. Log:
+`test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`. No imported
+source/tests will change during this run. Neither earlier full PASS covers it.
+Return receipt implementation is isolated in a managed worktree, not delivered
+or merged; public Group remains closed.
 
 Next: exact resolved board-return hierarchy receipts, dynamic replacement/morph
 paint-order validation, and Group-aware annotation/evidence construction, hold

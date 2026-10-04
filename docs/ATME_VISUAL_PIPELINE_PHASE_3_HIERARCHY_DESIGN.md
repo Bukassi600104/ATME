@@ -214,11 +214,15 @@ rejection, retaining Group+annotation and public Group gates.
 Regenerate the resolved-timeline schema only; semantic-plan/layout schemas must
 not acquire this compiler receipt. Acceptance must cover legacy omitted hashes,
 normal missing-receipt write rejection, A-to-B-to-A after group and after ungroup,
-same-time Group-end/return-start, random seeks, duplicate preservation, and
+boundary ordering, random seeks, duplicate preservation, and
 continued public Group rejection. Negatives: missing/extra inventory, wrong
 action/board/activation, parent/order/local transform/hash/state/version, stale
 prior activation and off-board edits. Retained legacy return oracle and v1
-behavior must remain unchanged. This is next work, not delivered functionality.
+behavior must remain unchanged. A source Group must finish strictly before its
+activation ends; a cross-board Group-end exactly at return-start is therefore
+invalid, not a positive fixture. Prove retained completed Groups and valid
+ordinary-end/return-start ordering without weakening activation guards.
+This is next work, not delivered functionality.
 
 Captured-start consumer integration at `58947e9` completes the bounded source
 portion of steps 1 and 2 below: static preflight, one immutable replay, temporal
@@ -226,9 +230,16 @@ readiness/state/version consumers and replay-aware camera planning. Private
 ungroup/regroup plus collective motion verifies dynamic camera ancestry and
 viewport inheritance; it does not enable public Group playback. The combined
 282-case run passed, independent main recheck passed 84 and Ruff, and ten offline
-annotation frame hashes/contact sheet are unchanged. The fresh full regression
-is still running in frozen isolated source `9ec3bb4` (session `91184`, log
-`test-artifacts/phase-3aa-consumers-final-full-sidecar.log`). The initial attempt
+annotation frame hashes/contact sheet are unchanged. Full session `91184`
+FAILED at frozen source `9ec3bb4`: 9 failed, 1,170 passed, 9 skipped, exit 1
+in 1298.45 seconds (`test-artifacts/phase-3aa-consumers-final-full-sidecar.log`).
+Six diagnostic-precedence regressions and three obsolete camera spies were
+repaired at `365c3a0`: 399 combined tests and 117 independent cases pass with
+clean scoped Ruff. The four missing-fixture skips in the isolated checkout are
+not baseline symlink skips. Fresh full session `83170` runs frozen repaired main
+source with those VO fixtures present, log
+`test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`; not yet full PASS.
+The initial attempt
 `34056` stopped for a reproduced missing local Python environment; a local
 environment junction restores all 30 resource-bundle tests. Frozen source/tests
 are Git-identical to main `58947e9`. Steps 3–5, dynamic

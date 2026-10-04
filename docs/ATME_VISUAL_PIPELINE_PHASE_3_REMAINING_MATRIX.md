@@ -35,8 +35,14 @@ installed preview/export or final creative-quality acceptance.
    five preexisting skips, exit 0 in 1472.35 seconds. Later consumer integration
    has bounded independent PASS: 282 combined tests, 84 independently rerun
    new/replay cases, clean sidecar-cwd Ruff, unchanged offline annotation hashes.
-   Its finalized fresh full suite remains RUNNING (session `91184`,
-   `test-artifacts/phase-3aa-consumers-final-full-sidecar.log`), not a full PASS.
+   Finalized full session `91184` FAILED: 9 failed, 1,170 passed, 9 skipped,
+   1298.45 seconds, exit 1 (`test-artifacts/phase-3aa-consumers-final-full-sidecar.log`).
+   Six diagnostic-precedence regressions and three obsolete camera spies are
+   repaired at `365c3a0`; 399 combined tests, 117 independent cases and scoped
+   Ruff pass. Four missing-VO-fixture skips in that isolated checkout are not
+   baseline symlink skips. Fresh full session `83170` runs repaired frozen main
+   source with those fixtures present; log
+   `test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`; not full PASS yet.
    Initial attempt `34056` stopped for a reproduced missing isolated Python
    environment; the corrected environment passes all 30 resource-bundle tests.
    Frozen publication source `9ec3bb4` and main `58947e9` match all five

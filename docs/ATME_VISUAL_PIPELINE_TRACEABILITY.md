@@ -67,8 +67,14 @@ camera framing. Its private group-camera fixture verifies ancestry after
 ungroup/regroup and collective motion, without enabling public Group frames.
 Combined tests passed 282; independent rerun passed 84 and sidecar-cwd Ruff.
 Ten offline annotation frames and their contact sheet remain byte-identical.
-Full verification remains RUNNING at equivalent publication source `9ec3bb4`,
-session `91184`, log `test-artifacts/phase-3aa-consumers-final-full-sidecar.log`.
+Full session `91184` FAILED at publication source `9ec3bb4`: 9 failed,
+1,170 passed, 9 skipped, exit 1 in 1298.45 seconds, retained log
+`test-artifacts/phase-3aa-consumers-final-full-sidecar.log`. Six diagnostic-order
+regressions and three obsolete camera spies were repaired at `365c3a0`;
+399 combined tests, 117 independent cases and scoped Ruff pass. Four isolated
+missing-VO-fixture skips are distinct from five baseline symlink skips. Fresh
+full session `83170` runs frozen repaired main source with those fixtures,
+log `test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`; not full PASS yet.
 Initial attempt `34056` stopped for a reproduced missing isolated Python
 environment; its corrected resource-bundle suite passes all 30 tests. No partial
 attempt is a full PASS. Group annotation/evidence lifetimes, return hierarchy

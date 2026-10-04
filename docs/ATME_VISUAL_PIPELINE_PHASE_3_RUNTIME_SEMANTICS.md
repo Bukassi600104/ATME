@@ -567,9 +567,16 @@ hierarchy receipts and replacement/morph effective paint order remain required.
 
 Bounded combined tests passed 282; independent main verification passed 84 and
 Ruff. Ten offline annotation frames and their contact sheet retained exact hashes.
-The fresh finalized full consumer regression is still running (session `91184`,
-`test-artifacts/phase-3aa-consumers-final-full-sidecar.log`); only its eventual terminal
-result may establish this changed source's full regression status. No schema,
+Finalized full session `91184` FAILED: 9 failed, 1,170 passed, 9 skipped,
+1298.45 seconds, exit 1 (`test-artifacts/phase-3aa-consumers-final-full-sidecar.log`).
+Repair `365c3a0` restores six history-independent readiness diagnostic boundaries
+without moving temporal checks, and updates three obsolete camera spies to prove
+one shared replay/plan. Combined verification passes 399; independent verification
+passes 117 and scoped Ruff. Four missing-VO-fixture skips in the isolated checkout
+are not baseline symlink skips. Fresh full session `83170` runs frozen repaired
+main source with those fixtures present, log
+`test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`; not yet full PASS.
+No schema,
 v1/Caleb renderer or installed application changes are claimed.
 
 The initial attempt `34056` stopped after a reproduced missing isolated
