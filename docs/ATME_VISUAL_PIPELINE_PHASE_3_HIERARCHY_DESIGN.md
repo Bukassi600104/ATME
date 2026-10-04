@@ -185,6 +185,18 @@ production acceptance remain incomplete. No new schema or v1 behavior changed.
 
 ## Required acceptance
 
+Captured-start consumer integration at `58947e9` completes the bounded source
+portion of steps 1 and 2 below: static preflight, one immutable replay, temporal
+readiness/state/version consumers and replay-aware camera planning. Private
+ungroup/regroup plus collective motion verifies dynamic camera ancestry and
+viewport inheritance; it does not enable public Group playback. The combined
+282-case run passed, independent main recheck passed 84 and Ruff, and ten offline
+annotation frame hashes/contact sheet are unchanged. The fresh full regression
+is still running in frozen isolated source (session `34056`, log
+`test-artifacts/phase-3aa-consumers-full-sidecar.log`). Steps 3–5, dynamic
+effective paint-order checks, and all public/compiler/installed acceptance remain
+open. No contracts or schemas changed in this slice.
+
 ### Next coherent integration slice: one replay, all temporal consumers
 
 The independent read-only integration assessment identified four separate stale

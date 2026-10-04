@@ -22,16 +22,21 @@ installed preview/export or final creative-quality acceptance.
    before/after receipt models, standalone step replay, owned initial empty shells,
    and initial resolved hierarchy receipts. The new standalone chronological
    kernel binds sampled Group boundary poses and preserves immutable active
-   baselines; ordinary frame sampling uses it. Public Group consumer integration,
-   dynamic camera/annotation/return receipts and production acceptance remain
-   incomplete.
+   baselines; ordinary frame sampling uses it. At `58947e9`, static/temporal pair
+   validation and camera planning share exact captured pre-action samples. The
+   private group-camera consumer proof passes, but public Group execution,
+   dynamic annotation/evidence lifetimes, return hierarchy receipts, effective
+   paint-order guards and production acceptance remain incomplete.
    The first full 3AA regression exposed a repaired authored-layer/sibling-order
    conflation; the frozen `965d27c` full suite passed (1,099 tests, five preexisting
    skips). The later chronology route passed its bounded independent 76-test
    source/docs audit, 274-case combined renderer run and unchanged ten-frame
    offline proof. Its fresh full regression at `37b0504` passed: 1,175 tests,
    five preexisting skips, exit 0 in 1472.35 seconds. Later consumer integration
-   remains separately unverified.
+   has bounded independent PASS: 282 combined tests, 84 independently rerun
+   new/replay cases, clean sidecar-cwd Ruff, unchanged offline annotation hashes.
+   Its fresh full suite remains RUNNING (session `34056`,
+   `test-artifacts/phase-3aa-consumers-full-sidecar.log`), not a full PASS.
 3. Split: explicit authored result objects, correspondence, ownership and source
    removal. Do not infer fragments.
 4. Count: numeric range, unit, formatting, rounding/steps and a bound text object.

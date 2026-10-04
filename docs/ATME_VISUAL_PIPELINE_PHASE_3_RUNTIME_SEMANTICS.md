@@ -536,9 +536,9 @@ Owned-write overlaps reject. Positive completed fades and dim/isolate legacy
 version increments remain intact. Group requires an active visible destination
 sample and cannot end at activation/project exhaustion under this bounded rule.
 
-Ordinary `evaluate_frame` uses this kernel after existing pair validation and an
-explicit unsupported/Group gate. Camera planning still uses its prior ordinary
-consumer until dynamic hierarchy integration; Group+annotation and Group+return
+Ordinary `evaluate_frame` uses this kernel after pair validation and an
+explicit unsupported/Group gate. The captured-start consumer slice now supplies
+camera planning and temporal validation with this same replay; Group+annotation and Group+return
 combinations reject in the standalone clock until their complete lifetime and
 hierarchy receipts are implemented. This is not public Group, compiler, installed
 preview/export or phase completion. The independent bounded source/docs audit
@@ -548,3 +548,26 @@ oracle (27 families, 669 snapshots, 18 SVG/PNG pairs) prove separate scopes;
 the changed ordinary route's full suite passed against source `37b0504`:
 1,175 tests, five preexisting skips, exit 0 in 1472.35 seconds. Later consumer
 integration requires its own final source verification.
+
+### Captured-start validation and camera consumption
+
+At `58947e9`, static identity, inventory, bindings, supported forms and ignored
+field checks precede construction of one replay. Temporal validation then reads
+`before_action(action_id)`: the immutable captured baseline before the action's
+own zero-progress paint. Sampling `at(start_ms)` is not a substitute; evidence
+insertion intentionally has zero opacity but a revealed paint state at that time.
+Transform move/scale/rotate channel guards use the actual sampled local pose.
+
+Camera planning uses the same pre-action hierarchy, transforms and readiness,
+not an independent completion ledger. Focus conflict checks still precede
+readiness, previous viewport inheritance remains exact, and public errors retain
+the V2FrameError boundary. Private group-camera consumer tests do not authorize
+public Group frames. Dynamic retained-pointer/evidence conflicts, full return
+hierarchy receipts and replacement/morph effective paint order remain required.
+
+Bounded combined tests passed 282; independent main verification passed 84 and
+Ruff. Ten offline annotation frames and their contact sheet retained exact hashes.
+The fresh full consumer regression is still running (session `34056`,
+`test-artifacts/phase-3aa-consumers-full-sidecar.log`); only its eventual terminal
+result may establish this changed source's full regression status. No schema,
+v1/Caleb renderer or installed application changes are claimed.

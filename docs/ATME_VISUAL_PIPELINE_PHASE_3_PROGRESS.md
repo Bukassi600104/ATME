@@ -121,6 +121,44 @@ returned exit 0 with the result above; imported source/tests remained frozen
 throughout. This result does not cover later static/temporal or camera integration
 in the separate source checkout. The installed application is unchanged.
 
+### Slice 3AA captured-start consumer integration (2026-10-04)
+
+Source commit `58947e9` separates static pair preflight from temporal readiness.
+Malformed bindings, unsupported forms and ignored fields reject before replay
+construction. One immutable chronology supplies temporal state/version checks,
+annotation/evidence readiness, replacement geometry and camera framing. Camera
+targets use the sampled hierarchy and local transforms and preserve the preceding
+viewport; this removes the old independent start-ordered camera ledger.
+
+`before_action(action_id)` returns the exact captured precondition, not the
+operator's zero-progress painted frame. This distinction preserves evidence
+insertion's legacy paint without falsely treating its hidden source as revealed.
+Transform channel purity is checked against that sampled start pose. A private
+ungroup/regroup, collective move and later camera fixture verifies dynamic ancestry
+and viewport inheritance; public Group still explicitly rejects.
+
+The finalized combined run passed 282 tests in 107.36 seconds. All 27 retained
+legacy oracle families remain included. The main checkout reran the 84 new/replay
+cases (28.65 seconds); the independent auditor reran 84 (23.32 seconds), verified
+production-source equivalence to the isolated checkout, and issued bounded PASS.
+Ruff passes from the canonical sidecar working directory; two test import blocks
+were mechanically normalized after its first independent lint check. The ten
+network-denied annotation frames/contact sheet remain byte-identical.
+
+Fresh full regression is RUNNING, not PASS: terminal session `34056`, frozen
+isolated checkout `C:/Users/USER/AppData/Local/Temp/atme-phase3x-source-sync`,
+log `test-artifacts/phase-3aa-consumers-full-sidecar.log`. Its three production
+modules are text-identical to `58947e9` after line-ending normalization; the two
+test files differ only in canonical import ordering/trailing whitespace. Do not
+reuse the earlier `37b0504` full PASS as evidence for these consumer changes.
+
+Next: exact resolved board-return hierarchy receipts, dynamic replacement/morph
+paint-order validation, and Group-aware annotation/evidence construction, hold
+and retained-pointer lifetimes. Only then can Group gates be removed and actual
+stored-project SVG/PNG acceptance run in both profiles. Contracts/schemas,
+v1/Caleb rendering and the installed app are unchanged in this bounded slice.
+All remaining Phase 3 and R-01–R-15/Phase 4–12 gates remain required.
+
 - Slice 3Z adds an optional explicit annotation policy to `TargetAction`, preserving
   legacy no-policy serialization. New plan writes require authored hidden text/
   mark leaves, exact action/beat coverage, construction order/weights, a target
