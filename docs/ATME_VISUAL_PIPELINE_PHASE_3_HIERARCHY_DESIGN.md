@@ -342,7 +342,10 @@ zero-reveal or inactive authored leaves. Always retain the current source and
 destination. Either adjacent orientation remains valid. This preserves the
 existing chain whose removed first source lies between later alternatives, while
 rejecting an intervening future leaf. Keep every leaf in receipts and state/
-version inventory; this view is not source deletion. Only temporal validation
+version inventory; this view is not source deletion. Explicitly reject a sampled
+removed-but-visible leaf before filtering: current models do not universally
+enforce that invariant. Add a model-valid negative instead of relying on another
+guard. Only temporal validation
 can apply this rule, not plan/static checks that lack chronological state.
 
 Required positives: post-Group annotation/evidence at exact completion; unrelated
