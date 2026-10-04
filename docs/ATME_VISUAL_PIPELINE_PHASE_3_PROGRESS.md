@@ -175,8 +175,10 @@ earlier independently frozen chronology result; it proves the repaired consumers
 Return receipt implementation subsequently merged at `821acd3`; its independent
 54-case bounded audit and exact integration audit PASS. New resolved writes bind
 complete retained-board hierarchy receipts to chronological state/version history;
-legacy stored reads remain explicit. Combined main session `54572` is RUNNING,
-not accepted. Ten integrated offline annotation frames remain byte-identical.
+legacy stored reads remain explicit. Combined main session `54572` PASSED:
+298 tests in 363.73 seconds, exit 0. Full session `79529` is RUNNING against
+frozen source `821acd3`, log `test-artifacts/phase-3aa-return-receipt-full-sidecar.log`.
+No full result is claimed. Ten integrated offline annotation frames remain byte-identical.
 See `ATME_VISUAL_PIPELINE_PHASE_3_RETURN_RECEIPT_PROGRESS.md`. Public Group remains closed.
 
 Next: finalize receipt integration regressions, dynamic replacement/morph

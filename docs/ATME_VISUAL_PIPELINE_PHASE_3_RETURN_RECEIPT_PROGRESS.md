@@ -38,9 +38,11 @@ acceptance. The isolated source worktree is
   from isolated receipt commit `98db1e2`. Independent integration audit PASS:
   all 15 receipt files match exactly; repaired static readiness guards and
   shared-replay camera spies remain intact; scoped Ruff and diff checks pass.
-- Fresh combined main regression is RUNNING, session `54572`, log
-  `test-artifacts/phase-3aa-return-receipt-combined.log`. No terminal result is
-  claimed. The integrated offline comparison passed ten frames, session `36329`,
+- Fresh combined main regression PASSED: 298 tests in 363.73 seconds, session
+  `54572`, exit 0, log `test-artifacts/phase-3aa-return-receipt-combined.log`.
+  Fresh full main regression is RUNNING, session `79529`, log
+  `test-artifacts/phase-3aa-return-receipt-full-sidecar.log`; no full result is claimed.
+  The integrated offline comparison passed ten frames, session `36329`,
   retaining both hashes recorded below. Source/tests remain frozen at `821acd3`.
 - Independent final bounded audit: 54 receipt-focused tests passed in 88.57
   seconds; Ruff passed across all 13 changed/new Python files and diff whitespace

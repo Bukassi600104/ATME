@@ -84,7 +84,9 @@ attempt is a full PASS. Exact return hierarchy receipts are now implemented at
 hierarchy hash and exact chronological state/version binding, atomic new-write
 rejection, explicit legacy reads, duplication preservation and resolved-only schema
 delivery. Independent 54-case receipt and exact integration audits PASS. Combined
-main session `54572` is RUNNING, not accepted; fresh full regression is required.
+main session `54572` PASSED (298 tests, 363.73 seconds, exit 0). Full session
+`79529` is RUNNING at frozen source `821acd3`, log
+`test-artifacts/phase-3aa-return-receipt-full-sidecar.log`; no full acceptance claimed.
 Ten integrated offline annotation frames/contact sheet remain byte-identical.
 Group annotation/evidence lifetimes, effective paint order, public playback and installed acceptance remain
 open; all R-01–R-15 requirements and later phases remain retained.

@@ -162,8 +162,10 @@ Exact retained-board return receipts subsequently merged at `821acd3`; independe
 54-case bounded receipt audit and exact integration audit PASS. New writes prove
 complete hierarchy/state/version history, stored legacy reads remain explicit,
 and only resolved-timeline schema changed. Ten integrated offline frames remain
-unchanged. Combined main session `54572` is RUNNING; fresh full regression still
-required. See the return-receipt progress report for exact scope and evidence.
+unchanged. Combined main session `54572` PASSED: 298 tests, 363.73 seconds, exit 0.
+Full session `79529` is RUNNING at frozen source `821acd3`, log
+`test-artifacts/phase-3aa-return-receipt-full-sidecar.log`; no full result claimed.
+See the return-receipt progress report for exact scope and evidence.
 Dynamic grouping annotation/evidence lifetimes,
 effective paint-order guards, production playback, compiler
 integration and all remaining Phase 3/4–12 requirements are still open. See the

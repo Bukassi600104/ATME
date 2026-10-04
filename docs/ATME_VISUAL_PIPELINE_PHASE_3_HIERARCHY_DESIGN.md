@@ -227,8 +227,10 @@ receipt and integration PASS (54 focused tests). The complete board-only retaine
 basis is checked by the shared chronological observer; new writes reject absent
 or stale receipts atomically and legacy stored preview explicitly opts into read
 compatibility. Only the private Group+return rejection changed; Group+annotation
-and public Group remain closed. Combined session `54572` is RUNNING and fresh
-full regression remains required. See the return-receipt progress report.
+and public Group remain closed. Combined session `54572` PASSED: 298 tests,
+363.73 seconds, exit 0. Full session `79529` is RUNNING at frozen source `821acd3`,
+log `test-artifacts/phase-3aa-return-receipt-full-sidecar.log`; no full result is
+claimed. See the return-receipt progress report.
 
 Captured-start consumer integration at `58947e9` completes the bounded source
 portion of steps 1 and 2 below: static preflight, one immutable replay, temporal

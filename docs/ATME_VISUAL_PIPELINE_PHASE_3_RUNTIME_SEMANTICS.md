@@ -595,7 +595,9 @@ mode preserves old non-Group returns. Duplicate/rebind preserves receipt semanti
 Only the private Group+return rejection is removed; Group+annotation and public
 Group still reject and MCP advertises renderer v1 only.
 Independent bounded audit: 54 cases PASS; exact integration and scoped Ruff PASS.
-Combined main session `54572` is RUNNING, fresh full regression pending. Integrated
+Combined main session `54572` PASSED: 298 tests, 363.73 seconds, exit 0. Full
+session `79529` is RUNNING at frozen source `821acd3`, log
+`test-artifacts/phase-3aa-return-receipt-full-sidecar.log`; no full result claimed. Integrated
 offline annotation frames/contact sheet retain their hashes. This is not public,
 compiler, installed, creative-quality or full Phase 3 acceptance.
 
