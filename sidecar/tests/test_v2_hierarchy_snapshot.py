@@ -315,30 +315,45 @@ def test_state_camera_and_svg_consume_the_same_frame_hierarchy(monkeypatch):
     layout, timeline, _, _ = basis()
     observed = {}
     original_camera = state_module.camera_segments
+    original_temporal = state_module._validate_pair_temporal
     original_evaluate = svg_module.evaluate_frame
     original_map = HierarchySnapshot.object_map
 
-    def camera(layout, timeline, hierarchy=None):
-        observed["camera"] = hierarchy
-        return original_camera(layout, timeline, hierarchy)
+    def camera(layout, timeline, replay):
+        observed["camera_calls"] = observed.get("camera_calls", 0) + 1
+        observed["camera_clock"] = replay
+        plan = original_camera(layout, timeline, replay)
+        observed["camera_plan"] = plan
+        return plan
+
+    def temporal(context, replay, plan):
+        observed["temporal_clock"] = replay
+        observed["temporal_plan"] = plan
+        return original_temporal(context, replay, plan)
 
     def evaluate(*args):
         snapshot = original_evaluate(*args)
         observed["frame"] = snapshot.hierarchy
+        observed["frame_ready"] = True
         return snapshot
 
     def project(self, objects):
-        observed.setdefault("consumers", []).append(self)
+        if observed.get("frame_ready"):
+            observed.setdefault("svg_consumers", []).append(self)
         return original_map(self, objects)
 
     monkeypatch.setattr(state_module, "camera_segments", camera)
+    monkeypatch.setattr(state_module, "_validate_pair_temporal", temporal)
     monkeypatch.setattr(svg_module, "evaluate_frame", evaluate)
     monkeypatch.setattr(HierarchySnapshot, "object_map", project)
     rendered = compose_svg_frame(layout, timeline, 5000)
     assert 'data-object-id="object-group"' in rendered.svg
-    assert observed["camera"] is observed["frame"]
-    assert len(observed["consumers"]) >= 4
-    assert all(snapshot is observed["frame"] for snapshot in observed["consumers"])
+    assert observed["camera_calls"] == 1
+    assert observed["camera_clock"] is observed["temporal_clock"]
+    assert observed["camera_plan"] is observed["temporal_plan"]
+    assert observed["camera_clock"].at(5000).hierarchy is observed["frame"]
+    assert observed["svg_consumers"]
+    assert all(snapshot is observed["frame"] for snapshot in observed["svg_consumers"])
 
 
 @pytest.mark.parametrize("fixture", ["annotation", "evidence"])
@@ -353,21 +368,33 @@ def test_all_annotation_and_evidence_camera_checks_share_frame_hierarchy(monkeyp
         service = None
     else:
         service, layout, timeline, _ = evidence_documents(tmp_path)
-    observed = []
+    observed = {}
     original = state_module.camera_segments
+    original_temporal = state_module._validate_pair_temporal
 
-    def camera(layout, timeline, hierarchy=None):
-        observed.append(hierarchy)
-        return original(layout, timeline, hierarchy)
+    def camera(layout, timeline, replay):
+        observed["camera_calls"] = observed.get("camera_calls", 0) + 1
+        observed["camera_clock"] = replay
+        plan = original(layout, timeline, replay)
+        observed["camera_plan"] = plan
+        return plan
+
+    def temporal(context, replay, plan):
+        observed["temporal_clock"] = replay
+        observed["temporal_plan"] = plan
+        return original_temporal(context, replay, plan)
 
     monkeypatch.setattr(state_module, "camera_segments", camera)
+    monkeypatch.setattr(state_module, "_validate_pair_temporal", temporal)
     try:
         frame = evaluate_frame(layout, timeline, 100)
     finally:
         if service is not None:
             service.store.close()
-    assert len(observed) >= 2
-    assert all(snapshot is frame.hierarchy for snapshot in observed)
+    assert observed["camera_calls"] == 1
+    assert observed["camera_clock"] is observed["temporal_clock"]
+    assert observed["camera_plan"] is observed["temporal_plan"]
+    assert observed["camera_clock"].at(100).hierarchy is frame.hierarchy
 
 
 def test_topology_checks_observe_projected_connector_ancestry_not_stored_layout():

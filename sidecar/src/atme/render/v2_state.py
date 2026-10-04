@@ -347,7 +347,17 @@ def _validate_static_action(item, layout, timeline, objects, mask_sources, manag
                          or action.verb == "isolate" and isinstance(obj, VisualObject)
                          and obj.object_type in _REPLACE_VISUAL_TYPES)
             if not supported:
+                if action.verb == "isolate":
+                    raise V2FrameError(f"isolate {action.action_id} needs a supported focus object")
                 raise V2FrameError(f"{action.verb} {action.action_id} needs a supported mark or text target")
+            if action.verb in {"highlight", "cross_out"} and (
+                not obj.visible or obj.initial_state != "visible" or obj.opacity <= 0
+            ):
+                raise V2FrameError(f"{action.verb} {action.action_id} needs an untouched visible target")
+            if action.verb == "dim" and (
+                not obj.visible or obj.initial_state != "visible" or obj.opacity <= 0
+            ):
+                raise V2FrameError(f"dim {action.action_id} needs visible context without prior edits")
             post = {"highlight": "highlighted", "cross_out": "crossed_out"}.get(action.verb, "visible")
             if (action.expected_state, action.post_state) != ("visible", post):
                 raise V2FrameError(f"{action.verb} {action.action_id} needs canonical visible-to-{post} states")
@@ -355,6 +365,8 @@ def _validate_static_action(item, layout, timeline, objects, mask_sources, manag
                 if action.easing == "step":
                     raise V2FrameError(f"{action.verb} {action.action_id} cannot use step easing")
                 if len(set(action.target_ids)) != len(action.target_ids):
+                    if action.verb == "isolate":
+                        raise V2FrameError(f"isolate {action.action_id} has duplicate focus targets")
                     raise V2FrameError(f"{action.verb} {action.action_id} has duplicate targets")
             if not any(a.board_id == action.board_id and a.start_ms <= item.start_ms
                        and item.end_ms <= a.end_ms for a in layout.activations):
@@ -373,6 +385,8 @@ def _validate_static_action(item, layout, timeline, objects, mask_sources, manag
                 validate_ordered_list(obj)
             except UnsupportedOrderedList as exc:
                 raise V2FrameError(str(exc)) from exc
+            if obj.visible or obj.initial_state != "hidden":
+                raise V2FrameError(f"action {action.action_id} requires a previously untouched hidden list")
             if (action.expected_state, action.post_state) != ("hidden", "visible"):
                 raise V2FrameError(f"action {action.action_id} requires canonical hidden-to-visible list states")
 
