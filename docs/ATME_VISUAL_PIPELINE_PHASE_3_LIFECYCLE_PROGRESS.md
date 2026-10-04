@@ -2,12 +2,13 @@
 
 Date: 2026-10-04
 
-Status: isolated source implementation; corrected consumer-history/call-site
+Status: integrated bounded source implementation; corrected consumer-history/call-site
 bounded independent source re-audit PASS; fresh combined regression PASS;
 exact integration `cc1a6a4` from isolated `21eda61` PASS; full main session
 `67141` RUNNING on frozen source, with no full result claimed yet.
-This is not complete Group+annotation, public Group, Phase 3, installed-app or
-creative-quality acceptance. Main receipt source `821acd3` remains separate.
+Independent exact-integration audit PASS. This is not complete Group+annotation,
+public Group, Phase 3, installed-app or creative-quality acceptance. The earlier
+receipt source `821acd3` is the baseline, not proof of the new integrated source.
 
 ## Implemented runtime wiring
 
@@ -87,7 +88,7 @@ creative-quality acceptance. Main receipt source `821acd3` remains separate.
 - Scoped Ruff across all nine Python paths and diff whitespace checks PASS.
 - Fresh frozen 25-suite combined regression PASS: 528 tests, 406.44 seconds,
   session `62255`, terminal exit 0. Retained log:
-  `sidecar/test-artifacts/phase-3aa-lifecycle-combined.log`, SHA256
+  `C:/Users/USER/.codex/worktrees/phase3-return-receipts/Movie engine/sidecar/test-artifacts/phase-3aa-lifecycle-combined.log`, SHA256
   `3400280A1B565349090D44D7BC421F21A8040E13366D86A13FB845A5A81F8D38`.
   This covers the corrected caller boundaries and lifecycle consumers, not the
   still-closed Group+annotation/public Group workflow or a full sidecar run.
@@ -103,7 +104,7 @@ creative-quality acceptance. Main receipt source `821acd3` remains separate.
 
 ## Still required
 
-Independent exact-integration review and fresh full integration evidence; real paired
+Fresh full integration evidence; real paired
 Group+annotation construction/hold/retention positives and negatives; coherent
 private gate removal only after those dependencies are proven; post-Group
 replacement/morph/connector and hierarchy-aware isolate follow-through; stored

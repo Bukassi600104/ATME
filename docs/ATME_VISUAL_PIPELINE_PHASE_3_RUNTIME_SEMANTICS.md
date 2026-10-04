@@ -624,4 +624,3 @@ progress report for reproduction logs and immutable offline frame hashes.
 Group+annotation/private blanket removal, connector/isolate, public/stored pixels,
 compiler/installed and all remaining Phase 3/4–12 gates remain open. V1, Caleb,
 semantic authority, schemas and public capabilities are unchanged.
-
