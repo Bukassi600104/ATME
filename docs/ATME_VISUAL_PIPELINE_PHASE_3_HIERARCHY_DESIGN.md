@@ -176,8 +176,10 @@ snapshot/pixel goldens come from the exact hash-pinned old evaluator, retain the
 input documents/hashes, and include evidence insertion/return and all camera
 verbs. The final bounded independent source/docs audit passed 76 replay tests
 and Ruff; the finalized combined renderer run passed 274 tests. The ten offline
-annotation frames/contact sheet remain byte-identical. A fresh full suite for
-the changed chronology route remains required. Dynamic camera source evaluation, retained-pointer lifetimes,
+annotation frames/contact sheet remain byte-identical. The fresh full suite for
+the changed chronology route at `37b0504` passed: 1,175 tests, five preexisting
+skips, exit 0 in 1472.35 seconds. Later consumer integration requires its own
+verification. Dynamic camera source evaluation, retained-pointer lifetimes,
 full board-return hierarchy receipts, stored grouping SVG/PNG proof and installed
 production acceptance remain incomplete. No new schema or v1 behavior changed.
 

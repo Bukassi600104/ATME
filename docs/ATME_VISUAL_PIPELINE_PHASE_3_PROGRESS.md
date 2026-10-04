@@ -109,15 +109,17 @@ tests in 33.85 seconds and clean Ruff. The finalized combined renderer run passe
 (`test-artifacts/phase-3aa-chronology-final-focused.log`). The oracle retains
 27 operator families, 669 complete-frame hashes and 18 SVG/PNG byte-hash pairs.
 The ten offline annotation frames/contact sheet again retained their original
-hashes. A fresh full regression remains required for this changed ordinary route;
-the frozen 1,099-test baseline is not its acceptance. Dynamic Group consumers and
-full Phase 3 acceptance remain open.
+hashes. The fresh full regression against source `37b0504` passed: 1,175 tests,
+five preexisting Windows symlink skips, 1472.35 seconds, exit 0. This is distinct
+from the frozen 1,099-test baseline. Dynamic Group consumers and full Phase 3
+acceptance remain open.
 
-Fresh full regression is running against frozen source commit `37b0504`:
+Fresh full regression completed against frozen source commit `37b0504`:
 `pytest tests --tb=short`, unified terminal session `24270`, log
-`test-artifacts/phase-3aa-chronology-full-sidecar.log`. A live handle is not a PASS;
-record the terminal exit/result before advancing its gate. Do not change imported
-source or tests while this run is live. The installed application is unchanged.
+`test-artifacts/phase-3aa-chronology-full-sidecar.log`. Terminal session `24270`
+returned exit 0 with the result above; imported source/tests remained frozen
+throughout. This result does not cover later static/temporal or camera integration
+in the separate source checkout. The installed application is unchanged.
 
 - Slice 3Z adds an optional explicit annotation policy to `TargetAction`, preserving
   legacy no-policy serialization. New plan writes require authored hidden text/

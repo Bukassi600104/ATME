@@ -545,4 +545,6 @@ preview/export or phase completion. The independent bounded source/docs audit
 passed 76 replay tests and Ruff; the finalized combined renderer run passed 274
 tests. Frozen pre-route full regression and the independent hash-pinned pre-route
 oracle (27 families, 669 snapshots, 18 SVG/PNG pairs) prove separate scopes;
-a fresh full suite is still required for the changed ordinary route.
+the changed ordinary route's full suite passed against source `37b0504`:
+1,175 tests, five preexisting skips, exit 0 in 1472.35 seconds. Later consumer
+integration requires its own final source verification.

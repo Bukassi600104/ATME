@@ -29,7 +29,9 @@ installed preview/export or final creative-quality acceptance.
    conflation; the frozen `965d27c` full suite passed (1,099 tests, five preexisting
    skips). The later chronology route passed its bounded independent 76-test
    source/docs audit, 274-case combined renderer run and unchanged ten-frame
-   offline proof. Its fresh full regression is still required.
+   offline proof. Its fresh full regression at `37b0504` passed: 1,175 tests,
+   five preexisting skips, exit 0 in 1472.35 seconds. Later consumer integration
+   remains separately unverified.
 3. Split: explicit authored result objects, correspondence, ownership and source
    removal. Do not infer fragments.
 4. Count: numeric range, unit, formatting, rounding/steps and a bound text object.

@@ -59,7 +59,8 @@ ordinary source frames use it after existing pair validation. An independent
 pre-route snapshot/pixel oracle covers 27 families, 669 snapshots and 18 SVG/PNG
 pairs. Its bounded independent source/docs audit passed 76 tests; the finalized
 combined renderer run passed 274 tests, with unchanged offline annotation pixels.
-A fresh full regression for that later route is still required separately.
+Its fresh full regression at `37b0504` passed: 1,175 tests, five preexisting
+skips, exit 0 in 1472.35 seconds. This does not prove subsequent consumer changes.
 Group camera/annotation/return and installed acceptance remain
 open; the historical baseline is not proof for the new route.
 

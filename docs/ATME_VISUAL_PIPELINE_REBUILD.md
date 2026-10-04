@@ -139,8 +139,9 @@ the frozen `965d27c` rerun passed (1,099 tests, five preexisting skips). Ordinar
 frame sampling now uses a shared chronological replay kernel; its bounded
 independent source/docs audit passed 76 tests, the combined renderer run passed
 274 tests, and the offline annotation proof remained byte-identical. Its pinned
-pre-route oracle and fresh full regression are separate gates; the latter remains
-pending. Dynamic grouping
+pre-route oracle and fresh full regression are separate gates; the latter passed
+at `37b0504` (1,175 tests, five preexisting skips, exit 0 in 1472.35 seconds).
+Subsequent consumer changes require separate verification. Dynamic grouping
 camera/annotation/board-return integration, production playback, compiler
 integration and all remaining Phase 3/4–12 requirements are still open. See the
 Phase 3 hierarchy design, remaining matrix and R-01–R-15 ledger for scope.
