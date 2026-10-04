@@ -79,8 +79,14 @@ Log `test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`; imported
 source/tests remained frozen. This proves repaired consumers, not all Phase 3.
 Initial attempt `34056` stopped for a reproduced missing isolated Python
 environment; its corrected resource-bundle suite passes all 30 tests. No partial
-attempt is a full PASS. Group annotation/evidence lifetimes, return hierarchy
-receipts, effective paint order, public playback and installed acceptance remain
+attempt is a full PASS. Exact return hierarchy receipts are now implemented at
+`821acd3`, advancing R-08/R-09/R-13: complete retained board inventory, canonical
+hierarchy hash and exact chronological state/version binding, atomic new-write
+rejection, explicit legacy reads, duplication preservation and resolved-only schema
+delivery. Independent 54-case receipt and exact integration audits PASS. Combined
+main session `54572` is RUNNING, not accepted; fresh full regression is required.
+Ten integrated offline annotation frames/contact sheet remain byte-identical.
+Group annotation/evidence lifetimes, effective paint order, public playback and installed acceptance remain
 open; all R-01–R-15 requirements and later phases remain retained.
 
 Slice 3Z advances R-02/R-08/R-10/R-11 with authored general annotation:

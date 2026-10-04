@@ -172,10 +172,14 @@ The original four VO integration fixtures ran instead of skipping. Log:
 `test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`. Imported source/tests
 remained frozen throughout. This supersedes neither the failed evidence nor the
 earlier independently frozen chronology result; it proves the repaired consumers.
-Return receipt implementation is isolated in a managed worktree, not delivered
-or merged; public Group remains closed.
+Return receipt implementation subsequently merged at `821acd3`; its independent
+54-case bounded audit and exact integration audit PASS. New resolved writes bind
+complete retained-board hierarchy receipts to chronological state/version history;
+legacy stored reads remain explicit. Combined main session `54572` is RUNNING,
+not accepted. Ten integrated offline annotation frames remain byte-identical.
+See `ATME_VISUAL_PIPELINE_PHASE_3_RETURN_RECEIPT_PROGRESS.md`. Public Group remains closed.
 
-Next: exact resolved board-return hierarchy receipts, dynamic replacement/morph
+Next: finalize receipt integration regressions, dynamic replacement/morph
 paint-order validation, and Group-aware annotation/evidence construction, hold
 and retained-pointer lifetimes. Only then can Group gates be removed and actual
 stored-project SVG/PNG acceptance run in both profiles. Contracts/schemas,

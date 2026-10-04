@@ -34,6 +34,14 @@ acceptance. The isolated source worktree is
 
 ## Verification evidence
 
+- Integrated onto repaired main as `821acd30bca1ce7386213c7e3e56ab1a973f5afb`
+  from isolated receipt commit `98db1e2`. Independent integration audit PASS:
+  all 15 receipt files match exactly; repaired static readiness guards and
+  shared-replay camera spies remain intact; scoped Ruff and diff checks pass.
+- Fresh combined main regression is RUNNING, session `54572`, log
+  `test-artifacts/phase-3aa-return-receipt-combined.log`. No terminal result is
+  claimed. The integrated offline comparison passed ten frames, session `36329`,
+  retaining both hashes recorded below. Source/tests remain frozen at `821acd3`.
 - Independent final bounded audit: 54 receipt-focused tests passed in 88.57
   seconds; Ruff passed across all 13 changed/new Python files and diff whitespace
   validation passed. The auditor found no remaining blocker within this boundary.
@@ -62,8 +70,7 @@ acceptance. The isolated source worktree is
 
 ## Still required
 
-Integration onto the repaired main source, fresh combined/full regression and
-offline retained-pixel comparison after integration. Dynamic
+Terminal combined and fresh full regression acceptance of integrated main. Dynamic
 Group annotation/evidence lifetimes, effective paint order, stored Group SVG/PNG
 acceptance, compiler/public/installed routing and all other approved Phase 3–12
 and R-01–R-15 requirements remain open. V1/Caleb behavior and the installed app

@@ -222,7 +222,13 @@ behavior must remain unchanged. A source Group must finish strictly before its
 activation ends; a cross-board Group-end exactly at return-start is therefore
 invalid, not a positive fixture. Prove retained completed Groups and valid
 ordinary-end/return-start ordering without weakening activation guards.
-This is next work, not delivered functionality.
+This contract is now implemented in source at `821acd3`, with independent bounded
+receipt and integration PASS (54 focused tests). The complete board-only retained
+basis is checked by the shared chronological observer; new writes reject absent
+or stale receipts atomically and legacy stored preview explicitly opts into read
+compatibility. Only the private Group+return rejection changed; Group+annotation
+and public Group remain closed. Combined session `54572` is RUNNING and fresh
+full regression remains required. See the return-receipt progress report.
 
 Captured-start consumer integration at `58947e9` completes the bounded source
 portion of steps 1 and 2 below: static preflight, one immutable replay, temporal

@@ -25,7 +25,7 @@ installed preview/export or final creative-quality acceptance.
    baselines; ordinary frame sampling uses it. At `58947e9`, static/temporal pair
    validation and camera planning share exact captured pre-action samples. The
    private group-camera consumer proof passes, but public Group execution,
-   dynamic annotation/evidence lifetimes, return hierarchy receipts, effective
+   dynamic annotation/evidence lifetimes, final return-receipt integration evidence, effective
    paint-order guards and production acceptance remain incomplete.
    The first full 3AA regression exposed a repaired authored-layer/sibling-order
    conflation; the frozen `965d27c` full suite passed (1,099 tests, five preexisting
@@ -44,7 +44,11 @@ installed preview/export or final creative-quality acceptance.
    main source `365c3a0`: 1,187 passed, five preexisting symlink skips, 1399.88 seconds,
    exit 0, with those VO cases run. Log:
    `test-artifacts/phase-3aa-consumer-repair-full-sidecar.log`; source/tests remained
-   frozen throughout. Receipt work and all remaining Group gates stay open.
+   frozen throughout. Receipt implementation subsequently merged at `821acd3`,
+   independently audited (54 focused cases and exact integration PASS); combined
+   main session `54572` is RUNNING, fresh full acceptance still required.
+   Integrated offline annotation hashes remain identical. Only private Group+return
+   replay accepts exact receipts; public Group and other remaining gates stay open.
    Initial attempt `34056` stopped for a reproduced missing isolated Python
    environment; the corrected environment passes all 30 resource-bundle tests.
    Frozen publication source `9ec3bb4` and main `58947e9` match all five

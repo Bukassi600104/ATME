@@ -158,7 +158,13 @@ source/tests remained frozen. This is repaired-consumer regression acceptance,
 not full Phase 3 or installed-app acceptance.
 Initial attempt `34056` stopped for a reproduced missing isolated Python
 environment; all 30 resource-bundle tests pass after the local environment repair.
-Dynamic grouping annotation/evidence lifetimes, exact board-return receipts,
+Exact retained-board return receipts subsequently merged at `821acd3`; independent
+54-case bounded receipt audit and exact integration audit PASS. New writes prove
+complete hierarchy/state/version history, stored legacy reads remain explicit,
+and only resolved-timeline schema changed. Ten integrated offline frames remain
+unchanged. Combined main session `54572` is RUNNING; fresh full regression still
+required. See the return-receipt progress report for exact scope and evidence.
+Dynamic grouping annotation/evidence lifetimes,
 effective paint-order guards, production playback, compiler
 integration and all remaining Phase 3/4–12 requirements are still open. See the
 Phase 3 hierarchy design, remaining matrix and R-01–R-15 ledger for scope.

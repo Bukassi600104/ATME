@@ -538,9 +538,9 @@ sample and cannot end at activation/project exhaustion under this bounded rule.
 
 Ordinary `evaluate_frame` uses this kernel after pair validation and an
 explicit unsupported/Group gate. The captured-start consumer slice now supplies
-camera planning and temporal validation with this same replay; Group+annotation and Group+return
-combinations reject in the standalone clock until their complete lifetime and
-hierarchy receipts are implemented. This is not public Group, compiler, installed
+camera planning and temporal validation with this same replay. Group+annotation
+still rejects pending complete lifetime handling. Private Group+return now requires
+an exact retained-board receipt as described below. This is not public Group, compiler, installed
 preview/export or phase completion. The independent bounded source/docs audit
 passed 76 replay tests and Ruff; the finalized combined renderer run passed 274
 tests. Frozen pre-route full regression and the independent hash-pinned pre-route
@@ -580,6 +580,24 @@ exit 0, with those VO cases run. Log:
 remained frozen throughout. Return receipt work remains separate and open.
 No schema,
 v1/Caleb renderer or installed application changes are claimed.
+
+### Exact retained-board return receipts
+
+Source `821acd3` adds optional `ResolvedAction.return_hierarchy_receipt`, omitted
+when absent to retain legacy canonical hashes. Semantic plan/layout contracts
+remain unchanged. Identity binds action, destination board/activation, complete
+board-owned parent/order/local-transform inventory and canonical SHA-256, with
+exact state/version key inventory. At captured return start, one shared observer
+compares the retained sample without changing any state, version or hierarchy.
+Normal project writes require receipts and validate the stable resolved-index
+causal prefix through the last return before commit. Explicit legacy stored-read
+mode preserves old non-Group returns. Duplicate/rebind preserves receipt semantics.
+Only the private Group+return rejection is removed; Group+annotation and public
+Group still reject and MCP advertises renderer v1 only.
+Independent bounded audit: 54 cases PASS; exact integration and scoped Ruff PASS.
+Combined main session `54572` is RUNNING, fresh full regression pending. Integrated
+offline annotation frames/contact sheet retain their hashes. This is not public,
+compiler, installed, creative-quality or full Phase 3 acceptance.
 
 The initial attempt `34056` stopped after a reproduced missing isolated
 `sidecar/.venv/Scripts/python.exe` resource-generator failure. Adding a local
