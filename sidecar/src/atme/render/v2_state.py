@@ -26,7 +26,16 @@ from atme.render.v2_emphasis import (
     cross_out_paths,
     emphasis_path,
 )
+from atme.render.v2_evidence_reading import validate_evidence_reading
 from atme.render.v2_hierarchy import HierarchySnapshot, UnsupportedHierarchy
+from atme.render.v2_lifecycle import (
+    UnsupportedLifecycle,
+    geometry_dependencies,
+    lifecycle_samples,
+    validate_annotation_paint_order,
+    validate_group_lifetime,
+    validate_replacement_paint_order,
+)
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.render.v2_mask import UnsupportedMask, mask_source_region
 from atme.render.v2_morph import (
@@ -41,7 +50,7 @@ from atme.render.v2_timeline_replay import (
     replay_chronology,
     supports_operator,
 )
-from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds, world_matrix
+from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds
 from atme.store.contracts_v2 import (
     CameraAction,
     ConnectionAction,
@@ -393,7 +402,8 @@ def _validate_static_action(item, layout, timeline, objects, mask_sources, manag
 
 
 def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
-                   layout_sha256: str, hierarchy: HierarchySnapshot) -> _PairContext:
+                   layout_sha256: str, hierarchy: HierarchySnapshot,
+                   *, structural_timeline: ResolvedVisualTimelineV2 | None = None) -> _PairContext:
     if (layout.project_id != timeline.project_id or layout.layout_id != timeline.layout_id
             or layout.plan_id != timeline.plan_id or layout.plan_revision != timeline.plan_revision
             or layout.plan_sha256 != timeline.plan_sha256
@@ -404,11 +414,14 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
             or layout.evidence_treatments != timeline.evidence_treatments):
         raise V2FrameError("resolved timeline and executable layout do not describe the same composition")
     try:
-        validate_resolved_hierarchy(layout, timeline)
+        # Initial ownership/receipt inventory binds the complete document even
+        # when consumer execution is restricted to a return's causal prefix.
+        validate_resolved_hierarchy(layout, structural_timeline if structural_timeline is not None else timeline)
     except ValueError as exc:
         raise V2FrameError(str(exc)) from exc
     resolved_actions = {item.action.action_id: item for item in timeline.actions}
-    treatments_by_action = {item.action_id: item for item in layout.evidence_treatments}
+    treatments_by_action = {item.action_id: item for item in layout.evidence_treatments
+                            if structural_timeline is None or item.action_id in resolved_actions}
     layout_objects = hierarchy.object_map({item.object_id: item for item in layout.objects})
     validate_static_hierarchy(layout, layout_objects)
     state_objects = {item.object_id for item in timeline.initial_object_states}
@@ -496,7 +509,7 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
                 or action.post_state != action.destination_state
                 or action.destination_state != treatment.intent.destination_state):
             raise V2FrameError(f"insert_evidence {action.action_id} changes its authored binding")
-    for treatment in layout.evidence_treatments:
+    for treatment in treatments_by_action.values():
         resolved = resolved_actions.get(treatment.action_id)
         if resolved is None or not any(
             activation.board_id == treatment.intent.destination_board_id
@@ -505,7 +518,7 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
             for activation in layout.activations
         ):
             raise V2FrameError("evidence readable hold outlasts its destination board")
-    for treatment in layout.evidence_treatments:
+    for treatment in treatments_by_action.values():
         obj = layout_objects[treatment.object_id]
         chain = {obj.object_id, *_ancestor_ids(obj, layout_objects)}
         if "rotate" not in treatment.allowed_transformations and any(
@@ -526,7 +539,7 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
         resolved = resolved_actions[treatment.action_id]
         hold_end = resolved.end_ms + treatment.intent.readable_hold_intent_ms
         for other in timeline.actions:
-            if other is resolved or isinstance(other.action, SoundAction):
+            if other is resolved or isinstance(other.action, (SoundAction, GroupAction)):
                 continue
             if (other.action.board_id == obj.board_id
                     and other.start_ms < hold_end and other.end_ms > resolved.start_ms):
@@ -618,8 +631,9 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
                                 managed_connectors, connector_endpoints)
         if isinstance(action, TargetAction) and action.annotation_policy is not None:
             participants = set(action.target_ids) | set(_annotation_object_ids(action))
-            dependencies = participants | {parent for key in participants
-                                            for parent in _ancestor_ids(layout_objects[key], layout_objects)}
+            # Parentage is temporal. Only direct participants and whole-board
+            # effects are history-independent preflight conflicts.
+            dependencies = participants
             hold_end = item.end_ms + action.annotation_policy.readable_hold_ms
             for other in timeline.actions:
                 if other is item or isinstance(other.action, SoundAction):
@@ -707,13 +721,20 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
             if leader_id is not None:
                 leader = layout_objects[leader_id]
                 endpoint_ids = {leader.source_object_id, leader.destination_object_id}
-                live_dependencies = {leader_id, *endpoint_ids, *(ancestor for endpoint in endpoint_ids
-                    for ancestor in _ancestor_ids(layout_objects[endpoint], layout_objects))}
                 removal = next((other for other in timeline.actions
                                 if isinstance(other.action, TargetAction) and other.action.verb == "exit"
                                 and other.action.target_ids == [leader_id]
                                 and other.start_ms >= hold_end), None)
                 live_end = removal.end_ms if removal is not None else timeline.duration_ms
+                try:
+                    validate_group_lifetime(context.objects, timeline.actions,
+                                            {leader_id, *endpoint_ids}, hold_end, live_end,
+                                            description=f"retained annotation pointer {leader_id}")
+                    for retained in lifecycle_samples(replay, item, live_end):
+                        validate_annotation_paint_order(
+                            action, retained.hierarchy.object_map(context.objects), retained.hierarchy)
+                except ValueError as exc:
+                    raise V2FrameError(str(exc)) from exc
                 for other in timeline.actions:
                     if (other is item or other is removal or other.start_ms >= live_end
                             or other.end_ms <= hold_end
@@ -726,14 +747,38 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                         mutations = [other.action.connector_id]
                     else:
                         mutations = _action_object_references(other.action)
+                    observed_hierarchy = replay.before_action(other.action.action_id).hierarchy
+                    live_dependencies = geometry_dependencies(observed_hierarchy, {leader_id, *endpoint_ids})
                     if live_dependencies.intersection(mutations):
                         raise V2FrameError(
                             f"retained annotation pointer {leader_id} requires completed explicit removal before endpoint edits"
                         )
             try:
-                viewports = [evaluate_camera(layout, camera_plan, moment, activation.activation_id, _ease)
-                             for moment in (item.start_ms, item.end_ms, hold_end - 1)]
-                validate_annotation_geometry(action, layout, layout_objects, completed_transform, viewports)
+                validate_group_lifetime(context.objects, timeline.actions, participants,
+                                        item.start_ms, hold_end,
+                                        description=f"annotation {action.action_id} needs uninterrupted construction and hold")
+                for reading in lifecycle_samples(replay, item, hold_end):
+                    reading_objects = reading.hierarchy.object_map(context.objects)
+                    reading_frames = {frame.object_id: frame for frame in reading.objects}
+                    reading_dependencies = geometry_dependencies(reading.hierarchy, participants)
+                    target_chain = geometry_dependencies(reading.hierarchy, [target_id])
+                    if any(not reading_frames[key].visible or reading_frames[key].opacity != 1
+                           or reading_frames[key].reveal_fraction != 1 for key in target_chain):
+                        raise V2FrameError(f"annotation {action.action_id} needs fully visible opaque target and parents")
+                    parents = reading_dependencies.difference(participants)
+                    if any(not reading_frames[key].visible or reading_frames[key].opacity != 1
+                           or reading_frames[key].reveal_fraction != 1 for key in parents):
+                        raise V2FrameError(f"annotation {action.action_id} needs fully visible opaque note parents")
+                    if reading.at_ms >= item.end_ms and any(
+                        not reading_frames[key].visible or reading_frames[key].opacity != 1
+                        or reading_frames[key].reveal_fraction != 1 for key in note_ids
+                    ):
+                        raise V2FrameError(f"annotation {action.action_id} needs completed notes throughout its hold")
+                    viewport = evaluate_camera(layout, camera_plan, reading.at_ms, activation.activation_id, _ease)
+                    validate_annotation_geometry(
+                        action, layout, reading_objects,
+                        {key: frame.transform for key, frame in reading_frames.items()},
+                        [viewport], hierarchy=reading.hierarchy)
             except ValueError as exc:
                 raise V2FrameError(str(exc)) from exc
             for object_id in participants:
@@ -761,79 +806,23 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                 raise V2FrameError(
                     f"evidence {target} must remain fully opaque for its readable hold"
                 )
-            if ("rotate" not in treatment.allowed_transformations
-                    and any(completed_transform[object_id].rotation_degrees != 0
-                            for object_id in chain)):
-                raise V2FrameError(f"evidence {target} has an undeclared rotation")
-            try:
-                rect = world_bounds(obj, layout_objects, completed_transform)
-                matrix = world_matrix(obj, layout_objects, completed_transform)
-            except (UnsupportedWorldGeometry, UnsupportedCamera) as exc:
-                raise V2FrameError(str(exc)) from exc
-            for parent_id in ancestors:
-                parent = layout_objects[parent_id]
-                if isinstance(parent, MaskContainer):
-                    source = layout_objects[parent.mask_source_object_id]
-                    if (source.object_type != "rectangle"
-                            or any(completed_transform[object_id].rotation_degrees != 0
-                                   for object_id in (*chain, source.object_id))):
-                        raise V2FrameError(
-                            f"evidence {target} needs an axis-aligned rectangular mask aperture"
-                        )
-                    try:
-                        aperture = world_bounds(source, layout_objects, completed_transform)
-                    except UnsupportedWorldGeometry as exc:
-                        raise V2FrameError(str(exc)) from exc
-                    if (rect[0] < aperture[0] or rect[1] < aperture[1]
-                            or rect[2] > aperture[2] or rect[3] > aperture[3]):
-                        raise V2FrameError(
-                            f"evidence {target} is clipped by its declared mask"
-                        )
-                elif isinstance(parent, ContainerObject) and parent.object_type == "clip":
-                    if any(completed_transform[object_id].rotation_degrees != 0
-                           for object_id in chain):
-                        raise V2FrameError(
-                            f"evidence {target} needs an axis-aligned clip aperture"
-                        )
-                    try:
-                        aperture = world_bounds(parent, layout_objects, completed_transform)
-                    except UnsupportedWorldGeometry as exc:
-                        raise V2FrameError(str(exc)) from exc
-                    if (rect[0] < aperture[0] or rect[1] < aperture[1]
-                            or rect[2] > aperture[2] or rect[3] > aperture[3]):
-                        raise V2FrameError(f"evidence {target} is clipped by its parent")
             activation = next(
                 activation for activation in layout.activations
                 if activation.board_id == action.board_id
                 and activation.start_ms <= item.start_ms
                 and item.end_ms + treatment.intent.readable_hold_intent_ms <= activation.end_ms
             )
-            for moment in (item.start_ms, item.end_ms,
-                           item.end_ms + treatment.intent.readable_hold_intent_ms - 1):
-                viewport = evaluate_camera(layout, camera_plan, moment,
-                                           activation.activation_id, _ease)
-                crop = treatment.intent.crop
-                focus = treatment.intent.focus_region
-                bounds = obj.geometry.bounds
-                source_scale = min(bounds.width / crop.width,
-                                   bounds.height * 0.5 / crop.height)
-                origin = matrix.point(0, 0)
-                focus_x = matrix.point(focus.width * source_scale, 0)
-                focus_y = matrix.point(0, focus.height * source_scale)
-                displayed_focus_x = ((focus_x[0] - origin[0]) ** 2
-                                     + (focus_x[1] - origin[1]) ** 2) ** 0.5
-                displayed_focus_y = ((focus_y[0] - origin[0]) ** 2
-                                     + (focus_y[1] - origin[1]) ** 2) ** 0.5
-                if (rect[0] < viewport.x or rect[1] < viewport.y
-                        or rect[2] > viewport.x + viewport.width
-                        or rect[3] > viewport.y + viewport.height
-                        or (rect[2] - rect[0]) * layout.canvas.width / viewport.width < 180
-                        or (rect[3] - rect[1]) * layout.canvas.height / viewport.height < 160
-                        or displayed_focus_x * layout.canvas.width / viewport.width < 8
-                        or displayed_focus_y * layout.canvas.height / viewport.height < 8):
-                    raise V2FrameError(
-                        f"evidence {target} is not fully readable in the camera frame during its hold"
-                    )
+            try:
+                observed = {target, *(layout_objects[parent].mask_source_object_id
+                            for parent in ancestors if isinstance(layout_objects[parent], MaskContainer))}
+                hold_end = item.end_ms + treatment.intent.readable_hold_intent_ms
+                validate_group_lifetime(context.objects, timeline.actions, observed, item.start_ms, hold_end,
+                                        description=f"evidence {target} readable insert and hold")
+                for reading in lifecycle_samples(replay, item, hold_end):
+                    viewport = evaluate_camera(layout, camera_plan, reading.at_ms, activation.activation_id, _ease)
+                    validate_evidence_reading(item, layout, context.objects, treatment, reading, viewport)
+            except ValueError as exc:
+                raise V2FrameError(str(exc)) from exc
             last_target_end[target] = item.end_ms
             last_target_verb[target] = "insert_evidence"
             continue
@@ -842,6 +831,10 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
             verb = action.verb
             source_id, destination_id = action.from_object_id, action.to_object_id
             source, destination = layout_objects[source_id], layout_objects[destination_id]
+            try:
+                validate_replacement_paint_order(action, sample, layout_objects)
+            except UnsupportedLifecycle as exc:
+                raise V2FrameError(str(exc)) from exc
             if (source.board_id != action.board_id or destination.board_id != action.board_id
                     or source.parent_id != destination.parent_id
                     or source.z_index != destination.z_index
@@ -969,16 +962,14 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
 
 
 
-def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
-                   layout_sha256: str, hierarchy: HierarchySnapshot):
-    context = _validate_pair_static(layout, timeline, layout_sha256, hierarchy)
-    # Preserve capability/error boundaries until full structural consumers land.
-    for resolved in timeline.actions:
-        action = resolved.action
-        if isinstance(action, GroupAction) or not supports_operator(action):
-            raise UnsupportedVisualAction(
-                f"v2 action {action.action_id} uses {action.verb}, which has no frame implementation"
-            )
+def _validate_consumer_history(context: _PairContext):
+    """One replay/camera/lifecycle proof for the caller's exact causal actions.
+
+    Storage receipt callers may use a resolved-order prefix. All observers must
+    use that same prefix, including their later-edit scans, not the full document.
+    Public capability admission remains the responsibility of the frame caller.
+    """
+    layout, timeline, hierarchy = context.layout, context.timeline, context.hierarchy
     try:
         replay = replay_chronology(
             context.objects, hierarchy, {frame.object_id: frame for frame in context.frames},
@@ -995,32 +986,40 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
     return replay, camera_plan
 
 
+def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
+                   layout_sha256: str, hierarchy: HierarchySnapshot):
+    context = _validate_pair_static(layout, timeline, layout_sha256, hierarchy)
+    # Preserve capability/error boundaries until full structural consumers land.
+    for resolved in timeline.actions:
+        action = resolved.action
+        if isinstance(action, GroupAction) or not supports_operator(action):
+            raise UnsupportedVisualAction(
+                f"v2 action {action.action_id} uses {action.verb}, which has no frame implementation"
+            )
+    return _validate_consumer_history(context)
+
+
 def validate_resolved_return_history(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
                                      *, layout_sha256: str) -> None:
     """Validate compiler return receipts on write without opening public Group rendering.
 
-    Replay is the same immutable chronological kernel used by frames. A receipt
-    is proved at its captured start, never compared to the initial board pose.
-    This is a storage validator, not a renderer capability advertisement.
+    Replay and lifecycle consumers are the same immutable proof used by frames.
+    A receipt is proved at its captured start, never compared to the initial pose.
+    Without returns, this helper proves the full history. This is a storage
+    validator, not a renderer capability advertisement.
     """
     hierarchy = HierarchySnapshot.from_objects({obj.object_id: obj for obj in layout.objects})
-    # The caller hashes the exact stored document, not a default-expanded dump.
-    context = _validate_pair_static(layout, timeline, layout_sha256, hierarchy)
     return_indices = [index for index, item in enumerate(timeline.actions)
                       if isinstance(item.action, EvidenceAction) and item.action.verb == "return_board"]
-    if not return_indices:
-        return
     # Same-time starts follow resolved order. An action after the last return is
     # not its causal history, even if their millisecond timestamps are equal.
-    causal_actions = tuple(timeline.actions[:return_indices[-1] + 1])
-    try:
-        replay_chronology(
-            context.objects, hierarchy, {obj.object_id: obj for obj in context.frames},
-            {key: state.state_version for key, state in context.initial.items()}, causal_actions,
-            tuple((a.board_id, a.start_ms, a.end_ms) for a in layout.activations), timeline.duration_ms,
-        )
-    except ReplayError as exc:
-        raise V2FrameError(str(exc)) from exc
+    causal_actions = timeline.actions[:return_indices[-1] + 1] if return_indices else timeline.actions
+    causal_timeline = timeline.model_copy(update={"actions": list(causal_actions)})
+    # The caller hashes the exact stored document, not a default-expanded dump.
+    # All static and temporal consumer scans share this same resolved-order slice.
+    context = _validate_pair_static(layout, causal_timeline, layout_sha256, hierarchy,
+                                    structural_timeline=timeline if return_indices else None)
+    _validate_consumer_history(context)
 
 
 def evaluate_frame(

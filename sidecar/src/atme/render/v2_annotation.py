@@ -9,19 +9,19 @@ from __future__ import annotations
 import math
 
 from atme.render.style_bundle import resolve_contract_bundle
+from atme.render.v2_lifecycle import validate_annotation_paint_order
 from atme.render.v2_world import world_anchor, world_bounds, world_matrix
 from atme.store.contracts_v2 import (
     TextObject,
     _annotation_object_ids,
-    _validate_annotation_layout,
     _validate_annotation_plan_objects,
 )
 
 
-def validate_annotation_geometry(action, layout, objects, transforms, viewports):
+def validate_annotation_geometry(action, layout, objects, transforms, viewports, *, hierarchy):
     """Validate final authored paint, transformed anchors, and on-screen size."""
     _validate_annotation_plan_objects(action, objects)
-    _validate_annotation_layout(action, objects)
+    validate_annotation_paint_order(action, objects, hierarchy)
     ids = [action.target_ids[0], *_annotation_object_ids(action)]
     for object_id in ids:
         parent_id = objects[object_id].parent_id

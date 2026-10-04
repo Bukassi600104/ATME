@@ -646,10 +646,7 @@ class ProjectService:
                 or resolved.fallbacks != plan.fallbacks
                 or resolved.evidence_treatments != layout.evidence_treatments):
             raise ProjectError("invalid_artifact", "Resolved timeline changes authored actions or coverage")
-        if require_return_receipts and any(
-            isinstance(item.action, EvidenceAction) and item.action.verb == "return_board"
-            for item in resolved.actions
-        ):
+        if require_return_receipts:
             from atme.render.v2_state import validate_resolved_return_history
 
             try:
