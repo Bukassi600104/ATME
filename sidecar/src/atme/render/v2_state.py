@@ -1014,6 +1014,14 @@ def validate_resolved_return_history(layout: ExecutableLayoutV2, timeline: Resol
     # Same-time starts follow resolved order. An action after the last return is
     # not its causal history, even if their millisecond timestamps are equal.
     causal_actions = timeline.actions[:return_indices[-1] + 1] if return_indices else timeline.actions
+    # Kernel-level paired consumer proofs do not yet admit stored Group/annotation
+    # productions. Preserve that write boundary until stored receipts/duplication
+    # and the remaining hierarchy consumers are proven through their real callers.
+    if any(isinstance(item.action, GroupAction) for item in causal_actions) and any(
+        isinstance(item.action, TargetAction) and item.action.annotation_policy is not None
+        for item in causal_actions
+    ):
+        raise V2FrameError("stored hierarchy annotation productions require consumer integration")
     causal_timeline = timeline.model_copy(update={"actions": list(causal_actions)})
     # The caller hashes the exact stored document, not a default-expanded dump.
     # All static and temporal consumer scans share this same resolved-order slice.
@@ -1044,6 +1052,16 @@ def evaluate_frame(
     except UnsupportedHierarchy as exc:
         raise V2FrameError(str(exc)) from exc
     replay, camera_plan = _validate_pair(layout, timeline, layout_sha256, hierarchy)
+    return _sample_validated_frame(layout, timeline, replay, camera_plan, at_ms)
+
+
+def _sample_validated_frame(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
+                            replay: ChronologicalReplay, camera_plan, at_ms: int) -> FrameSnapshot:
+    """Sample an already-proven history; not a public capability admission route.
+
+    Private paired-consumer proofs and the public evaluator use this identical
+    geometry/view assembly. Production callers still enter through evaluate_frame.
+    """
     if type(at_ms) is not int or not 0 <= at_ms < timeline.duration_ms:
         raise V2FrameError("frame time must be an integer within the resolved timeline")
     sample = replay.at(at_ms)

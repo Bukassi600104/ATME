@@ -1,10 +1,10 @@
 """Immutable chronological local-state replay for the v2 hierarchy integration.
 
 This is the shared clock/state kernel, not a replacement production gate. Callers
-must retain plan/layout/asset/geometry validation. Public frames still reject
-GroupActions until camera, annotation lifetime and retained-board consumers use
-this same clock. Group/annotation combinations reject until their dependencies
-are integrated. Group/return requires an exact retained-board hierarchy receipt.
+must retain plan/layout/asset/geometry validation. The kernel can replay paired
+Group/annotation actions; temporal consumer, stored-project and public admission
+are separate proofs. Public frames still reject GroupActions. Group/return
+requires an exact retained-board hierarchy receipt.
 
 At a timestamp: ordinary completions, structural completions in resolved order,
 then starts. An active operator always samples its captured start pose. A Group
@@ -275,11 +275,6 @@ def _validate_operators(actions: tuple) -> None:
         action = item.action
         if not supports_operator(action):
             raise ReplayError(f"action {action.action_id} has no chronological operator for {action.verb}")
-    if any(isinstance(item.action, GroupAction) for item in actions) and any(
-        isinstance(item.action, TargetAction) and item.action.annotation_policy is not None
-        for item in actions
-    ):
-        raise ReplayError("hierarchy annotation lifetimes and retained-board receipts require consumer integration")
     if any(isinstance(item.action, GroupAction) for item in actions) and any(
         isinstance(item.action, EvidenceAction) and item.action.verb == "return_board"
         and item.return_hierarchy_receipt is None for item in actions

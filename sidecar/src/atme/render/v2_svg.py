@@ -44,7 +44,7 @@ from atme.render.v2_path import (
     parse_freehand_path,
 )
 from atme.render.v2_raster import UnsupportedProjectPNG, canonical_png
-from atme.render.v2_state import FrameObject, evaluate_frame
+from atme.render.v2_state import FrameObject, FrameSnapshot, evaluate_frame
 from atme.render.v2_world import UnsupportedWorldGeometry, transform_svg, world_anchor
 from atme.store.contracts_v2 import (
     ConnectionAction,
@@ -711,6 +711,31 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     snapshot = evaluate_frame(layout_document, timeline_document, at_ms)
     layout = ExecutableLayoutV2.model_validate(layout_document)
     timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
+    held_frames = {
+        item.action.action_id: evaluate_frame(layout_document, timeline_document, item.end_ms)
+        for item in timeline.actions
+        if isinstance(item.action, TargetAction) and item.action.annotation_policy is not None
+        and item.action.annotation_policy.leader_connector_id is not None
+    }
+    return _compose_validated_svg_frame(layout, timeline, snapshot, held_frames, asset_bytes)
+
+
+def _compose_validated_svg_frame(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
+                                 snapshot: FrameSnapshot, held_frames: dict[str, FrameSnapshot],
+                                 asset_bytes: dict[str, bytes | VerifiedEvidenceBytes] | None = None) -> SVGFrame:
+    """Pure paint from requested and held snapshots of the same proven history.
+
+    This internal consumer does not admit an action or advertise a capability.
+    Public callers obtain every snapshot through the public frame evaluator.
+    """
+    at_ms = snapshot.at_ms
+    leader_actions = {item.action.action_id: item for item in timeline.actions
+                      if isinstance(item.action, TargetAction) and item.action.annotation_policy is not None
+                      and item.action.annotation_policy.leader_connector_id is not None}
+    if held_frames.keys() != leader_actions.keys() or any(
+        held_frames[key].at_ms != item.end_ms for key, item in leader_actions.items()
+    ):
+        raise UnsupportedVisualObject("annotation pointer preflight requires every exact completed construction frame")
     objects = snapshot.hierarchy.object_map({obj.object_id: obj for obj in layout.objects})
     annotation_leaders = {item.action.annotation_policy.leader_connector_id for item in timeline.actions
                           if isinstance(item.action, TargetAction) and item.action.annotation_policy is not None}
@@ -769,7 +794,7 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
     for item in timeline.actions:
         if (isinstance(item.action, TargetAction) and item.action.annotation_policy is not None
                 and item.action.annotation_policy.leader_connector_id is not None):
-            held = evaluate_frame(layout_document, timeline_document, item.end_ms)
+            held = held_frames[item.action.action_id]
             held_states = {state.object_id: state for state in held.objects}
             held_objects = held.hierarchy.object_map({obj.object_id: obj for obj in layout.objects})
             leader = held_objects[item.action.annotation_policy.leader_connector_id]
@@ -952,14 +977,18 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
 def compose_png_frame(layout_document: dict, timeline_document: dict, at_ms: int,
                       asset_bytes: dict[str, bytes | VerifiedEvidenceBytes] | None = None) -> PNGFrame:
     """Rasterize a supported frame with verified, pinned fonts and no system-font fallback."""
+    frame = compose_svg_frame(layout_document, timeline_document, at_ms, asset_bytes)
+    return _rasterize_svg_frame(ExecutableLayoutV2.model_validate(layout_document), frame)
+
+
+def _rasterize_svg_frame(layout: ExecutableLayoutV2, frame: SVGFrame) -> PNGFrame:
+    """The same pinned offline rasterizer for public frames and private proofs."""
     import resvg_py
 
-    frame = compose_svg_frame(layout_document, timeline_document, at_ms, asset_bytes)
-    style, _, root = resolve_contract_bundle(layout_document["style_system_version"],
-                                             layout_document["asset_registry_version"])
+    style, _, root = resolve_contract_bundle(layout.style_system_version, layout.asset_registry_version)
     font_files = [str(root / font.file) for font in style.fonts]
     png = bytes(resvg_py.svg_to_bytes(
         svg_string=frame.svg, width=frame.width, height=frame.height,
         font_files=font_files, skip_system_fonts=True,
     ))
-    return PNGFrame(at_ms=at_ms, width=frame.width, height=frame.height, png=png)
+    return PNGFrame(at_ms=frame.at_ms, width=frame.width, height=frame.height, png=png)
