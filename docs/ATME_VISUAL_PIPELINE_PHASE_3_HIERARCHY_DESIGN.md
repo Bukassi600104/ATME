@@ -297,6 +297,64 @@ annotation starting at Group completion, return after completed group/ungroup,
 retained leader exit before later Group, and unrelated sibling motion through the
 structural boundary. This sequence does not remove any R-01–R-15 or Phase 4–12 work.
 
+### Independent next-consumer assessment after receipt integration
+
+The independent read-only assessment confirms SVG already projects sampled
+hierarchy and sibling ordinals. Do not replace its compositor or remove gates to
+hide stale validators. The remaining source defects are:
+
+- Annotation temporal checks reuse the captured-start projected objects and
+  transforms at construction end and hold end. Retained pointer dependency chains
+  are frozen at that same start. Runtime geometry calls the plan-time annotation
+  layout helper, which rebuilds initial `(z_index, object_id)` order instead of
+  accepting sampled hierarchy order.
+- Evidence temporal checks freeze ancestry, opacity, world geometry and aperture
+  at insert start, while camera sampling advances. Group conflict checks only
+  cover the action interval, not its extended readable hold.
+- Replacement/morph validates sampled parentage but still equates authored layer
+  identity with effective stacking position. Hierarchy-aware isolate is separately
+  unsupported: dimming every non-focus object also dims the focus's ancestors.
+
+Implementation order remains one shared replay, no extra history ledger:
+
+1. Add read-only lifecycle sampling at captured pre-start, construction end,
+   hold end minus one, and relevant Group start/completion boundaries. Preserve
+   half-open rules: Group completion at consumer start and Group start at hold
+   end are allowed; related overlap within construction/hold rejects. Geometric
+   dependencies are not the ordinal-only structural version closure.
+2. Add sampled paint-order proofs without overwriting authored layers. Annotation
+   target precedes every note/leader. Replacement alternatives share sampled
+   parent, authored layer and consecutive nonterminal paint slots.
+3. Migrate annotation geometry/readiness and completed notes throughout hold.
+   Recompute retained leader/endpoint chains through later hierarchy boundaries;
+   related changes require a fully completed solo leader exit. Unrelated Group
+   remains valid when relative paint order and geometry remain unchanged.
+4. Migrate evidence chain, rotation permission, apertures, geometry, opacity and
+   camera readability at every lifecycle sample. Preserve all attestation rules.
+5. Apply replacement/morph sampled slots, then connector ancestry and separately
+   hierarchy-aware isolate. Only remove the private Group+annotation blanket
+   after complete consumer proofs; public Group still needs stored SVG/PNG,
+   both profiles, seek/offline and full acceptance.
+
+The compatibility-safe replacement slot view removes only canonical terminal
+leaves (`state == "removed"` and `visible is False`), never hidden, zero-opacity,
+zero-reveal or inactive authored leaves. Always retain the current source and
+destination. Either adjacent orientation remains valid. This preserves the
+existing chain whose removed first source lies between later alternatives, while
+rejecting an intervening future leaf. Keep every leaf in receipts and state/
+version inventory; this view is not source deletion. Only temporal validation
+can apply this rule, not plan/static checks that lack chronological state.
+
+Required positives: post-Group annotation/evidence at exact completion; unrelated
+Group during hold and pointer retention; completed leader exit before endpoint
+edits; post-Group adjacent replacement/morph; valid removed-source chains; random
+and backward seeks; both-profile SVG/PNG. Required negatives: related Group in
+construction/hold/retention, stale endpoint ancestry or annotation paint order,
+changed evidence aperture, intervening nonterminal replacement leaf, and Group
+starting one millisecond before hold end. Existing stale receipt negatives remain.
+This is an audited implementation map, not delivered consumer functionality.
+Receipt integration full session `79529` remains separate RUNNING evidence.
+
 Prove real grouping and later collective transforms, exact ungroup roundtrips,
 nested/nonidentity parent geometry, overlapping-leaf paint order, camera and
 connector handoff, annotation lifecycle conflicts, retained-board hierarchy and
