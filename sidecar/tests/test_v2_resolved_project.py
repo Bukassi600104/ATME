@@ -17,8 +17,8 @@ from atme.project_service import ProjectError, _resolved_compilation_fingerprint
 
 
 def stored_v2_basis(tmp_path, *, real_evidence=False, real_image=False,
-                    image_object_asset_id="valid"):
-    service, project, plan = _store_v2_plan(tmp_path)
+                    image_object_asset_id="valid", profile="LONG_FORM_16_9"):
+    service, project, plan = _store_v2_plan(tmp_path, profile=profile)
     project_id = project["project_id"]
     imported = service.attach_wav(project_id, wav_bytes(seconds=10), project["revision"])
     project = imported["project"]
@@ -105,6 +105,8 @@ def stored_v2_basis(tmp_path, *, real_evidence=False, real_image=False,
         plan["project_revision"] = project["revision"]
         project = service.write(project_id, "storyboard", plan, project["revision"])
     layout = executable_layout_v2(plan)
+    layout["output_profile"] = deepcopy(plan["output_profile"])
+    layout["canvas"].update(width=plan["output_profile"]["width"], height=plan["output_profile"]["height"])
     if asset is not None:
         layout["objects"][2]["asset_id"] = asset["asset_id"]
     if image_asset is not None:
@@ -128,6 +130,7 @@ def stored_v2_basis(tmp_path, *, real_evidence=False, real_image=False,
     except ProjectError as exc:
         raise AssertionError(exc.errors) from exc
     timeline = resolved_timeline_v2(plan, layout)
+    timeline["output_profile"] = deepcopy(plan["output_profile"])
     if asset is not None:
         timeline["resolved_assets"][0].update(
             asset_id=asset["asset_id"], revision=asset["revision"],

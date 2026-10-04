@@ -1014,14 +1014,8 @@ def validate_resolved_return_history(layout: ExecutableLayoutV2, timeline: Resol
     # Same-time starts follow resolved order. An action after the last return is
     # not its causal history, even if their millisecond timestamps are equal.
     causal_actions = timeline.actions[:return_indices[-1] + 1] if return_indices else timeline.actions
-    # Kernel-level paired consumer proofs do not yet admit stored Group/annotation
-    # productions. Preserve that write boundary until stored receipts/duplication
-    # and the remaining hierarchy consumers are proven through their real callers.
-    if any(isinstance(item.action, GroupAction) for item in causal_actions) and any(
-        isinstance(item.action, TargetAction) and item.action.annotation_policy is not None
-        for item in causal_actions
-    ):
-        raise V2FrameError("stored hierarchy annotation productions require consumer integration")
+    # Storage proves paired hierarchy/annotation consumers through this same
+    # captured history. Public Group frame admission remains a separate gate.
     causal_timeline = timeline.model_copy(update={"actions": list(causal_actions)})
     # The caller hashes the exact stored document, not a default-expanded dump.
     # All static and temporal consumer scans share this same resolved-order slice.

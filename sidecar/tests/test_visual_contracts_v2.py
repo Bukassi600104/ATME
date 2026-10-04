@@ -410,9 +410,11 @@ def test_resolved_trigger_kinds_require_and_accept_truthful_anchors(kind):
     ResolvedVisualTimelineV2.model_validate(document)
 
 
-def _store_v2_plan(tmp_path):
-    service, project = ready_project(tmp_path)
+def _store_v2_plan(tmp_path, *, profile="LONG_FORM_16_9"):
+    service, project = ready_project(tmp_path, profile)
     plan = visual_plan_v2(project["revision"]); plan["project_id"] = project["project_id"]
+    if profile == "SHORT_FORM_9_16":
+        plan["output_profile"] = {"profile_id": profile, "width": 720, "height": 1280, "fps": 30}
     source = describe(service, project["project_id"])
     timeline = service.source_timeline.get(project["project_id"])
     media = source["timing_authority"]["media"]

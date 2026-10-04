@@ -256,15 +256,16 @@ def test_public_group_frame_admission_remains_closed():
         v2_state.evaluate_frame(layout, timeline, 6500)
 
 
-def test_kernel_pair_proof_does_not_silently_open_no_return_storage_admission():
+def test_no_return_storage_pair_proof_uses_full_history_without_opening_public_frames():
     layout, timeline = annotation_group_documents()
     consumer_clock(layout, timeline)
     original = deepcopy((layout, timeline))
-    with pytest.raises(v2_state.V2FrameError, match="stored hierarchy annotation productions"):
-        v2_state.validate_resolved_return_history(
-            ExecutableLayoutV2.model_validate(layout), ResolvedVisualTimelineV2.model_validate(timeline),
-            layout_sha256=digest(layout))
+    v2_state.validate_resolved_return_history(
+        ExecutableLayoutV2.model_validate(layout), ResolvedVisualTimelineV2.model_validate(timeline),
+        layout_sha256=digest(layout))
     assert (layout, timeline) == original
+    with pytest.raises(v2_state.UnsupportedVisualAction, match="no frame implementation"):
+        v2_state.evaluate_frame(layout, timeline, 6750)
 
 
 def private_svg(context, replay, camera, at_ms):
