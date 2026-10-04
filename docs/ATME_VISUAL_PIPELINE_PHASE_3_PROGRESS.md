@@ -92,8 +92,8 @@ reject instead of becoming last-writer behavior. Positive completed member alpha
 and legacy dim/isolate revision history are preserved.
 
 Ordinary `evaluate_frame` sampling now uses this shared clock after all existing
-pair validation. Public Group remains explicitly unsupported until dynamic
-camera, annotation lifetime and retained-board hierarchy consumers are complete.
+pair validation. Public Group remains explicitly unsupported until public Group
+camera acceptance, annotation lifetime and retained-board hierarchy consumers are complete.
 This removes the duplicate start-ordered sampling loop, not the v1/Caleb renderer.
 No contracts, schemas, public dispatcher or installed application changed here.
 
