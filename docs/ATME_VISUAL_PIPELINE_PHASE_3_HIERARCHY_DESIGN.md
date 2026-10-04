@@ -83,8 +83,8 @@ an executable ContainerObject.
 
 The standalone chronology kernel now proves exact resolved-boundary source-basis
 equality with CURRENT sampled transforms while preserving unrelated active
-baselines. Still required before public Group execution: action-aware dynamic
-camera/conflict handling, retained
+baselines. Private replay-aware dynamic camera/conflict handling now has bounded
+PASS; public Group camera routing/production acceptance remains required, with retained
 board parent/order expectations, and integrated preview/export parity. The new
 schema data and pure validators do not claim those gates complete. Split remains
 separate; the grouping policy rejects a split action rather than ignoring it.
@@ -179,11 +179,46 @@ and Ruff; the finalized combined renderer run passed 274 tests. The ten offline
 annotation frames/contact sheet remain byte-identical. The fresh full suite for
 the changed chronology route at `37b0504` passed: 1,175 tests, five preexisting
 skips, exit 0 in 1472.35 seconds. Later consumer integration requires its own
-verification. Dynamic camera source evaluation, retained-pointer lifetimes,
+verification. Private replay-aware camera source evaluation is now bounded PASS;
+public Group camera execution/stored acceptance, retained-pointer lifetimes,
 full board-return hierarchy receipts, stored grouping SVG/PNG proof and installed
 production acceptance remain incomplete. No new schema or v1 behavior changed.
 
 ## Required acceptance
+
+### Next resolved-return receipt implementation contract
+
+The independent next-step assessment places the compiler receipt on
+`ResolvedAction`, not `EvidenceAction`: semantic plan/layout action equality
+must remain unchanged. An optional `return_hierarchy_receipt` must be omitted
+when absent, preserving old 2.0.0 canonical dumps/hashes. A receipt on any other
+action rejects. It binds action ID, destination board and destination activation,
+one complete destination-board-only `HierarchyBasis` (parent, sibling ordinal
+and local transform for every owned object), and its canonical SHA-256.
+
+Typed/static validation must verify hash, identity, exact state/version key
+inventory and complete same-board parent/order closure. Pairing binds the layout
+board inventory, never the initial layout transforms: completed hierarchy edits
+may legitimately change the retained board. Normal ProjectService resolved
+writes require the receipt; legacy stored reads remain compatible. Group plus
+return must always fail closed without it. Duplication/rebinding preserves it
+byte-for-byte; it contains no project ID.
+
+At the return's captured start, compare exact states, versions and the canonical
+destination-board-only sampled hierarchy/local transforms. A return observes and
+cuts to retained work; it never resets transforms, hierarchy or state. Share this
+comparison between replay and frame temporal validation, not another history
+ledger. After that consumer is verified, remove only the standalone Group+return
+rejection, retaining Group+annotation and public Group gates.
+
+Regenerate the resolved-timeline schema only; semantic-plan/layout schemas must
+not acquire this compiler receipt. Acceptance must cover legacy omitted hashes,
+normal missing-receipt write rejection, A-to-B-to-A after group and after ungroup,
+same-time Group-end/return-start, random seeks, duplicate preservation, and
+continued public Group rejection. Negatives: missing/extra inventory, wrong
+action/board/activation, parent/order/local transform/hash/state/version, stale
+prior activation and off-board edits. Retained legacy return oracle and v1
+behavior must remain unchanged. This is next work, not delivered functionality.
 
 Captured-start consumer integration at `58947e9` completes the bounded source
 portion of steps 1 and 2 below: static preflight, one immutable replay, temporal

@@ -517,7 +517,7 @@ inverse-parent connector semantics.
 The structural step is not enabled in frame execution. Ordinary frame sampling
 now uses the shared chronology kernel described below. Remaining: dynamic
 Group consumer/conflict and lifetime guards, FrameSnapshot production
-routing, camera/annotation/connector consumers, board-return
+routing, public Group camera acceptance, annotation/connector lifetime consumers, board-return
 hierarchy receipts, stored SVG/PNG integration and public/installed acceptance.
 Group/ungroup/split remain rejected by the current frame evaluator.
 

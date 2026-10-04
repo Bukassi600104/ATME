@@ -335,7 +335,10 @@ All remaining Phase 3 and R-01–R-15/Phase 4–12 gates remain required.
   opacity reach SVG/PNG without changing v1. Group membership is contract-checked for
   same-board ownership, bidirectional references, cycles, duplicate children, and depth.
   Dynamic group/ungroup/split actions, masks, clips, clip references, and grouped
-  camera/connector geometry remain explicitly unsupported. This is not final hierarchy,
+  camera/connector geometry were explicitly unsupported at that historical
+  checkpoint. Later hierarchy/mask/camera slices supersede those static limitations;
+  `58947e9` adds private replay-aware group-camera consumption, not public
+  Group playback. This is not final hierarchy,
   preview/export, or full Phase 3 acceptance.
 
 - Slice 3N adds bounded purposeful-camera mechanics for all five canonical camera verbs.
