@@ -183,6 +183,47 @@ production acceptance remain incomplete. No new schema or v1 behavior changed.
 
 ## Required acceptance
 
+### Next coherent integration slice: one replay, all temporal consumers
+
+The independent read-only integration assessment identified four separate stale
+history consumers: `v2_camera.camera_segments` (initial parents and start-ordered
+transforms), the temporal half of `v2_state._validate_pair` (annotation/evidence/
+replace/connect/attention/transform readiness), its retained-board state/version
+loop, and retained annotation endpoint lifetime checks. Removing only the Group
+gate would leave each of these incorrect. The accepted order remains:
+
+1. Separate static pair preflight from temporal validation. Construct the shared
+   immutable replay once after safe identity/inventory/policy preflight, then use
+   it for all readiness/history checks; do not add another state ledger.
+2. Supply camera planning with replay samples at each camera start, including the
+   sampled hierarchy and local transforms. Preserve viewport inheritance and all
+   existing framing guards; reject geometrically related overlapping Group edits,
+   not unrelated ordinal-only shifted siblings.
+3. Add a legacy-omitted resolved return hierarchy receipt: complete destination-
+   board parent/order/local-transform inventory and canonical hash. New writes
+   requiring that receipt must bind it to exact state/version history. A return
+   observes the board, never resets it; semantic plan intent is not an executable
+   transform receipt. Regenerate the resolved schema and test old serialization.
+4. Migrate annotation construction/hold/retained leader lifetime, evidence
+   readability/apertures, replace/morph co-parent geometry, connector ancestry,
+   attention and transform preconditions to the same replay. Replace the current
+   blanket container/isolate rejection with faithful hierarchy-aware validation
+   or retain an explicit unsupported combination until it is implemented.
+5. Only after those consumers pass, remove the standalone Group+annotation/return
+   rejection and the evaluator Group gate. Exercise stored-project SVG/PNG frames
+   in both profiles, random/backward seeks, exact end-before-start boundaries,
+   group/ungroup world preservation, and offline execution. Preserve all 27 legacy
+   oracle families and the v1/Caleb regression. Public production/compiler and
+   installed-app acceptance remain separate gates.
+
+Required negatives include Group during camera focus, annotation construction/
+hold/retention or evidence reading; changed endpoint ancestry; stale/missing/extra
+return inventory/hash/parent/order/local transform/state/version; and invalid
+post-Group replacement/morph parentage. Required positives include a camera or
+annotation starting at Group completion, return after completed group/ungroup,
+retained leader exit before later Group, and unrelated sibling motion through the
+structural boundary. This sequence does not remove any R-01–R-15 or Phase 4–12 work.
+
 Prove real grouping and later collective transforms, exact ungroup roundtrips,
 nested/nonidentity parent geometry, overlapping-leaf paint order, camera and
 connector handoff, annotation lifecycle conflicts, retained-board hierarchy and

@@ -113,6 +113,12 @@ hashes. A fresh full regression remains required for this changed ordinary route
 the frozen 1,099-test baseline is not its acceptance. Dynamic Group consumers and
 full Phase 3 acceptance remain open.
 
+Fresh full regression is running against frozen source commit `37b0504`:
+`pytest tests --tb=short`, unified terminal session `24270`, log
+`test-artifacts/phase-3aa-chronology-full-sidecar.log`. A live handle is not a PASS;
+record the terminal exit/result before advancing its gate. Do not change imported
+source or tests while this run is live. The installed application is unchanged.
+
 - Slice 3Z adds an optional explicit annotation policy to `TargetAction`, preserving
   legacy no-policy serialization. New plan writes require authored hidden text/
   mark leaves, exact action/beat coverage, construction order/weights, a target
