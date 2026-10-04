@@ -141,8 +141,16 @@ independent source/docs audit passed 76 tests, the combined renderer run passed
 274 tests, and the offline annotation proof remained byte-identical. Its pinned
 pre-route oracle and fresh full regression are separate gates; the latter passed
 at `37b0504` (1,175 tests, five preexisting skips, exit 0 in 1472.35 seconds).
-Subsequent consumer changes require separate verification. Dynamic grouping
-camera/annotation/board-return integration, production playback, compiler
+At `58947e9`, static/temporal validation and replay-aware camera planning have
+bounded independent PASS: 282 combined tests, 84 independently rerun cases,
+clean sidecar-cwd Ruff and unchanged ten-frame offline annotation proof. Private
+group-camera ancestry/collective-motion verification is not public Group playback.
+The fresh full suite at equivalent publication source `9ec3bb4` remains RUNNING
+(session `91184`, `test-artifacts/phase-3aa-consumers-final-full-sidecar.log`).
+Initial attempt `34056` stopped for a reproduced missing isolated Python
+environment; all 30 resource-bundle tests pass after the local environment repair.
+Dynamic grouping annotation/evidence lifetimes, exact board-return receipts,
+effective paint-order guards, production playback, compiler
 integration and all remaining Phase 3/4–12 requirements are still open. See the
 Phase 3 hierarchy design, remaining matrix and R-01–R-15 ledger for scope.
 

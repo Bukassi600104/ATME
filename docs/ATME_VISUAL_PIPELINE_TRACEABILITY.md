@@ -61,8 +61,19 @@ pairs. Its bounded independent source/docs audit passed 76 tests; the finalized
 combined renderer run passed 274 tests, with unchanged offline annotation pixels.
 Its fresh full regression at `37b0504` passed: 1,175 tests, five preexisting
 skips, exit 0 in 1472.35 seconds. This does not prove subsequent consumer changes.
-Group camera/annotation/return and installed acceptance remain
-open; the historical baseline is not proof for the new route.
+The subsequent `58947e9` slice advances R-01/R-02/R-08/R-10 with static
+preflight, exact immutable captured-start temporal validation and replay-aware
+camera framing. Its private group-camera fixture verifies ancestry after
+ungroup/regroup and collective motion, without enabling public Group frames.
+Combined tests passed 282; independent rerun passed 84 and sidecar-cwd Ruff.
+Ten offline annotation frames and their contact sheet remain byte-identical.
+Full verification remains RUNNING at equivalent publication source `9ec3bb4`,
+session `91184`, log `test-artifacts/phase-3aa-consumers-final-full-sidecar.log`.
+Initial attempt `34056` stopped for a reproduced missing isolated Python
+environment; its corrected resource-bundle suite passes all 30 tests. No partial
+attempt is a full PASS. Group annotation/evidence lifetimes, return hierarchy
+receipts, effective paint order, public playback and installed acceptance remain
+open; all R-01–R-15 requirements and later phases remain retained.
 
 Slice 3Z advances R-02/R-08/R-10/R-11 with authored general annotation:
 exact action/beat-owned hidden leaves, ordered weighted construction, bound
