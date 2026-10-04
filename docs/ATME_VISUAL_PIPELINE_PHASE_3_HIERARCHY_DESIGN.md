@@ -228,9 +228,10 @@ basis is checked by the shared chronological observer; new writes reject absent
 or stale receipts atomically and legacy stored preview explicitly opts into read
 compatibility. Only the private Group+return rejection changed; Group+annotation
 and public Group remain closed. Combined session `54572` PASSED: 298 tests,
-363.73 seconds, exit 0. Full session `79529` is RUNNING at frozen source `821acd3`,
-log `test-artifacts/phase-3aa-return-receipt-full-sidecar.log`; no full result is
-claimed. See the return-receipt progress report.
+363.73 seconds, exit 0. Full session `79529` PASSED frozen source `821acd3`:
+1,241 passed, five preexisting symlink skips, 1504.30 seconds, exit 0. Log
+`test-artifacts/phase-3aa-return-receipt-full-sidecar.log`; source/tests remained
+unchanged. Later isolated lifecycle/paint-order changes are not covered. See the return-receipt progress report.
 
 Captured-start consumer integration at `58947e9` completes the bounded source
 portion of steps 1 and 2 below: static preflight, one immutable replay, temporal
@@ -356,7 +357,9 @@ construction/hold/retention, stale endpoint ancestry or annotation paint order,
 changed evidence aperture, intervening nonterminal replacement leaf, and Group
 starting one millisecond before hold end. Existing stale receipt negatives remain.
 This is an audited implementation map, not delivered consumer functionality.
-Receipt integration full session `79529` remains separate RUNNING evidence.
+Receipt integration full session `79529` subsequently PASSED frozen source
+`821acd3` (1,241 passed, five preexisting symlink skips, 1504.30 seconds, exit 0).
+It does not certify the consumer work described here.
 
 Prove real grouping and later collective transforms, exact ungroup roundtrips,
 nested/nonidentity parent geometry, overlapping-leaf paint order, camera and

@@ -47,8 +47,10 @@ installed preview/export or final creative-quality acceptance.
    frozen throughout. Receipt implementation subsequently merged at `821acd3`,
    independently audited (54 focused cases and exact integration PASS); combined
    main session `54572` PASSED (298 tests, 363.73 seconds, exit 0). Fresh full
-   session `79529` is RUNNING at frozen source `821acd3`, log
-   `test-artifacts/phase-3aa-return-receipt-full-sidecar.log`; no full acceptance claimed.
+   session `79529` PASSED frozen source `821acd3`: 1,241 passed, five preexisting
+   symlink skips, 1504.30 seconds, exit 0, log
+   `test-artifacts/phase-3aa-return-receipt-full-sidecar.log`. Source/tests remained
+   unchanged; later isolated lifecycle/paint-order changes are not covered.
    Integrated offline annotation hashes remain identical. Only private Group+return
    replay accepts exact receipts; public Group and other remaining gates stay open.
    Initial attempt `34056` stopped for a reproduced missing isolated Python

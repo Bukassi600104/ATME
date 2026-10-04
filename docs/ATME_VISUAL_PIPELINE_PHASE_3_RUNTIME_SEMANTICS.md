@@ -596,8 +596,10 @@ Only the private Group+return rejection is removed; Group+annotation and public
 Group still reject and MCP advertises renderer v1 only.
 Independent bounded audit: 54 cases PASS; exact integration and scoped Ruff PASS.
 Combined main session `54572` PASSED: 298 tests, 363.73 seconds, exit 0. Full
-session `79529` is RUNNING at frozen source `821acd3`, log
-`test-artifacts/phase-3aa-return-receipt-full-sidecar.log`; no full result claimed. Integrated
+session `79529` PASSED frozen source `821acd3`: 1,241 passed, five preexisting
+symlink skips, 1504.30 seconds, exit 0, log
+`test-artifacts/phase-3aa-return-receipt-full-sidecar.log`. Source/tests remained
+unchanged; later isolated lifecycle/paint-order changes are not covered. Integrated
 offline annotation frames/contact sheet retain their hashes. This is not public,
 compiler, installed, creative-quality or full Phase 3 acceptance.
 

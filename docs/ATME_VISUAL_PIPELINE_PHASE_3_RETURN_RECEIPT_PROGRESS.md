@@ -40,8 +40,11 @@ acceptance. The isolated source worktree is
   shared-replay camera spies remain intact; scoped Ruff and diff checks pass.
 - Fresh combined main regression PASSED: 298 tests in 363.73 seconds, session
   `54572`, exit 0, log `test-artifacts/phase-3aa-return-receipt-combined.log`.
-  Fresh full main regression is RUNNING, session `79529`, log
-  `test-artifacts/phase-3aa-return-receipt-full-sidecar.log`; no full result is claimed.
+  Fresh full main regression PASSED at frozen source `821acd3`: 1,241 passed,
+  five preexisting Windows symlink skips, 1504.30 seconds, session `79529`, exit 0.
+  Log `test-artifacts/phase-3aa-return-receipt-full-sidecar.log`; source/tests
+  remained unchanged throughout. Later isolated lifecycle/paint-order changes
+  are not covered by this full result.
   The integrated offline comparison passed ten frames, session `36329`,
   retaining both hashes recorded below. Source/tests remain frozen at `821acd3`.
 - Independent final bounded audit: 54 receipt-focused tests passed in 88.57
@@ -72,7 +75,7 @@ acceptance. The isolated source worktree is
 
 ## Still required
 
-Terminal combined and fresh full regression acceptance of integrated main. Dynamic
+Dynamic
 Group annotation/evidence lifetimes, effective paint order, stored Group SVG/PNG
 acceptance, compiler/public/installed routing and all other approved Phase 3–12
 and R-01–R-15 requirements remain open. V1/Caleb behavior and the installed app

@@ -163,8 +163,10 @@ Exact retained-board return receipts subsequently merged at `821acd3`; independe
 complete hierarchy/state/version history, stored legacy reads remain explicit,
 and only resolved-timeline schema changed. Ten integrated offline frames remain
 unchanged. Combined main session `54572` PASSED: 298 tests, 363.73 seconds, exit 0.
-Full session `79529` is RUNNING at frozen source `821acd3`, log
-`test-artifacts/phase-3aa-return-receipt-full-sidecar.log`; no full result claimed.
+Full session `79529` PASSED frozen source `821acd3`: 1,241 passed, five preexisting
+symlink skips, 1504.30 seconds, exit 0, log
+`test-artifacts/phase-3aa-return-receipt-full-sidecar.log`. Source/tests remained
+unchanged; later isolated lifecycle/paint-order work is not covered by this result.
 See the return-receipt progress report for exact scope and evidence.
 Dynamic grouping annotation/evidence lifetimes,
 effective paint-order guards, production playback, compiler
