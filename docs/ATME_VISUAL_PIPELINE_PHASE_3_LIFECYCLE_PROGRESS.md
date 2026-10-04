@@ -26,8 +26,9 @@ receipt source `821acd3` is the baseline, not proof of the new integrated source
 - Annotation construction/hold geometry, target/parent visibility, opacity,
   completed-note state and matching camera viewports use lifecycle samples.
   Retained leader dependency chains are recomputed at later action captures;
-  geometric Group edits require completed leader removal. Actual Group+annotation
-  paired workflow remains unproved because its existing private blanket remains.
+  geometric Group edits require completed leader removal. The later integrated
+  paired source `2c21c2c` proves real construction/hold/retention and removes the
+  kernel blanket; causal storage/public admission remains explicitly closed.
 - `v2_evidence_reading.py` checks each sample's chain, permission-bound rotation,
   actual world matrix/bounds, clip/mask apertures, opacity/reveal and camera/focus
   readability. Source attestation, source pixels and semantic authority are intact.
@@ -106,11 +107,13 @@ receipt source `821acd3` is the baseline, not proof of the new integrated source
 
 ## Still required
 
-Real paired
-Group+annotation construction/hold/retention positives and negatives; coherent
-private gate removal only after those dependencies are proven; post-Group
-replacement/morph/connector and hierarchy-aware isolate follow-through; stored
-Group SVG/PNG, both profiles, seek/offline/public/compiler/installed acceptance.
+Real paired Group+annotation construction/hold/retention, exact pointer-exit
+boundaries and both-profile private pixels are now separately integrated at
+`2c21c2c` with bounded independent/combined PASS. Its full `56029` is still RUNNING;
+the 1,281-test result above covers only earlier `cc1a6a4`. See the paired progress
+report. Real stored Group+annotation/duplicate/return receipts, post-Group
+replacement/morph/connector and hierarchy-aware isolate, stored Group SVG/PNG,
+public/compiler/installed acceptance remain required.
 All other Phase 3 primitives/actions and R-01–R-15/Phase 4–12 requirements remain.
 No v1/Caleb behavior, semantic schema, public capability or installed-app change
 is claimed. No release or production-readiness claim is made here.

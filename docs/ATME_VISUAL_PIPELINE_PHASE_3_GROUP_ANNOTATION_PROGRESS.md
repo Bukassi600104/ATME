@@ -5,6 +5,7 @@ Date: 2026-10-04
 Status: integrated `2c21c2c` from audited isolated `7b93db0`; focused proof,
 independent corrected-source re-audit and fresh combined regression PASS.
 Exact source/tests/bench/pixels integration comparison and scoped Ruff PASS.
+Independent exact-integration audit PASS; both logs and pixel hashes verified.
 Fresh full main `56029` RUNNING on frozen `2c21c2c`; no full result claimed yet.
 This is not public Group,
 stored Group+annotation production, Phase 3, installed or creative acceptance.
@@ -91,7 +92,7 @@ stored Group+annotation production, Phase 3, installed or creative acceptance.
 
 ## Remaining acceptance
 
-Independent exact-integration review and fresh full frozen regression remain required. Then prove
+Fresh full frozen regression remains required. Then prove
 real stored Group+annotation writes and
 duplicate/return-receipt history, both-profile stored SVG/PNG, post-Group connector
 and isolate/replace/morph consumers before public/production admission. Trusted
