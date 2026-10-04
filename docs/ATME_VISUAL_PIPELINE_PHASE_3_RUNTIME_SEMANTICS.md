@@ -567,7 +567,13 @@ hierarchy receipts and replacement/morph effective paint order remain required.
 
 Bounded combined tests passed 282; independent main verification passed 84 and
 Ruff. Ten offline annotation frames and their contact sheet retained exact hashes.
-The fresh full consumer regression is still running (session `34056`,
-`test-artifacts/phase-3aa-consumers-full-sidecar.log`); only its eventual terminal
+The fresh finalized full consumer regression is still running (session `91184`,
+`test-artifacts/phase-3aa-consumers-final-full-sidecar.log`); only its eventual terminal
 result may establish this changed source's full regression status. No schema,
 v1/Caleb renderer or installed application changes are claimed.
+
+The initial attempt `34056` stopped after a reproduced missing isolated
+`sidecar/.venv/Scripts/python.exe` resource-generator failure. Adding a local
+junction to the existing environment restored all 30 resource tests (9.34s).
+The restarted frozen `9ec3bb4` source/tests are Git-identical to main
+`58947e9`; no assertions were weakened and no earlier partial run is a PASS.

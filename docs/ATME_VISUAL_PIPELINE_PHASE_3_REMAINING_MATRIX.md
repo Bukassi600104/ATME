@@ -35,8 +35,12 @@ installed preview/export or final creative-quality acceptance.
    five preexisting skips, exit 0 in 1472.35 seconds. Later consumer integration
    has bounded independent PASS: 282 combined tests, 84 independently rerun
    new/replay cases, clean sidecar-cwd Ruff, unchanged offline annotation hashes.
-   Its fresh full suite remains RUNNING (session `34056`,
-   `test-artifacts/phase-3aa-consumers-full-sidecar.log`), not a full PASS.
+   Its finalized fresh full suite remains RUNNING (session `91184`,
+   `test-artifacts/phase-3aa-consumers-final-full-sidecar.log`), not a full PASS.
+   Initial attempt `34056` stopped for a reproduced missing isolated Python
+   environment; the corrected environment passes all 30 resource-bundle tests.
+   Frozen publication source `9ec3bb4` and main `58947e9` match all five
+   changed source/test files exactly in Git.
 3. Split: explicit authored result objects, correspondence, ownership and source
    removal. Do not infer fragments.
 4. Count: numeric range, unit, formatting, rounding/steps and a bound text object.

@@ -192,8 +192,11 @@ ungroup/regroup plus collective motion verifies dynamic camera ancestry and
 viewport inheritance; it does not enable public Group playback. The combined
 282-case run passed, independent main recheck passed 84 and Ruff, and ten offline
 annotation frame hashes/contact sheet are unchanged. The fresh full regression
-is still running in frozen isolated source (session `34056`, log
-`test-artifacts/phase-3aa-consumers-full-sidecar.log`). Steps 3–5, dynamic
+is still running in frozen isolated source `9ec3bb4` (session `91184`, log
+`test-artifacts/phase-3aa-consumers-final-full-sidecar.log`). The initial attempt
+`34056` stopped for a reproduced missing local Python environment; a local
+environment junction restores all 30 resource-bundle tests. Frozen source/tests
+are Git-identical to main `58947e9`. Steps 3–5, dynamic
 effective paint-order checks, and all public/compiler/installed acceptance remain
 open. No contracts or schemas changed in this slice.
 

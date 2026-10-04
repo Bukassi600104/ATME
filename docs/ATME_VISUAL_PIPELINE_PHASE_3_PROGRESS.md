@@ -145,11 +145,20 @@ Ruff passes from the canonical sidecar working directory; two test import blocks
 were mechanically normalized after its first independent lint check. The ten
 network-denied annotation frames/contact sheet remain byte-identical.
 
-Fresh full regression is RUNNING, not PASS: terminal session `34056`, frozen
+The initial full attempt (session `34056`) hit a reproduced environment failure:
+`test_generator_is_idempotent` launches the isolated checkout's
+`sidecar/.venv/Scripts/python.exe`, which did not exist. The attempt was stopped,
+not counted as PASS; its partial log remains retained. A local junction to the
+existing main environment fixes that path without changing test assertions.
+All 30 resource-bundle tests then passed in 9.34 seconds. The test import
+normalization was also copied into the isolated checkout before restarting.
+
+Fresh finalized full regression is RUNNING, not PASS: terminal session `91184`, frozen
 isolated checkout `C:/Users/USER/AppData/Local/Temp/atme-phase3x-source-sync`,
-log `test-artifacts/phase-3aa-consumers-full-sidecar.log`. Its three production
-modules are text-identical to `58947e9` after line-ending normalization; the two
-test files differ only in canonical import ordering/trailing whitespace. Do not
+log `test-artifacts/phase-3aa-consumers-final-full-sidecar.log`. Source commit
+`9ec3bb4` has all five changed source/test files Git-identical to main
+`58947e9`; explicit cross-check returned exit 0. No imported source/tests will
+change during the run. Do not
 reuse the earlier `37b0504` full PASS as evidence for these consumer changes.
 
 Next: exact resolved board-return hierarchy receipts, dynamic replacement/morph
