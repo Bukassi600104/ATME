@@ -7,8 +7,8 @@ time at which a caller happens to seek. The legacy camera renderer is untouched.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from atme.render.v2_hierarchy import HierarchySnapshot
 from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds
 from atme.store.contracts_v2 import (
     CameraAction,
@@ -16,10 +16,10 @@ from atme.store.contracts_v2 import (
     ExecutableLayoutV2,
     ReplaceAction,
     ResolvedVisualTimelineV2,
-    TargetAction,
-    TransformAction,
-    _annotation_object_ids,
 )
+
+if TYPE_CHECKING:
+    from atme.render.v2_timeline_replay import ChronologicalReplay
 
 
 class UnsupportedCamera(ValueError):
@@ -153,15 +153,9 @@ def _destination(layout, source: CameraViewport, target: CameraViewport,
 
 
 def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
-                    hierarchy: HierarchySnapshot | None = None):
-    """Validate all camera actions and return immutable start/end viewport segments."""
+                    replay: ChronologicalReplay):
+    """Frame focus from the shared sampled start boundary, never start-ordered guesses."""
     initial = {obj.object_id: obj for obj in layout.objects}
-    hierarchy = hierarchy if hierarchy is not None else HierarchySnapshot.from_objects(initial)
-    objects = hierarchy.object_map(initial)
-    visible = {item.object_id: item.visible for item in timeline.initial_object_states}
-    opacity = {obj.object_id: obj.opacity for obj in layout.objects}
-    revealed = {object_id: value for object_id, value in visible.items()}
-    transforms = {obj.object_id: obj.transform for obj in layout.objects}
     segments = []
     previous_end = 0
     active_activation = None
@@ -169,6 +163,13 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
     for resolved in timeline.actions:
         action = resolved.action
         if isinstance(action, CameraAction):
+            sample = replay.before_action(action.action_id)
+            objects = sample.hierarchy.object_map(initial)
+            frames = {frame.object_id: frame for frame in sample.objects}
+            visible = {key: frame.visible for key, frame in frames.items()}
+            opacity = {key: frame.opacity for key, frame in frames.items()}
+            revealed = {key: frame.reveal_fraction == 1 for key, frame in frames.items()}
+            transforms = {key: frame.transform for key, frame in frames.items()}
             if len(set(action.target_ids)) != len(action.target_ids):
                 raise UnsupportedCamera(f"camera {action.action_id} repeats a focus target")
             activation = next((item for item in layout.activations
@@ -205,15 +206,6 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                         )
                     dependency_ids.add(parent_id)
                     parent_id = objects[parent_id].parent_id
-                if any(not visible[item] or not revealed[item] or opacity[item] <= 0
-                       for item in dependency_ids):
-                    raise UnsupportedCamera(f"camera {action.action_id} needs revealed visible focus")
-                # The current compositor has faithful geometry for these types.
-                if obj.object_type not in {"freehand", "line", "rectangle", "rounded_rectangle",
-                                           "ellipse", "polygon", "underline", "highlight", "text", "list",
-                                           "icon", "pictogram", "character", "device", "document",
-                                           "chart", "terminal"}:
-                    raise UnsupportedCamera(f"camera {action.action_id} targets unsupported visual geometry")
                 if any((other.action.verb in {"move", "scale", "rotate", "fade", "reveal",
                                               "write", "draw", "enter", "exit", "progressive_reveal"}
                         and dependency_ids.intersection(getattr(other.action, "target_ids", ()))
@@ -226,6 +218,15 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                            and resolved.start_ms < other.end_ms)
                        for other in timeline.actions):
                     raise UnsupportedCamera(f"camera {action.action_id} overlaps a focus-object edit")
+                if any(not visible[item] or not revealed[item] or opacity[item] <= 0
+                       for item in dependency_ids):
+                    raise UnsupportedCamera(f"camera {action.action_id} needs revealed visible focus")
+                # The current compositor has faithful geometry for these types.
+                if obj.object_type not in {"freehand", "line", "rectangle", "rounded_rectangle",
+                                           "ellipse", "polygon", "underline", "highlight", "text", "list",
+                                           "icon", "pictogram", "character", "device", "document",
+                                           "chart", "terminal"}:
+                    raise UnsupportedCamera(f"camera {action.action_id} targets unsupported visual geometry")
                 try:
                     rects.append(world_bounds(obj, objects, transforms))
                 except UnsupportedWorldGeometry as exc:
@@ -240,31 +241,6 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                 raise UnsupportedCamera(f"{action.verb} has no visible camera movement")
             segments.append((resolved, activation.activation_id, viewport, destination))
             viewport = destination
-        elif isinstance(action, TargetAction):
-            if action.annotation_policy is not None:
-                for target in _annotation_object_ids(action):
-                    visible[target] = True
-                    revealed[target] = True
-            for target in action.target_ids:
-                if action.verb == "exit":
-                    visible[target] = False
-                    revealed[target] = False
-                    opacity[target] = 0.0
-                elif action.verb in {"reveal", "write", "draw", "enter", "progressive_reveal"}:
-                    visible[target] = True
-                    revealed[target] = True
-        elif isinstance(action, TransformAction):
-            for target in action.target_ids:
-                if action.verb == "fade":
-                    opacity[target] = action.opacity
-                else:
-                    transforms[target] = action.destination
-        elif isinstance(action, ReplaceAction):
-            visible[action.from_object_id] = False
-            revealed[action.from_object_id] = False
-            opacity[action.from_object_id] = 0.0
-            visible[action.to_object_id] = True
-            revealed[action.to_object_id] = True
     return tuple(segments)
 
 

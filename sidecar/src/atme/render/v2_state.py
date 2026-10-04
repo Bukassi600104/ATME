@@ -35,6 +35,7 @@ from atme.render.v2_morph import (
     validate_morph_geometry,
 )
 from atme.render.v2_timeline_replay import (
+    ChronologicalReplay,
     ReplayError,
     replay_chronology,
     supports_operator,
@@ -61,6 +62,7 @@ from atme.store.contracts_v2 import (
     _action_object_references,
     _annotation_object_ids,
     _annotation_phase_windows,
+    _require_annotation_contract,
     _require_morph_contract,
     _require_return_board_policy,
     _require_return_contract,
@@ -253,8 +255,130 @@ def _interpolate_transform(start: FrameTransform, end: Transform,
     )
 
 
-def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
-                   layout_sha256: str, hierarchy: HierarchySnapshot) -> None:
+@dataclass(frozen=True)
+class _PairContext:
+    """Caller-local validated inventory; sampled history belongs only to replay."""
+    layout: ExecutableLayoutV2
+    timeline: ResolvedVisualTimelineV2
+    hierarchy: HierarchySnapshot
+    objects: dict
+    initial: dict
+    frames: tuple[FrameObject, ...]
+    mask_sources: frozenset[str]
+    managed_connectors: frozenset[str]
+    connector_endpoints: frozenset[str]
+    treatments_by_action: dict
+
+
+def _validate_static_action(item, layout, timeline, objects, mask_sources, managed_connectors,
+                            connector_endpoints) -> None:
+    """Operator form/binding checks must precede construction of its replay."""
+    action = item.action
+    if isinstance(action, GroupAction) and action.container_id is not None:
+        shell = objects[action.container_id]
+        if (not isinstance(shell, ContainerObject) or shell.object_type != "group"
+                or shell.board_id != action.board_id
+                or any(objects[key].board_id != action.board_id for key in action.target_ids)):
+            raise V2FrameError(f"action {action.action_id} needs a same-board group container")
+    if isinstance(action, ConnectionAction):
+        connector = objects[action.connector_id]
+        if not isinstance(connector, ConnectorObject):
+            raise V2FrameError(f"connection {action.action_id} needs a rendered arrow connector")
+        try:
+            validate_static_arrow(connector, objects)
+        except UnsupportedConnector as exc:
+            raise V2FrameError(str(exc)) from exc
+        if connector.opacity <= 0:
+            raise V2FrameError(f"connection {action.action_id} needs a visible semantic connector")
+        if (action.board_id != connector.board_id
+                or action.source_object_id != connector.source_object_id
+                or action.source_anchor_id != connector.source_anchor_id
+                or action.destination_object_id != connector.destination_object_id
+                or action.destination_anchor_id != connector.destination_anchor_id):
+            raise V2FrameError(f"connection {action.action_id} disagrees with the authored connector")
+        if (action.expected_state, action.post_state) != (
+            ("disconnected", "connected") if action.verb == "connect" else ("connected", "disconnected")
+        ):
+            raise V2FrameError(f"connection {action.action_id} needs canonical relationship states")
+    if isinstance(action, ReplaceAction):
+        source, destination = objects[action.from_object_id], objects[action.to_object_id]
+        if (source.object_id == destination.object_id
+                or {source.object_id, destination.object_id}.intersection(mask_sources | connector_endpoints)):
+            raise V2FrameError(f"{action.verb} {action.action_id} needs distinct paintable objects")
+        if not all(
+            isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
+            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT
+            or isinstance(obj, VisualObject) and obj.object_type in _REPLACE_VISUAL_TYPES
+            for obj in (source, destination)
+        ):
+            raise V2FrameError(f"{action.verb} {action.action_id} needs supported paintable leaves")
+        if (source.board_id != action.board_id or destination.board_id != action.board_id
+                or source.z_index != destination.z_index
+                or action.verb == "replace" and source.geometry.bounds != destination.geometry.bounds):
+            raise V2FrameError(f"replace {action.action_id} needs co-located objects" if action.verb == "replace"
+                               else f"morph {action.action_id} changes board, parent, or layer ownership")
+        # Exact co-parentage/transforms are temporal, not initial-layout guesses.
+        for other in timeline.actions:
+            if (other is item or isinstance(other.action, (CameraAction, SoundAction))
+                    or other.start_ms >= item.end_ms or item.start_ms >= other.end_ms):
+                continue
+            overlap = {source.object_id, destination.object_id}.intersection(_action_object_references(other.action))
+            if overlap:
+                if other.start_ms <= item.start_ms:
+                    raise V2FrameError(f"{action.verb} {action.action_id} overlaps a participant action")
+                raise V2FrameError(f"overlapping actions on {min(overlap)} need an explicit composition rule")
+    if isinstance(action, TransformAction) and action.verb == "fade" and action.destination is not None:
+        raise V2FrameError("fade cannot carry an ignored transform destination")
+    if isinstance(action, (TargetAction, TransformAction)) and set(action.target_ids) & managed_connectors:
+        raise V2FrameError(f"action {action.action_id} mutates a connection-managed connector")
+    if not isinstance(action, TargetAction):
+        return
+    if action.annotation is not None and action.verb != "annotate":
+        raise V2FrameError(f"action {action.action_id} carries an annotation it cannot display")
+    if action.annotation_policy is not None:
+        return
+    for target in action.target_ids:
+        obj = objects[target]
+        if isinstance(obj, ContainerObject):
+            raise V2FrameError(f"action {action.action_id} needs defined descendant semantics for a container")
+        if action.verb in {"highlight", "cross_out", "dim", "isolate"}:
+            supported = (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
+                         or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT
+                         or action.verb == "isolate" and isinstance(obj, VisualObject)
+                         and obj.object_type in _REPLACE_VISUAL_TYPES)
+            if not supported:
+                raise V2FrameError(f"{action.verb} {action.action_id} needs a supported mark or text target")
+            post = {"highlight": "highlighted", "cross_out": "crossed_out"}.get(action.verb, "visible")
+            if (action.expected_state, action.post_state) != ("visible", post):
+                raise V2FrameError(f"{action.verb} {action.action_id} needs canonical visible-to-{post} states")
+            if action.verb in {"dim", "isolate"}:
+                if action.easing == "step":
+                    raise V2FrameError(f"{action.verb} {action.action_id} cannot use step easing")
+                if len(set(action.target_ids)) != len(action.target_ids):
+                    raise V2FrameError(f"{action.verb} {action.action_id} has duplicate targets")
+            if not any(a.board_id == action.board_id and a.start_ms <= item.start_ms
+                       and item.end_ms <= a.end_ms for a in layout.activations):
+                raise V2FrameError(f"{action.verb} {action.action_id} needs an active board")
+            try:
+                if action.verb == "highlight":
+                    emphasis_path(obj.geometry.bounds, "highlight")
+                elif action.verb == "cross_out":
+                    cross_out_paths(obj.geometry.bounds)
+            except UnsupportedEmphasis as exc:
+                raise V2FrameError(str(exc)) from exc
+        if action.verb == "progressive_reveal":
+            if not isinstance(obj, TextObject):
+                raise V2FrameError(f"action {action.action_id} requires an authored ordered-child list")
+            try:
+                validate_ordered_list(obj)
+            except UnsupportedOrderedList as exc:
+                raise V2FrameError(str(exc)) from exc
+            if (action.expected_state, action.post_state) != ("hidden", "visible"):
+                raise V2FrameError(f"action {action.action_id} requires canonical hidden-to-visible list states")
+
+
+def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
+                   layout_sha256: str, hierarchy: HierarchySnapshot) -> _PairContext:
     if (layout.project_id != timeline.project_id or layout.layout_id != timeline.layout_id
             or layout.plan_id != timeline.plan_id or layout.plan_revision != timeline.plan_revision
             or layout.plan_sha256 != timeline.plan_sha256
@@ -322,8 +446,6 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                     or set(action.expected_object_state_versions) != board_objects
                     or destination_board.expected_prior_state != action.expected_state):
                 raise V2FrameError(f"return_board {action.action_id} has incomplete board state")
-            states = {object_id: initial[object_id].state for object_id in board_objects}
-            versions = {object_id: initial[object_id].state_version for object_id in board_objects}
             for earlier in timeline.actions:
                 if earlier is item:
                     continue
@@ -341,29 +463,6 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                 if (prior.end_ms <= earlier.start_ms < item.start_ms
                         or earlier.start_ms < prior.end_ms < earlier.end_ms):
                     raise V2FrameError(f"return_board {action.action_id} has off-board mutations")
-                if earlier.end_ms > prior.end_ms:
-                    continue
-                if isinstance(previous, (CameraAction, SoundAction)) or (
-                    isinstance(previous, EvidenceAction) and previous.verb == "return_board"
-                ):
-                    continue
-                if isinstance(previous, ReplaceAction):
-                    mutations = ((previous.from_object_id, "removed"),
-                                 (previous.to_object_id, previous.post_state))
-                elif isinstance(previous, ConnectionAction):
-                    mutations = ((previous.connector_id, previous.post_state),)
-                elif isinstance(previous, TargetAction) and previous.annotation_policy is not None:
-                    mutations = ((object_id, "visible") for object_id in _annotation_object_ids(previous))
-                else:
-                    mutations = ((object_id, previous.post_state)
-                                 for object_id in _action_object_references(previous))
-                for object_id, state in mutations:
-                    if object_id in board_objects:
-                        states[object_id] = state
-                        versions[object_id] += 1
-            if (states != action.expected_object_states
-                    or versions != action.expected_object_state_versions):
-                raise V2FrameError(f"return_board {action.action_id} changes retained board state")
             continue
         if action.verb != "insert_evidence":
             raise UnsupportedVisualAction(
@@ -464,19 +563,101 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             raise V2FrameError(
                 f"managed connector {connector_id} has inconsistent initial relationship visibility"
             )
+    for obj in layout.objects:
+        state = initial[obj.object_id]
+        if obj.visible != state.visible or obj.initial_state != state.state:
+            raise V2FrameError(f"initial layout and timeline state disagree for {obj.object_id}")
+    # Models own unique IDs, triggers and interval bounds. Close every observer
+    # and operator reference before any replay sampler may dereference it.
+    for item in timeline.actions:
+        action = item.action
+        refs = set(_action_object_references(action))
+        if isinstance(action, GroupAction) and action.hierarchy_policy is not None:
+            refs.update(action.hierarchy_policy.changed_object_ids)
+            for basis in (action.hierarchy_policy.source_basis, action.hierarchy_policy.destination_basis):
+                refs.update(row.object_id for row in basis.placements)
+        if not refs <= layout_objects.keys():
+            raise V2FrameError(f"action {action.action_id} targets an unknown layout object")
+        if isinstance(action, (TargetAction, TransformAction, CameraAction)) and any(
+            layout_objects[target].board_id != action.board_id for target in action.target_ids
+        ):
+            raise V2FrameError(f"action {action.action_id} crosses board ownership")
+        if isinstance(action, TargetAction) and action.annotation_policy is not None:
+            try:
+                _require_annotation_contract(action)
+                _annotation_phase_windows(item)
+                leader_id = action.annotation_policy.leader_connector_id
+                if leader_id is not None:
+                    leader = layout_objects[leader_id]
+                    if not isinstance(leader, ConnectorObject):
+                        raise V2FrameError("annotation leader must be an authored connector")
+                    for key, anchor_id in ((leader.source_object_id, leader.source_anchor_id),
+                                           (leader.destination_object_id, leader.destination_anchor_id)):
+                        if (key not in layout_objects or layout_objects[key].board_id != action.board_id
+                                or not any(anchor.anchor_id == anchor_id for anchor in layout_objects[key].anchors)):
+                            raise V2FrameError("annotation leader needs existing same-board named endpoints")
+                    validate_static_arrow(leader, layout_objects, annotation_pointer=True)
+            except ValueError as exc:
+                raise V2FrameError(str(exc)) from exc
+        _validate_static_action(item, layout, timeline, layout_objects, mask_sources,
+                                managed_connectors, connector_endpoints)
+        if isinstance(action, TargetAction) and action.annotation_policy is not None:
+            participants = set(action.target_ids) | set(_annotation_object_ids(action))
+            dependencies = participants | {parent for key in participants
+                                            for parent in _ancestor_ids(layout_objects[key], layout_objects)}
+            hold_end = item.end_ms + action.annotation_policy.readable_hold_ms
+            for other in timeline.actions:
+                if other is item or isinstance(other.action, SoundAction):
+                    continue
+                board_effect = (other.action.board_id == action.board_id and (
+                    isinstance(other.action, CameraAction)
+                    or isinstance(other.action, TargetAction) and other.action.verb == "isolate"))
+                if (other.start_ms < hold_end and item.start_ms < other.end_ms
+                        and (board_effect or dependencies.intersection(_action_object_references(other.action)))):
+                    raise V2FrameError(f"annotation {action.action_id} needs uninterrupted construction and hold")
+        if isinstance(action, ReplaceAction) and action.verb == "morph":
+            try:
+                _require_morph_contract(action)
+                validate_morph_geometry(layout_objects[action.from_object_id],
+                                        layout_objects[action.to_object_id], action.morph_policy)
+            except ValueError as exc:
+                raise V2FrameError(str(exc)) from exc
+    frames = tuple(FrameObject(
+        object_id=obj.object_id, board_id=obj.board_id, state=initial[obj.object_id].state,
+        visible=obj.visible, opacity=obj.opacity, reveal_fraction=1.0 if obj.visible else 0.0,
+        transform=FrameTransform.from_contract(obj.transform),
+    ) for obj in layout.objects)
+    return _PairContext(layout, timeline, hierarchy, layout_objects, initial, frames,
+                        frozenset(mask_sources), frozenset(managed_connectors),
+                        frozenset(connector_endpoints), treatments_by_action)
+
+
+def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, camera_plan) -> None:
+    """Read every action boundary from the same immutable chronology."""
+    layout, timeline = context.layout, context.timeline
+    initial = context.initial
+    treatments_by_action = context.treatments_by_action
     last_target_end: dict[str, int] = {}
     last_target_verb: dict[str, str] = {}
     highlighted_targets: set[str] = set()
     crossed_out_targets: set[str] = set()
-    completed_visible = {object_id: state.visible for object_id, state in initial.items()}
-    completed_opacity = {object_id: obj.opacity for object_id, obj in layout_objects.items()}
-    completed_reveal = {object_id: 1.0 if state.visible else 0.0
-                        for object_id, state in initial.items()}
-    completed_transform = {
-        object_id: FrameTransform.from_contract(obj.transform)
-        for object_id, obj in layout_objects.items()
-    }
     for item in timeline.actions:
+        sample = replay.before_action(item.action.action_id)
+        layout_objects = sample.hierarchy.object_map(context.objects)
+        sampled = {frame.object_id: frame for frame in sample.objects}
+        completed_visible = {key: frame.visible for key, frame in sampled.items()}
+        completed_opacity = {key: frame.opacity for key, frame in sampled.items()}
+        completed_reveal = {key: frame.reveal_fraction for key, frame in sampled.items()}
+        completed_transform = {key: frame.transform for key, frame in sampled.items()}
+        if isinstance(item.action, EvidenceAction) and item.action.verb == "return_board":
+            action = item.action
+            owned = {key for key, obj in layout_objects.items()
+                     if obj.board_id == action.destination_board_id}
+            if ({key: sampled[key].state for key in owned} != action.expected_object_states
+                    or {key: version for key, version in sample.state_versions if key in owned}
+                    != action.expected_object_state_versions):
+                raise V2FrameError(f"return_board {action.action_id} changes retained board state")
+            continue
         if isinstance(item.action, TargetAction) and item.action.annotation_policy is not None:
             action = item.action
             target_id = action.target_ids[0]
@@ -538,8 +719,6 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                             f"retained annotation pointer {leader_id} requires completed explicit removal before endpoint edits"
                         )
             try:
-                _annotation_phase_windows(item)
-                camera_plan = camera_segments(layout, timeline, hierarchy)
                 viewports = [evaluate_camera(layout, camera_plan, moment, activation.activation_id, _ease)
                              for moment in (item.start_ms, item.end_ms, hold_end - 1)]
                 validate_annotation_geometry(action, layout, layout_objects, completed_transform, viewports)
@@ -549,8 +728,6 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                 last_target_end[object_id] = hold_end
             for object_id in note_ids:
                 last_target_verb[object_id] = "annotate"
-                completed_visible[object_id] = True
-                completed_reveal[object_id] = 1.0
             continue
         if isinstance(item.action, EvidenceAction) and item.action.verb == "insert_evidence":
             action = item.action
@@ -579,7 +756,6 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             try:
                 rect = world_bounds(obj, layout_objects, completed_transform)
                 matrix = world_matrix(obj, layout_objects, completed_transform)
-                camera_plan = camera_segments(layout, timeline, hierarchy)
             except (UnsupportedWorldGeometry, UnsupportedCamera) as exc:
                 raise V2FrameError(str(exc)) from exc
             for parent_id in ancestors:
@@ -648,32 +824,12 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                     )
             last_target_end[target] = item.end_ms
             last_target_verb[target] = "insert_evidence"
-            completed_visible[target] = True
-            completed_reveal[target] = 1.0
             continue
         if isinstance(item.action, ReplaceAction):
             action = item.action
             verb = action.verb
-            if verb == "morph":
-                try:
-                    _require_morph_contract(action)
-                    validate_morph_geometry(layout_objects[action.from_object_id],
-                                            layout_objects[action.to_object_id], action.morph_policy)
-                except ValueError as exc:
-                    raise V2FrameError(str(exc)) from exc
             source_id, destination_id = action.from_object_id, action.to_object_id
             source, destination = layout_objects[source_id], layout_objects[destination_id]
-            if (source_id == destination_id or source_id in mask_sources
-                    or destination_id in mask_sources
-                    or source_id in connector_endpoints or destination_id in connector_endpoints):
-                raise V2FrameError(f"{verb} {action.action_id} needs distinct paintable objects")
-            if not all(
-                isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
-                or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT
-                or isinstance(obj, VisualObject) and obj.object_type in _REPLACE_VISUAL_TYPES
-                for obj in (source, destination)
-            ):
-                raise V2FrameError(f"{verb} {action.action_id} needs supported paintable leaves")
             if (source.board_id != action.board_id or destination.board_id != action.board_id
                     or source.parent_id != destination.parent_id
                     or source.z_index != destination.z_index
@@ -718,57 +874,13 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             last_target_end[destination_id] = item.end_ms
             last_target_verb[source_id] = verb
             last_target_verb[destination_id] = verb
-            completed_visible[source_id] = False
-            completed_reveal[source_id] = 0.0
-            completed_opacity[source_id] = 0.0
-            completed_visible[destination_id] = True
-            completed_reveal[destination_id] = 1.0
             continue
-        if isinstance(item.action, GroupAction) and item.action.container_id is not None:
-            container = layout_objects.get(item.action.container_id)
-            if (not isinstance(container, ContainerObject)
-                    or container.object_type != "group"
-                    or container.board_id != item.action.board_id):
-                raise V2FrameError(
-                    f"action {item.action.action_id} needs a same-board group container"
-                )
         if isinstance(item.action, ConnectionAction):
             action = item.action
-            connector = layout_objects.get(action.connector_id)
-            if not isinstance(connector, ConnectorObject):
-                raise V2FrameError(f"connection {action.action_id} needs a rendered arrow connector")
-            try:
-                validate_static_arrow(connector, layout_objects)
-            except UnsupportedConnector as exc:
-                raise V2FrameError(str(exc)) from exc
-            if connector.opacity <= 0:
-                raise V2FrameError(f"connection {action.action_id} needs a visible semantic connector")
-            if (action.board_id != connector.board_id
-                    or action.source_object_id != connector.source_object_id
-                    or action.source_anchor_id != connector.source_anchor_id
-                    or action.destination_object_id != connector.destination_object_id
-                    or action.destination_anchor_id != connector.destination_anchor_id):
-                raise V2FrameError(f"connection {action.action_id} disagrees with the authored connector")
-            if (action.expected_state, action.post_state) != (
-                ("disconnected", "connected") if action.verb == "connect"
-                else ("connected", "disconnected")
-            ):
-                raise V2FrameError(f"connection {action.action_id} needs canonical relationship states")
             if item.start_ms < last_target_end.get(action.connector_id, 0):
                 raise V2FrameError(f"overlapping actions on {action.connector_id} need composition rules")
             last_target_end[action.connector_id] = item.end_ms
-            completed_visible[action.connector_id] = action.verb == "connect"
-            completed_reveal[action.connector_id] = 1.0 if action.verb == "connect" else 0.0
         if isinstance(item.action, (TargetAction, TransformAction)):
-            if set(item.action.target_ids) & managed_connectors:
-                raise V2FrameError(
-                    f"action {item.action.action_id} mutates a connection-managed connector"
-                )
-            if set(item.action.target_ids) - set(layout_objects):
-                raise V2FrameError(f"action {item.action.action_id} targets an unknown layout object")
-            if any(layout_objects[target].board_id != item.action.board_id
-                   for target in item.action.target_ids):
-                raise V2FrameError(f"action {item.action.action_id} crosses board ownership")
             if (isinstance(item.action, TargetAction) and item.action.verb == "highlight"
                     and not any(activation.board_id == item.action.board_id
                                 and activation.start_ms <= item.start_ms
@@ -804,171 +916,71 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
                 ):
                     raise V2FrameError(f"isolate {action.action_id} needs visible secondary context")
             for target in item.action.target_ids:
-                if (isinstance(layout_objects[target], ContainerObject)
-                        and isinstance(item.action, TargetAction)):
-                    raise V2FrameError(
-                        f"action {item.action.action_id} needs defined descendant semantics for a container"
-                    )
+                obj = layout_objects[target]
                 if target in highlighted_targets:
                     raise V2FrameError(f"highlighted target {target} cannot receive another action")
                 if target in crossed_out_targets:
                     raise V2FrameError(f"crossed-out target {target} cannot receive another action")
                 if isinstance(item.action, TargetAction) and item.action.verb == "isolate":
                     obj = layout_objects[target]
-                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
-                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT
-                            or isinstance(obj, VisualObject) and obj.object_type in {
-                                "icon", "pictogram", "character", "device", "document", "chart", "terminal",
-                            }):
-                        raise V2FrameError(
-                            f"isolate {item.action.action_id} needs a supported focus object"
-                        )
                     if (not completed_visible[target] or completed_opacity[target] <= 0
                             or completed_reveal[target] < 1):
                         raise V2FrameError(
                             f"isolate {item.action.action_id} needs visible focus content"
                         )
                 if isinstance(item.action, TargetAction) and item.action.verb == "highlight":
-                    obj = layout_objects[target]
-                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
-                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT):
-                        raise V2FrameError(
-                            f"highlight {item.action.action_id} needs a supported mark or text target"
-                        )
                     if (not initial[target].visible or initial[target].state != "visible"
                             or obj.opacity <= 0 or target in last_target_end):
                         raise V2FrameError(
                             f"highlight {item.action.action_id} needs an untouched visible target"
                         )
-                    if (item.action.expected_state, item.action.post_state) != ("visible", "highlighted"):
-                        raise V2FrameError(
-                            f"highlight {item.action.action_id} needs canonical visible-to-highlighted states"
-                        )
-                    try:
-                        emphasis_path(obj.geometry.bounds, "highlight")
-                    except UnsupportedEmphasis as exc:
-                        raise V2FrameError(str(exc)) from exc
                     highlighted_targets.add(target)
                 if isinstance(item.action, TargetAction) and item.action.verb == "cross_out":
-                    obj = layout_objects[target]
-                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
-                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT):
-                        raise V2FrameError(
-                            f"cross_out {item.action.action_id} needs a supported mark or text target"
-                        )
                     if (not initial[target].visible or initial[target].state != "visible"
                             or obj.opacity <= 0 or target in last_target_end):
                         raise V2FrameError(
                             f"cross_out {item.action.action_id} needs an untouched visible target"
                         )
-                    if (item.action.expected_state, item.action.post_state) != ("visible", "crossed_out"):
-                        raise V2FrameError(
-                            f"cross_out {item.action.action_id} needs canonical visible-to-crossed_out states"
-                        )
-                    if not any(activation.board_id == item.action.board_id
-                               and activation.start_ms <= item.start_ms
-                               and item.end_ms <= activation.end_ms
-                               for activation in layout.activations):
-                        raise V2FrameError(f"cross_out {item.action.action_id} needs an active board")
-                    try:
-                        cross_out_paths(obj.geometry.bounds)
-                    except UnsupportedEmphasis as exc:
-                        raise V2FrameError(str(exc)) from exc
                     crossed_out_targets.add(target)
-                if isinstance(item.action, TargetAction) and item.action.verb == "dim":
-                    obj = layout_objects[target]
-                    if not (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
-                            or isinstance(obj, TextObject) and obj.object_type in SUPPORTED_HIGHLIGHT_TEXT):
-                        raise V2FrameError(
-                            f"dim {item.action.action_id} needs a supported mark or text target"
-                        )
-                    if (not initial[target].visible or initial[target].state != "visible"
-                            or obj.opacity <= 0 or last_target_verb.get(target) not in (None, "dim")):
-                        raise V2FrameError(
-                            f"dim {item.action.action_id} needs visible context without prior edits"
-                        )
-                    if (item.action.expected_state, item.action.post_state) != ("visible", "visible"):
-                        raise V2FrameError(
-                            f"dim {item.action.action_id} needs canonical visible-to-visible states"
-                        )
-                    if item.action.easing == "step":
-                        raise V2FrameError(f"dim {item.action.action_id} cannot use step easing")
-                    if len(set(item.action.target_ids)) != len(item.action.target_ids):
-                        raise V2FrameError(f"dim {item.action.action_id} has duplicate targets")
-                    if not any(activation.board_id == item.action.board_id
-                               and activation.start_ms <= item.start_ms
-                               and item.end_ms <= activation.end_ms
-                               for activation in layout.activations):
-                        raise V2FrameError(f"dim {item.action.action_id} needs an active board")
-                if isinstance(item.action, TargetAction) and item.action.verb == "progressive_reveal":
-                    obj = layout_objects[target]
-                    if not isinstance(obj, TextObject):
-                        raise V2FrameError(
-                            f"action {item.action.action_id} requires an authored ordered-child list"
-                        )
-                    try:
-                        validate_ordered_list(obj)
-                    except UnsupportedOrderedList as exc:
-                        raise V2FrameError(str(exc)) from exc
-                    if (initial[target].visible or initial[target].state != "hidden"
-                            or target in last_target_end):
-                        raise V2FrameError(
-                            f"action {item.action.action_id} requires a previously untouched hidden list"
-                        )
-                    if (item.action.expected_state, item.action.post_state) != ("hidden", "visible"):
-                        raise V2FrameError(
-                            f"action {item.action.action_id} requires canonical hidden-to-visible list states"
-                        )
+                if (isinstance(item.action, TargetAction) and item.action.verb == "dim"
+                        and (not initial[target].visible or initial[target].state != "visible"
+                             or obj.opacity <= 0 or last_target_verb.get(target) not in (None, "dim"))):
+                    raise V2FrameError(f"dim {item.action.action_id} needs visible context without prior edits")
+                if (isinstance(item.action, TargetAction) and item.action.verb == "progressive_reveal"
+                        and (initial[target].visible or initial[target].state != "hidden"
+                             or target in last_target_end)):
+                    raise V2FrameError(f"action {item.action.action_id} requires a previously untouched hidden list")
                 if item.start_ms < last_target_end.get(target, 0):
                     raise V2FrameError(f"overlapping actions on {target} need an explicit composition rule")
                 last_target_end[target] = item.end_ms
                 last_target_verb[target] = item.action.verb
-                if isinstance(item.action, TargetAction):
-                    if item.action.verb == "exit":
-                        completed_visible[target] = False
-                        completed_opacity[target] = 0.0
-                        completed_reveal[target] = 0.0
-                    elif item.action.verb in {
-                        "reveal", "write", "draw", "progressive_reveal", "enter"
-                    }:
-                        completed_visible[target] = True
-                        completed_reveal[target] = 1.0
-                if isinstance(item.action, TransformAction):
-                    action = item.action
-                    if action.verb == "fade":
-                        if action.destination is not None:
-                            raise V2FrameError("fade cannot carry an ignored transform destination")
-                        completed_opacity[target] = action.opacity
-                        completed_visible[target] = completed_visible[target] or action.opacity > 0
-                        continue
-                    before = completed_transform[target]
-                    after = action.destination
-                    if action.verb == "move":
-                        unused_changed = (
-                            after.scale_x != before.scale_x or after.scale_y != before.scale_y
-                            or after.rotation_degrees != before.rotation_degrees
-                            or after.origin.x != before.origin.x or after.origin.y != before.origin.y
-                        )
-                    elif action.verb == "scale":
-                        unused_changed = (
-                            after.position.x != before.position.x or after.position.y != before.position.y
-                            or after.rotation_degrees != before.rotation_degrees
-                        )
-                    else:  # rotate
-                        unused_changed = (
-                            after.position.x != before.position.x or after.position.y != before.position.y
-                            or after.scale_x != before.scale_x or after.scale_y != before.scale_y
-                        )
-                    if unused_changed:
-                        raise V2FrameError(
-                            f"{action.verb} action {action.action_id} changes an unrelated transform channel"
-                        )
-                    completed_transform[target] = FrameTransform.from_contract(after)
-            if (isinstance(item.action, TargetAction) and item.action.annotation is not None
-                    and item.action.verb != "annotate"):
-                raise V2FrameError(
-                    f"action {item.action.action_id} carries an annotation it cannot display"
-                )
+
+
+
+def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
+                   layout_sha256: str, hierarchy: HierarchySnapshot):
+    context = _validate_pair_static(layout, timeline, layout_sha256, hierarchy)
+    # Preserve capability/error boundaries until full structural consumers land.
+    for resolved in timeline.actions:
+        action = resolved.action
+        if isinstance(action, GroupAction) or not supports_operator(action):
+            raise UnsupportedVisualAction(
+                f"v2 action {action.action_id} uses {action.verb}, which has no frame implementation"
+            )
+    try:
+        replay = replay_chronology(
+            context.objects, hierarchy, {frame.object_id: frame for frame in context.frames},
+            {key: item.state_version for key, item in context.initial.items()}, tuple(timeline.actions),
+            tuple((item.board_id, item.start_ms, item.end_ms) for item in layout.activations), timeline.duration_ms,
+        )
+    except ReplayError as exc:
+        raise V2FrameError(str(exc)) from exc
+    try:
+        camera_plan = camera_segments(layout, timeline, replay)
+        _validate_pair_temporal(context, replay, camera_plan)
+    except (UnsupportedCamera, ReplayError) as exc:
+        raise V2FrameError(str(exc)) from exc
+    return replay, camera_plan
 
 
 def evaluate_frame(
@@ -992,47 +1004,10 @@ def evaluate_frame(
         hierarchy = HierarchySnapshot.from_objects({obj.object_id: obj for obj in layout.objects})
     except UnsupportedHierarchy as exc:
         raise V2FrameError(str(exc)) from exc
-    _validate_pair(layout, timeline, layout_sha256, hierarchy)
-    try:
-        camera_plan = camera_segments(layout, timeline, hierarchy)
-    except UnsupportedCamera as exc:
-        raise V2FrameError(str(exc)) from exc
+    replay, camera_plan = _validate_pair(layout, timeline, layout_sha256, hierarchy)
     if type(at_ms) is not int or not 0 <= at_ms < timeline.duration_ms:
         raise V2FrameError("frame time must be an integer within the resolved timeline")
-
-    initial = {item.object_id: item for item in timeline.initial_object_states}
-    for obj in layout.objects:
-        if obj.visible != initial[obj.object_id].visible or obj.initial_state != initial[obj.object_id].state:
-            raise V2FrameError(f"initial layout and timeline state disagree for {obj.object_id}")
-    current = {
-        obj.object_id: FrameObject(
-            object_id=obj.object_id,
-            board_id=obj.board_id,
-            state=initial[obj.object_id].state,
-            visible=obj.visible,
-            opacity=obj.opacity,
-            reveal_fraction=1.0 if obj.visible else 0.0,
-            transform=FrameTransform.from_contract(obj.transform),
-        )
-        for obj in layout.objects
-    }
-    # Preserve the public unsupported-action boundary while the structural
-    # camera/annotation/return consumers are still being integrated.
-    for resolved in timeline.actions:
-        action = resolved.action
-        if isinstance(action, GroupAction) or not supports_operator(action):
-            raise UnsupportedVisualAction(
-                f"v2 action {action.action_id} uses {action.verb}, which has no frame implementation"
-            )
-    try:
-        replay = replay_chronology(
-            {obj.object_id: obj for obj in layout.objects}, hierarchy, current,
-            {key: item.state_version for key, item in initial.items()}, tuple(timeline.actions),
-            tuple((item.board_id, item.start_ms, item.end_ms) for item in layout.activations), timeline.duration_ms,
-        )
-        sample = replay.at(at_ms)
-    except ReplayError as exc:
-        raise V2FrameError(str(exc)) from exc
+    sample = replay.at(at_ms)
     current = {item.object_id: item for item in sample.objects}
     hierarchy = sample.hierarchy
     activation = next((item for item in layout.activations

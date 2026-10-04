@@ -95,6 +95,17 @@ class ChronologicalReplay:
     authored_objects_json: tuple[tuple[str, str], ...]
     checkpoints: tuple[ReplayCheckpoint, ...]
 
+    def before_action(self, action_id: str) -> ReplaySample:
+        """Exact captured precondition, before this operator paints at progress zero."""
+        for checkpoint in self.checkpoints:
+            for capture in checkpoint.active:
+                resolved = capture.resolved
+                if (resolved.action.action_id == action_id
+                        and resolved.start_ms == checkpoint.at_ms):
+                    return ReplaySample(checkpoint.at_ms, capture.baseline,
+                                        checkpoint.state_versions, checkpoint.hierarchy)
+        raise ReplayError(f"unknown action {action_id}")
+
     def at(self, at_ms: int) -> ReplaySample:
         if type(at_ms) is not int or not 0 <= at_ms < self.duration_ms:
             raise ReplayError("frame time must be an integer within the resolved duration")
@@ -296,6 +307,29 @@ def _validate_owned_overlaps(actions: tuple, frames: dict) -> None:
 
 
 def _assert_start_state(action, sample: dict, versions: dict) -> None:
+    if isinstance(action, TransformAction) and action.verb != "fade":
+        # Channel purity depends on the captured chronological source, not the
+        # initial layout (a prior Group can change its local coordinate system).
+        for key in action.target_ids:
+            before, after = sample[key].transform, action.destination
+            if action.verb == "move":
+                unused_changed = (
+                    after.scale_x != before.scale_x or after.scale_y != before.scale_y
+                    or after.rotation_degrees != before.rotation_degrees
+                    or after.origin.x != before.origin.x or after.origin.y != before.origin.y
+                )
+            elif action.verb == "scale":
+                unused_changed = (
+                    after.position.x != before.position.x or after.position.y != before.position.y
+                    or after.rotation_degrees != before.rotation_degrees
+                )
+            else:
+                unused_changed = (
+                    after.position.x != before.position.x or after.position.y != before.position.y
+                    or after.scale_x != before.scale_x or after.scale_y != before.scale_y
+                )
+            if unused_changed:
+                raise ReplayError(f"{action.verb} action {action.action_id} changes an unrelated transform channel")
     if isinstance(action, (GroupAction, CameraAction)):
         return
     if isinstance(action, EvidenceAction) and action.verb == "return_board":

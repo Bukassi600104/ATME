@@ -341,6 +341,25 @@ def test_isolate_context_restores_without_inventing_context_version_mutations():
     assert after == {key: value + (key in focus) for key, value in before.items()}
 
 
+def test_action_start_snapshot_precedes_its_own_zero_progress_paint():
+    layout, timeline = legacy_parity_documents("insert_evidence")
+    trace = document_replay(layout, timeline)
+    action = timeline["actions"][-1]
+    target = action["action"]["target_object_id"]
+    # The compositor deliberately paints an invisible (alpha-zero) evidence
+    # object at t=0 of insertion. Its authored precondition is still hidden.
+    assert trace.at(action["start_ms"]).object(target).reveal_fraction == 1
+    before = trace.before_action(action["action"]["action_id"])
+    assert before.at_ms == action["start_ms"]
+    assert before.object(target).state == "hidden"
+    assert not before.object(target).visible
+    assert before.object(target).reveal_fraction == 0
+    trace.at(action["end_ms"])
+    assert trace.before_action(action["action"]["action_id"]) == before
+    with pytest.raises(ReplayError, match="unknown action"):
+        trace.before_action("missing-action")
+
+
 def test_same_target_overlap_cannot_overwrite_another_captured_baseline():
     action, _, _, frames, _ = prepared()
     first = moving(action, frames, start=1000, end=6000)
