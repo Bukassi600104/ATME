@@ -7,9 +7,13 @@ bounded independent source/test freeze review PASS. Independent initial-connecte
 micro-suite: 7 PASS /37 deselected, 4.32s; scoped Ruff PASS; earlier generic-arrow /
 unrelated-Group independent probe3 PASS. No remaining bounded source/test defect
 identified. Final independent acceptance still waits exact full matrix evidence.
-Exact focused hidden
-worker PID11908 (2026-10-05 20:37:56UTC), log
-`phase-3ac-connector-focused-frozen.log`, RUNNING on this frozen source.
+Exact focused hidden worker PID11908 completed on this frozen source: 151 passed,
+436.91s, explicit terminal exit 0 at2026-10-05 20:45:18UTC. Log
+`phase-3ac-connector-focused-frozen.log`, SHA256
+`3785876E427801C741EE710984B5FE35C01228391344E55F3939A757FC4108BB`.
+Source/tests/schema/bench comparison to4a11891 is empty. Broader v2/contract hidden
+worker PID2652 (started2026-10-05 20:45:49UTC), log
+`phase-3ac-connector-v2-frozen.log`, RUNNING on the same frozen source.
 Not integrated into main, not installed, not public Group admission or Phase 3
 completion. Main24031 stopped at95% during continuation without terminal result;
 it certifies nothing. A continuation-safe hidden full worker PID10628 is RUNNING
@@ -74,6 +78,11 @@ connector candidate.
    Verdict PARTIAL pending checked-in initial-connected cases and frozen final
    verification. The requested initial-connected cases above are now present;
    the independent final acceptance remains open.
+10. Frozen final focused matrix: 151 PASS, 436.91s, terminal exit0. This includes
+    the corrected same-time fixture and all genuinely initial-connected cases,
+    existing generic-arrow/connection/SVG suites and stored Group/annotation
+    regressions. The broader frozen regression and final independent acceptance
+    are still required; focused PASS is not overall Phase3 or installed acceptance.
 
 ## Fixture corrections, not runtime failures
 
