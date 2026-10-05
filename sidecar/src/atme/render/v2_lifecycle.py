@@ -9,7 +9,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from atme.render.v2_hierarchy import validate_authored_hierarchy
-from atme.store.contracts_v2 import GroupAction, _annotation_object_ids
+from atme.store.contracts_v2 import (
+    CameraAction,
+    ConnectionAction,
+    EvidenceAction,
+    GroupAction,
+    SoundAction,
+    TargetAction,
+    _action_object_references,
+    _annotation_object_ids,
+)
 
 if TYPE_CHECKING:
     from atme.render.v2_timeline_replay import ChronologicalReplay, ReplaySample
@@ -65,6 +74,45 @@ def validate_group_lifetime(objects: dict, actions, object_ids, start_ms: int,
                 and other.start_ms < end_ms and start_ms < other.end_ms
                 and group_affects_geometry(other.action, objects, object_ids)):
             raise UnsupportedLifecycle(f"{description} overlaps a geometric hierarchy edit")
+
+
+def validate_connection_lifetime(item, sample, objects: dict, actions, duration_ms: int) -> None:
+    """Managed relationships require stable endpoint geometry until disconnect ends.
+
+    Live endpoint motion remains available to generic arrows. Managed connect /
+    disconnect is bounded, not a promise of continuous moving-route validation.
+    """
+    action = item.action
+    index = next(index for index, row in enumerate(actions) if row is item)
+    if action.verb == "disconnect" and any(
+        isinstance(row.action, ConnectionAction) and row.action.connector_id == action.connector_id
+        and row.action.verb == "connect" for row in actions[:index]
+    ):
+        return  # The preceding connect already proves this whole retained interval.
+    start = item.start_ms if action.verb == "connect" else 0
+    end = item.end_ms if action.verb == "disconnect" else next(
+        (row.end_ms for row in actions[index + 1:]
+         if isinstance(row.action, ConnectionAction) and row.action.connector_id == action.connector_id
+         and row.action.verb == "disconnect"), duration_ms,
+    )
+    endpoints = {action.source_object_id, action.destination_object_id}
+    dependencies = geometry_dependencies(sample.hierarchy, endpoints)
+    description = f"connector {action.connector_id} connected lifetime"
+    validate_group_lifetime(objects, actions, endpoints, start, end, description=description)
+    for other in actions:
+        if other is item or other.start_ms >= end or other.end_ms <= start:
+            continue
+        candidate = other.action
+        if isinstance(candidate, (CameraAction, SoundAction, GroupAction)):
+            continue
+        if isinstance(candidate, EvidenceAction) and candidate.verb == "return_board":
+            continue
+        mutations = ({candidate.connector_id} if isinstance(candidate, ConnectionAction)
+                     else set(_action_object_references(candidate)))
+        board_isolate = (isinstance(candidate, TargetAction) and candidate.verb == "isolate"
+                         and candidate.board_id == action.board_id)
+        if board_isolate or dependencies.intersection(mutations):
+            raise UnsupportedLifecycle(f"{description} requires completed disconnect before endpoint edits")
 
 
 def validate_annotation_paint_order(action, objects: dict, hierarchy) -> None:

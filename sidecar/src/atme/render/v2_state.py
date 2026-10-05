@@ -11,6 +11,7 @@ import hashlib
 import json
 from dataclasses import dataclass, replace
 
+from atme.render.style_bundle import resolve_contract_bundle
 from atme.render.v2_annotation import validate_annotation_geometry
 from atme.render.v2_camera import (
     CameraViewport,
@@ -18,7 +19,11 @@ from atme.render.v2_camera import (
     camera_segments,
     evaluate_camera,
 )
-from atme.render.v2_connector import UnsupportedConnector, validate_static_arrow
+from atme.render.v2_connector import (
+    UnsupportedConnector,
+    connector_route,
+    validate_static_arrow,
+)
 from atme.render.v2_emphasis import (
     SUPPORTED_HIGHLIGHT_MARKS,
     SUPPORTED_HIGHLIGHT_TEXT,
@@ -33,6 +38,7 @@ from atme.render.v2_lifecycle import (
     geometry_dependencies,
     lifecycle_samples,
     validate_annotation_paint_order,
+    validate_connection_lifetime,
     validate_group_lifetime,
     validate_replacement_paint_order,
 )
@@ -884,6 +890,18 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
             action = item.action
             if item.start_ms < last_target_end.get(action.connector_id, 0):
                 raise V2FrameError(f"overlapping actions on {action.connector_id} need composition rules")
+            style, _, _ = resolve_contract_bundle(layout.style_system_version, layout.asset_registry_version)
+            profile = "landscape-16:9" if layout.output_profile.profile_id == "LONG_FORM_16_9" else "portrait-9:16"
+            design = style.aspects[profile]
+            scale = layout.output_profile.width / design.width
+            if abs(scale - layout.output_profile.height / design.height) > 1e-6:
+                raise V2FrameError("output profile cannot uniformly scale Paper & Ink design tokens")
+            try:
+                connector_route(layout_objects[action.connector_id], layout_objects, sampled,
+                                style.strokes.regular_px * scale)
+                validate_connection_lifetime(item, sample, context.objects, timeline.actions, timeline.duration_ms)
+            except (UnsupportedConnector, UnsupportedLifecycle) as exc:
+                raise V2FrameError(str(exc)) from exc
             last_target_end[action.connector_id] = item.end_ms
         if isinstance(item.action, (TargetAction, TransformAction)):
             if (isinstance(item.action, TargetAction) and item.action.verb == "highlight"

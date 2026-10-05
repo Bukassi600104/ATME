@@ -26,7 +26,11 @@ from atme.render.style_bundle import (
     resolve_contract_bundle,
     verified_asset_svg,
 )
-from atme.render.v2_connector import UnsupportedConnector, validate_static_arrow
+from atme.render.v2_connector import (
+    UnsupportedConnector,
+    connector_route,
+    validate_static_arrow,
+)
 from atme.render.v2_emphasis import (
     SUPPORTED_HIGHLIGHT_MARKS,
     SUPPORTED_HIGHLIGHT_TEXT,
@@ -45,7 +49,7 @@ from atme.render.v2_path import (
 )
 from atme.render.v2_raster import UnsupportedProjectPNG, canonical_png
 from atme.render.v2_state import FrameObject, FrameSnapshot, evaluate_frame
-from atme.render.v2_world import UnsupportedWorldGeometry, transform_svg, world_anchor
+from atme.render.v2_world import transform_svg
 from atme.store.contracts_v2 import (
     ConnectionAction,
     ConnectorObject,
@@ -334,77 +338,23 @@ def _registry_visual(obj: VisualObject) -> str:
 
 def _connector_shape(obj: ConnectorObject, objects: dict, states: dict,
                      stroke: str, weight: float, draw_fraction: float | None) -> str:
-    source = objects[obj.source_object_id]
-    destination = objects[obj.destination_object_id]
-    source_state = states[source.object_id]
-    destination_state = states[destination.object_id]
-    if any(not endpoint.visible or endpoint.opacity <= 0 or endpoint.reveal_fraction <= 0
-           for endpoint in (source_state, destination_state)):
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has a hidden endpoint")
-    for endpoint in (source, destination):
-        parent_id = endpoint.parent_id
-        while parent_id is not None:
-            parent_state = states[parent_id]
-            if not parent_state.visible or parent_state.opacity <= 0:
-                raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has a hidden endpoint")
-            parent_id = objects[parent_id].parent_id
-    transforms = {object_id: state.transform for object_id, state in states.items()}
     try:
-        start = world_anchor(source, obj.source_anchor_id, objects, transforms)
-        end = world_anchor(destination, obj.destination_anchor_id, objects, transforms)
-    except UnsupportedWorldGeometry as exc:
+        geometry = connector_route(obj, objects, states, weight)
+    except UnsupportedConnector as exc:
         raise UnsupportedVisualObject(str(exc)) from exc
-    if not all(math.isfinite(value) and abs(value) <= 1_000_000 for point in (start, end)
-               for value in point):
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} endpoint is outside supported range")
-    start = (float(_n(start[0])), float(_n(start[1])))
-    end = (float(_n(end[0])), float(_n(end[1])))
-    bounds = obj.geometry.bounds
-    if any(not (bounds.x <= x <= bounds.x + bounds.width
-                and bounds.y <= y <= bounds.y + bounds.height) for x, y in (start, end)):
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} exceeds authored bounds")
+    start, end = geometry.points[0], geometry.points[-1]
+    length = geometry.length
+    left, right = geometry.head
     if obj.routing == "straight":
-        route = [start, end]
-        tangent = (end[0] - start[0], end[1] - start[1])
         path = f'M {_n(start[0])} {_n(start[1])} L {_n(end[0])} {_n(end[1])}'
-        length = math.dist(start, end)
     elif obj.routing == "elbow":
-        bend = (end[0], start[1])
-        route = [start, bend, end]
-        tangent = (end[0] - bend[0], end[1] - bend[1])
-        if tangent == (0, 0):
-            tangent = (bend[0] - start[0], bend[1] - start[1])
+        bend = geometry.points[1]
         path = (f'M {_n(start[0])} {_n(start[1])} L {_n(bend[0])} {_n(bend[1])} '
                 f'L {_n(end[0])} {_n(end[1])}')
-        length = math.dist(start, bend) + math.dist(bend, end)
     else:
-        bend = (float(_n((start[0] + end[0]) / 2)), start[1])
-        route = [start, bend, end]
-        tangent = (end[0] - bend[0], end[1] - bend[1])
+        bend = geometry.points[1]
         path = (f'M {_n(start[0])} {_n(start[1])} Q {_n(bend[0])} {_n(bend[1])} '
                 f'{_n(end[0])} {_n(end[1])}')
-        length = sum(math.dist(previous, current) for previous, current in pairwise(
-            ((1 - t) ** 2 * start[0] + 2 * (1 - t) * t * bend[0] + t ** 2 * end[0],
-             (1 - t) ** 2 * start[1] + 2 * (1 - t) * t * bend[1] + t ** 2 * end[1])
-            for t in (step / 64 for step in range(65))
-        ))
-    if any(not (bounds.x <= x <= bounds.x + bounds.width
-                and bounds.y <= y <= bounds.y + bounds.height) for x, y in route):
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} route exceeds authored bounds")
-    if not math.isfinite(length) or not 0.0001 <= length <= 10_000_000:
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has degenerate/oversized route")
-    tangent_length = math.hypot(*tangent)
-    if tangent_length <= 0:
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} has no endpoint direction")
-    unit_x, unit_y = tangent[0] / tangent_length, tangent[1] / tangent_length
-    wing = 6 * weight / 2.6667
-    depth = 14 * weight / 2.6667
-    base_x, base_y = end[0] - depth * unit_x, end[1] - depth * unit_y
-    left = (float(_n(base_x - wing * unit_y)), float(_n(base_y + wing * unit_x)))
-    right = (float(_n(base_x + wing * unit_y)), float(_n(base_y - wing * unit_x)))
-    if any(not (bounds.x <= x <= bounds.x + bounds.width
-                and bounds.y <= y <= bounds.y + bounds.height) for x, y in (left, right)):
-        raise UnsupportedVisualObject(f"v2 arrow {obj.object_id} head exceeds authored bounds")
     dash = (f' stroke-dasharray="{_n(length)} {_n(length)}" '
             f'stroke-dashoffset="{_n(length * (1 - draw_fraction))}"'
             if draw_fraction is not None and draw_fraction < 1 else "")

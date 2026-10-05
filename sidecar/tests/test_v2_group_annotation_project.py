@@ -22,12 +22,16 @@ from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
 from atme.store.contracts_v2 import HierarchyBasis
 
 
-def stored_group_annotation_return_basis(tmp_path, *, regroup, stale=None, mutate=None, portrait=False):
+def stored_group_annotation_return_basis(tmp_path, *, regroup, stale=None, mutate=None, portrait=False,
+                                         document_builder=None):
     """Use the real project/WAV/cleaned timing store and exact authored hierarchy."""
     profile = "SHORT_FORM_9_16" if portrait else "LONG_FORM_16_9"
     service, project, plan, _, _ = stored_v2_basis(tmp_path, profile=profile)
-    builder = regroup_first_documents if regroup else annotation_group_documents
-    layout, timeline = builder(portrait=portrait)
+    if document_builder is None:
+        builder = regroup_first_documents if regroup else annotation_group_documents
+        layout, timeline = builder(portrait=portrait)
+    else:
+        layout, timeline = document_builder(regroup=regroup, portrait=portrait)
     layout["boards"][0]["expected_prior_state"] = "system_established"
     layout["activations"][0]["end_ms"] = 8000
     interlude = deepcopy(layout["objects"][0])
