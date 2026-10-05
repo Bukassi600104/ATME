@@ -12,8 +12,13 @@ Exact focused hidden worker PID11908 completed on this frozen source: 151 passed
 `phase-3ac-connector-focused-frozen.log`, SHA256
 `3785876E427801C741EE710984B5FE35C01228391344E55F3939A757FC4108BB`.
 Source/tests/schema/bench comparison to4a11891 is empty. Broader v2/contract hidden
-worker PID2652 (started2026-10-05 20:45:49UTC), log
-`phase-3ac-connector-v2-frozen.log`, RUNNING on the same frozen source.
+worker PID2652 completed on the same frozen source:1,106 passed, five preexisting
+Windows symlink skips,1542.86s, terminal exit0 at2026-10-05 21:11:37UTC. Log
+`phase-3ac-connector-v2-frozen.log`, SHA256
+`60D0E8E49E4A5D27F7F7F1DBA5E4C4395F00CCACAA569C2E1FB2767D2EF4E0AF`.
+Frozen source/tests/schema/bench diff is empty and worker absence verified before
+adding the next test-only replacement slice. Final independent evidence acceptance
+and exact main integration remain open.
 Not integrated into main, not installed, not public Group admission or Phase 3
 completion. Main24031 stopped at95% during continuation without terminal result;
 it certifies nothing. A continuation-safe hidden full worker PID10628 is RUNNING
@@ -83,6 +88,9 @@ connector candidate.
     existing generic-arrow/connection/SVG suites and stored Group/annotation
     regressions. The broader frozen regression and final independent acceptance
     are still required; focused PASS is not overall Phase3 or installed acceptance.
+11. Frozen broader v2/contract matrix:1,106 PASS/five existing Windows symlink
+    skips,1542.86s, terminal exit0; exact4a11891 source freeze verified. The final
+    independent evidence review and main integration/full regression are separate.
 
 ## Fixture corrections, not runtime failures
 
@@ -102,8 +110,8 @@ connector candidate.
 
 ## Acceptance still required
 
-- Independent review findings resolved; exact candidate frozen and all focused
-  and broader v2/contract tests complete, with hashes and terminal exit evidence.
+- Focused/broader candidate evidence is complete; final independent evidence
+  acceptance is still required before exact main integration.
 - Exact main integration audit and full main regression before release claims.
 - Subsequent post-Group replace/morph and hierarchy-aware isolate consumers.
 - Bound validated sampling bundle/public Group/compiler/installed production

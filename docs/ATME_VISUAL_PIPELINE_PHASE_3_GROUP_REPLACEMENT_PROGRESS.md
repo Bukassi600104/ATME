@@ -2,11 +2,13 @@
 
 Date: 2026-10-05
 
-Status: test-only candidate preparation against frozen connector source
-`4a118918824649c225f9691dbc41219662fe4271`. Production source/tests remain frozen
-for connector broad worker2652. The next-slice tests are deliberately outside
-that acceptance inventory at `sidecar/test-artifacts/test_group_replacement_candidate.py`;
-they are not integrated, published, installed or part of connector acceptance.
+Status: reviewed test-only candidate promoted to the tracked isolated suite
+`sidecar/tests/test_v2_group_replacement.py` after frozen connector source
+`4a118918824649c225f9691dbc41219662fe4271` completed focused151 and broader1,106
+PASS regressions (five existing Windows symlink skips). Draft verification happened
+outside that acceptance inventory at `sidecar/test-artifacts/test_group_replacement_candidate.py`.
+The tracked promotion changes only the module docstring, not behavior. It is not
+integrated into main, published, installed or part of the older connector result.
 No new runtime/schema/compiler/public capability has been added by this draft.
 
 ## Independent design findings
@@ -66,7 +68,9 @@ No new runtime/schema/compiler/public capability has been added by this draft.
   `5A1816605619DFB514CA3204D4150323EF80BFDB8773FE500485C854B27D2A7B`.
   That run precedes only the five final chain-assertion lines proved above; it is
   not a full tracked-suite or installed acceptance. Final independent read-only
-  assertion/rejection-path follow-through is requested.
+  assertion/rejection-path follow-through PASS: the added version proof is exact;
+  one compact stale-parent probe confirms the actual retained-hierarchy validator
+  rejects the coherent false receipt, not an unrelated schema/fingerprint check.
   Connector broad and main stored-pair full regressions remain separate boundaries.
 
 ## Implemented review follow-through awaiting final verification
@@ -91,9 +95,8 @@ to make a test pass or describe this partial review as final acceptance.
 
 ## Remaining acceptance
 
-Resolve independent review and any remaining dynamic hierarchy cases, then move
-the final tests into the tracked suite only after connector source verification
-finishes. Freeze the resulting source, run focused/broader regressions, and retain
+Independent bounded test-design review PASS and tracked promotion are complete.
+Freeze the resulting source, run tracked focused/broader regressions, and retain
 exact main integration/full regression evidence. Public Group admission, compiler,
 installed renderer and creative/Caleb quality gates remain closed. This proof does
 not complete hierarchy-aware isolate, remaining Phase3 primitives/actions or any
