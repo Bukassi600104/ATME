@@ -6,7 +6,11 @@ Status: integrated `2c21c2c` from audited isolated `7b93db0`; focused proof,
 independent corrected-source re-audit and fresh combined regression PASS.
 Exact source/tests/bench/pixels integration comparison and scoped Ruff PASS.
 Independent exact-integration audit PASS; both logs and pixel hashes verified.
-Fresh full main `56029` RUNNING on frozen `2c21c2c`; no full result claimed yet.
+Full main `56029` completed:1,318 passed, five existing Windows symlink skips,
+1866.02s, on frozen `2c21c2c`. Terminal log and empty source/tests/schema/bench
+diff verified by the primary agent on resume; original exec handle had expired
+before final status capture, so OS exit status is not claimed.
+Log SHA256:`D8C7AABA5FBC9143AA7F127700090C5FDCE36EC3B1A592266456FC9CB5BA48DC`.
 This is not public Group,
 stored Group+annotation production, Phase 3, installed or creative acceptance.
 
@@ -92,13 +96,17 @@ stored Group+annotation production, Phase 3, installed or creative acceptance.
 
 ## Remaining acceptance
 
-Fresh full frozen regression remains required. Then prove
-real stored Group+annotation writes and
+Exact integration and the fresh full frozen regression are complete for2c21c2c.
+Real stored Group+annotation writes and
 duplicate/return-receipt history, both-profile stored SVG/PNG, post-Group connector
 and isolate/replace/morph consumers before public/production admission. Trusted
 private snapshots must not become a caller-supplied public validation bypass.
 All remaining Phase 3 actions/primitives and approved R-01–R-15/Phase 4–12
-requirements remain in the original plan. No installer or release was rebuilt.
+requirements remain in the original plan. A later isolated candidate3f037ac has
+61 focused plus4 no-return cases and49-suite regression1,046 passed/five existing
+Windows symlink skips; its independent implementation review is pending after
+a usage-limit interruption, so it is not integrated or certified by this earlier
+full run. No installer or release was rebuilt.
 
 ## Independently mapped next stored-project slice
 
