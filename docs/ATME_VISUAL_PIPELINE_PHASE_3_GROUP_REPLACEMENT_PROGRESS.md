@@ -44,16 +44,26 @@ No new runtime/schema/compiler/public capability has been added by this draft.
   crossfades to differ; those may legitimately match. The corrected assertion
   compares each partial frame with the completed third object. This was a test
   expectation error, not a production renderer failure.
-- Full draft worker12552 started2026-10-05 20:55:04UTC, log
-  `phase-3ad-group-replacement-candidate.log`, RUNNING. Draft SHA256
+- Full first draft worker12552 completed:48 PASS,181.06s, terminal exit0 at
+  2026-10-05 20:58:10UTC. Log `phase-3ad-group-replacement-candidate.log`, SHA256
+  `81C9DEEE7038BB4D31A15705291A22ABDEAE566676E271A18EFB3E7A1B008105`.
+  First draft SHA256
   `2AE7FB966A1ED97786544CA4590940D5977BE6D0E5E46F0B6FDDA6BA14166AAC`
-  is checked before and after that run. No terminal result is claimed yet.
-- Independent test-design review is bounded PARTIAL: the nested-container model
-  is valid and no production defect was found, but exact return/authority assertions
-  and coherent dynamic hierarchy negatives must be stronger before promotion.
+  was checked before and after that run. It does not certify later stronger tests.
+- Initial independent review was PARTIAL. All substantive findings were addressed
+  in strengthened candidate SHA256
+  `AA16491F219E3D128830CB3C873AF3BFE0A876497F4EC7F7AE9B8B430CDFF4EF`.
+  Eight strengthened SVG/geometry cases PASS16.71s; two coherent direct-hidden-root
+  rejection cases PASS3.24s; scoped Ruff PASS. Bounded independent test-design
+  re-audit PASS, no production defect or factual authority-binding mismatch found.
+  One nonblocking hardening remains: directly assert hidden C's Group-change
+  membership and version2 before the chain, then version3 after replacement.
+- Strengthened full60-case worker10336 started2026-10-05 21:02:45UTC, log
+  `phase-3ad-group-replacement-strengthened.log`, RUNNING with exact draft hash
+  checked at start/end. No terminal result is claimed for this stronger candidate.
   Connector broad and main stored-pair full regressions remain separate boundaries.
 
-## Required review follow-through before promotion
+## Implemented review follow-through awaiting final verification
 
 1. Compare every returned A-board state/version and exact hierarchy inventory /
    basis/hash to the independently sampled pre-return frame. Subset checks do not
@@ -68,8 +78,9 @@ No new runtime/schema/compiler/public capability has been added by this draft.
 5. Assert actual post-Group SVG crossfade opacity vs single morph geometry and
    effective nonterminal adjacency, not just repeated private raster output.
 
-Keep the running draft byte-frozen until its terminal result; its current48-case
-run cannot certify these later stronger assertions. Do not alter production merely
+Keep the running strengthened draft byte-frozen until its terminal result. The
+previous48-case run cannot certify these later stronger assertions. Add and prove
+the final direct hidden-C version assertion only afterward. Do not alter production merely
 to make a test pass or describe this partial review as final acceptance.
 
 ## Remaining acceptance
