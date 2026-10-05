@@ -111,7 +111,8 @@ connector candidate.
 ## Acceptance still required
 
 - Focused/broader candidate evidence is complete; final independent evidence
-  acceptance is still required before exact main integration.
+  acceptance PASS on2026-10-05 after verification of both terminal logs, exact
+  hashes and unchanged production through724e7fc. This is bounded source acceptance.
 - Exact main integration audit and full main regression before release claims.
 - Subsequent post-Group replace/morph and hierarchy-aware isolate consumers.
 - Bound validated sampling bundle/public Group/compiler/installed production

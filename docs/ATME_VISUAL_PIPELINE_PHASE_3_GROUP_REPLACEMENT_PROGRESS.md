@@ -96,8 +96,17 @@ to make a test pass or describe this partial review as final acceptance.
 ## Remaining acceptance
 
 Independent bounded test-design review PASS and tracked promotion are complete.
-Freeze the resulting source, run tracked focused/broader regressions, and retain
-exact main integration/full regression evidence. Public Group admission, compiler,
+The tracked60 worker10992 completed at frozen source
+`724e7fc6d33433e56b19d9306f8ea7cb865147cc`:60 PASS,160.34s, explicit exit0 at
+2026-10-05 21:18:09UTC. Log `phase-3ad-group-replacement-tracked.log`, SHA256
+`4E9E38AEB3B8B309562071A3D52978070B264825F53DC10C36F2F2DFFD42D328`.
+The source/tests/schema/bench diff against that commit remained empty afterward;
+the worker exited. This full tracked result includes the final hidden-C assertions.
+Final independent connector evidence review PASS; unchanged production from4a
+through724 preserves focused151/broad1,106 evidence. The auditor explicitly accepts
+exact integration audit plus a fresh combined main full regression as the remaining
+whole-suite gate, without repeating an unchanged-production isolated broad run.
+Retain exact main integration/full regression evidence. Public Group admission, compiler,
 installed renderer and creative/Caleb quality gates remain closed. This proof does
 not complete hierarchy-aware isolate, remaining Phase3 primitives/actions or any
 Phase4–12 requirement from the original approved rebuild plan.
