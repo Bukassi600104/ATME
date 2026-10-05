@@ -235,11 +235,17 @@ independent exact-integration audit PASS. Full main `24031` stopped during
 continuation at 95% without terminal summary/exit marker; it is not acceptance.
 The preserved log SHA256 is `120D1C5B3DFEEC40CFED1D716D7D8A4AD2BF65FD91AE4C27BB4578205021DDC8`.
 Process absence and missing handle were verified before restart. A hidden,
-continuation-safe full worker (PID10628, started2026-10-05 20:34:55UTC) is RUNNING
-on frozen `eb811ce`, log `phase-3ab-stored-pair-full-sidecar-rerun.log`.
-Previous1,318-pass full run covers only `2c21c2c`. Post-Group connector candidate
-`4a11891` is isolated, bounded review PARTIAL pending frozen final verification;
-it has not been integrated or installed.
+continuation-safe full worker PID10628 PASSED on frozen `eb811ce`:1,346 passed,
+five existing Windows symlink skips,2420.49s, explicit terminal exit0 at2026-10-05
+21:15:23UTC. Log `phase-3ab-stored-pair-full-sidecar-rerun.log`, SHA256
+`33F5E96C65A3FDEAF3336CE8C8F73063A0BFA1F9F812CEF555256BC0B2368884`.
+Final source/tests/schema/bench freeze is empty. Previous1,318-pass full run
+covers only `2c21c2c`. Isolated connector `4a11891` now has focused151 and
+broader1,106 PASS/five existing Windows symlink skips with terminal exit0;
+final independent evidence acceptance and main integration remain pending.
+Reviewed test-only replacement/morph slice `724e7fc` has draft60 plus final
+chain8 PASS and bounded test-design PASS; tracked focused verification is running.
+Neither later slice has been integrated or installed.
 The blanket causal paired storage rejection is removed, not the sampled history
 validators or public Group admission. Public preview/export, post-Group connector/
 isolate/replace/morph, other Phase3 primitives/actions, compiler/installed and all

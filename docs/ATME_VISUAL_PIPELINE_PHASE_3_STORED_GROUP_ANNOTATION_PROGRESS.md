@@ -8,8 +8,11 @@ source/test/schema/bench/report comparison and scoped Ruff PASS. Independent
 exact-integration audit PASS at main0398ed3/referenceade8e25. Full main24031
 stopped during continuation at95%, without final summary or exit marker; it is
 not acceptance. Verified missing handle/process absence preceded hidden worker
-PID10628 (2026-10-05 20:34:55UTC), RUNNING on frozen eb811ce, log
-phase-3ab-stored-pair-full-sidecar-rerun.log. No public Group,
+PID10628 completed on frozen eb811ce:1,346 passed, five existing Windows symlink
+skips,2420.49s, terminal exit0 at2026-10-05 21:15:23UTC. Log
+phase-3ab-stored-pair-full-sidecar-rerun.log, SHA256
+33F5E96C65A3FDEAF3336CE8C8F73063A0BFA1F9F812CEF555256BC0B2368884.
+Final source/tests/schema/bench freeze is empty. No public Group,
 installed application, creative acceptance, Phase 3 or full-goal completion.
 The preceding source2c21c2c full main regression56029 is a separate frozen source
 boundary and cannot certify this later change.
@@ -99,19 +102,24 @@ Portrait uses the independently placed paired fixture, not a landscape crop.
   log/pixel hashes and unchanged source/test/schema/bench tree. Final bounded
   implementation audit PASS, with8 representative independent tests passing in
   88.46s and scoped Ruff PASS. Primary exact integration comparison also PASS;
-  independent exact-integration audit also PASS. The new full result remains pending.
+  independent exact-integration audit also PASS. The fresh continuation-safe full
+  result is1,346 PASS/five existing Windows symlink skips,2420.49s, terminal exit0
+  on frozen eb811ce; the interrupted24031 run remains non-acceptance.
 
 ## Remaining acceptance
 
 Focused and broader frozen proof, unchanged offline frames, independent
 implementation re-audit and primary exact integration comparison are complete.
-Independent exact-integration audit is complete; finish the continuation-safe
-full rerun PID10628, not the interrupted24031 run. The preserved interrupted log
+Independent exact-integration audit and continuation-safe full rerun PID10628
+are complete. The interrupted24031 run certifies nothing; its preserved log
 SHA256 is120D1C5B3DFEEC40CFED1D716D7D8A4AD2BF65FD91AE4C27BB4578205021DDC8.
 The hidden worker records source, start/end UTC and actual pytest exit status;
 its live process/command line, not a stale log alone, establishes a verified wait.
-Post-Group connector source4a11891 is isolated; bounded independent review found
-no production defect but final frozen focused/broader proof remains pending.
+Isolated connector4a11891 now has focused151 and broader1,106 PASS/five existing
+Windows symlink skips with terminal exit0; final independent evidence acceptance
+and exact integration remain pending. Reviewed replacement724e7fc has draft60
+plus final chain8 PASS/bounded test-design PASS; tracked focused verification is
+running. Neither later slice is integrated or installed yet.
 Retain the offline and unchanged public annotation
 frame hashes. Stored proof does not admit public Group or resolve missing
 post-Group connector/isolate/replace/morph consumers. Trusted private painting

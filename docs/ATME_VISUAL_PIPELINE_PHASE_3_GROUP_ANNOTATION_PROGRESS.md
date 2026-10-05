@@ -104,9 +104,14 @@ Main24031 stopped at95% during continuation without terminal result; it is not
 acceptance. Its preserved log SHA256 is120D1C5B3DFEEC40CFED1D716D7D8A4AD2BF65FD91AE4C27BB4578205021DDC8.
 Verified process absence/missing handle preceded the hidden continuation-safe
 rerun PID10628 (2026-10-05 20:34:55UTC), frozen eb811ce,
-log phase-3ab-stored-pair-full-sidecar-rerun.log. This rerun is RUNNING.
-Post-Group connector source4a11891 is isolated and still requires frozen final
-verification and independent acceptance; no integration or installer change.
+log phase-3ab-stored-pair-full-sidecar-rerun.log. This rerun PASSED:1,346 tests,
+five existing Windows symlink skips,2420.49s, terminal exit0; source freeze empty.
+Log SHA25633F5E96C65A3FDEAF3336CE8C8F73063A0BFA1F9F812CEF555256BC0B2368884.
+Isolated connector4a11891 now has focused151 and broader1,106 PASS with terminal
+exit0/five existing Windows symlink skips. Final independent evidence acceptance
+and exact integration remain pending. Test-only replacement724e7fc has draft60
+plus final chain8 PASS/bounded review PASS; tracked focused verification is running.
+No later source integration or installer change is claimed.
 Post-Group connector and isolate/replace/morph consumers remain required before
 public/production admission. Trusted
 private snapshots must not become a caller-supplied public validation bypass.
