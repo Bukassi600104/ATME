@@ -48,8 +48,29 @@ No new runtime/schema/compiler/public capability has been added by this draft.
   `phase-3ad-group-replacement-candidate.log`, RUNNING. Draft SHA256
   `2AE7FB966A1ED97786544CA4590940D5977BE6D0E5E46F0B6FDDA6BA14166AAC`
   is checked before and after that run. No terminal result is claimed yet.
-- Independent test-design review is requested and pending. Connector broad and
-  main stored-pair full regressions remain separate acceptance boundaries.
+- Independent test-design review is bounded PARTIAL: the nested-container model
+  is valid and no production defect was found, but exact return/authority assertions
+  and coherent dynamic hierarchy negatives must be stronger before promotion.
+  Connector broad and main stored-pair full regressions remain separate boundaries.
+
+## Required review follow-through before promotion
+
+1. Compare every returned A-board state/version and exact hierarchy inventory /
+   basis/hash to the independently sampled pre-return frame. Subset checks do not
+   prove complete source, hidden/removed destination, shell, root and sibling claims.
+2. Assert both Group bases' complete inventories and sole visible member-root
+   readiness; prove a hidden direct member rejects without relaxing that invariant.
+3. Check all original/duplicate project IDs, plan/layout revisions and hashes,
+   output profiles, cleaned revision/fingerprint, narrative/timing media identity
+   and compilation fingerprints. Keep original source and stored documents unchanged.
+4. Coherently false return parent/ordinal/transform claims and missing hidden /
+   chain descendants must reject atomically, even when their own hashes are renewed.
+5. Assert actual post-Group SVG crossfade opacity vs single morph geometry and
+   effective nonterminal adjacency, not just repeated private raster output.
+
+Keep the running draft byte-frozen until its terminal result; its current48-case
+run cannot certify these later stronger assertions. Do not alter production merely
+to make a test pass or describe this partial review as final acceptance.
 
 ## Remaining acceptance
 
