@@ -2,10 +2,17 @@
 
 Date: 2026-10-05
 
-Status: isolated candidate; independent review and exact final regression pending.
+Status: isolated source4a118918824649c225f9691dbc41219662fe4271 frozen;
+bounded independent review found no production defect, verdict PARTIAL pending
+checked-in initial-connected and exact final regression evidence. Initial-connected
+cases now pass. Final independent acceptance remains pending. Exact focused hidden
+worker PID11908 (2026-10-05 20:37:56UTC), log
+`phase-3ac-connector-focused-frozen.log`, RUNNING on this frozen source.
 Not integrated into main, not installed, not public Group admission or Phase 3
-completion. The full main24031 run certifies the earlier stored Group/annotation
-source eb811ce only; it cannot certify this connector candidate.
+completion. Main24031 stopped at95% during continuation without terminal result;
+it certifies nothing. A continuation-safe hidden full worker PID10628 is RUNNING
+on earlier stored Group/annotation source eb811ce; it cannot certify this later
+connector candidate.
 
 ## Bounded implementation
 
