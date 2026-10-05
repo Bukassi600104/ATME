@@ -75,15 +75,21 @@ Portrait uses the independently placed paired fixture, not a landscape crop.
   run30499 PASS:4 tests,24 deselected,52.46s, exit0. Log SHA256:
   `CC5E5E6A1C648AFD3EA6F9483984DD1149903394A4D3BF0542152B518DB7574B`.
   Candidate3f037ac freezes source/tests for the fresh49-suite run96341: all48
-  `test_v2_*.py` files plus visual contracts. This broader run is RUNNING.
+  `test_v2_*.py` files plus visual contracts. This broader run completed:
+  1,046 passed, five existing Windows symlink skips,1072.61s. Terminal log and
+  empty source/tests/schema/bench diff verified on resume. Original exec handle
+  had expired, so its OS exit status was not captured. Log SHA256:
+  `651E92B6149E8B35C66F6C7837D5BE1A33871E0E5701C5C256E2F8C66053001E`.
 - Offline run8446 PASS: all10 original public annotation frames and40 private
   paired frames preserve their exact JSON/PNG hashes. Public annotation JSON:
   `86D4E25C6C969281891862F8DE2F589B5EFC66404A7F6B7D3A4560F7127B0B70`;
   PNG:`112A6C9F980F05D62F6D0FBBAF83A317F7D9F5D859122C2F7507C3A2C4EF6A4F`.
   Paired JSON:`7489307543D1D562A10B22EB782C79392CC0EC0144E3ABA9BC2223ADB5AED08A`;
   PNG:`4B04705E56C18687C7BB289C375C5F16E14B83C5DFA92CBA4CA00033CF43549C`.
-  No independent implementation PASS, exact integration or later full PASS is
-  claimed yet.
+  Independent implementation audit was interrupted by the auditor's account
+  usage limit; it is not a PASS. The same auditor was resumed after the reported
+  reset, with candidate3f037ac still frozen. No independent implementation PASS,
+  exact integration or later full PASS is claimed yet.
 
 ## Remaining acceptance
 
