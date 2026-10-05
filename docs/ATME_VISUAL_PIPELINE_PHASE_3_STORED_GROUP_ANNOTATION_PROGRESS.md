@@ -2,7 +2,9 @@
 
 Date: 2026-10-04–05
 
-Status: isolated implementation and verification in progress. No public Group,
+Status: isolated implementation, focused/broader proof and independent final
+implementation audit PASS at source3f037ac. Exact main integration and its fresh
+full regression remain required. No public Group,
 installed application, creative acceptance, Phase 3 or full-goal completion.
 The preceding source2c21c2c full main regression56029 is a separate frozen source
 boundary and cannot certify this later change.
@@ -86,16 +88,18 @@ Portrait uses the independently placed paired fixture, not a landscape crop.
   PNG:`112A6C9F980F05D62F6D0FBBAF83A317F7D9F5D859122C2F7507C3A2C4EF6A4F`.
   Paired JSON:`7489307543D1D562A10B22EB782C79392CC0EC0144E3ABA9BC2223ADB5AED08A`;
   PNG:`4B04705E56C18687C7BB289C375C5F16E14B83C5DFA92CBA4CA00033CF43549C`.
-  Independent implementation audit was interrupted by the auditor's account
-  usage limit; it is not a PASS. The same auditor was resumed after the reported
-  reset, with candidate3f037ac still frozen. No independent implementation PASS,
-  exact integration or later full PASS is claimed yet.
+  Independent implementation audit was initially interrupted by the auditor's
+  account usage limit; that failed review was not counted as a PASS. The same
+  auditor resumed after reset and independently verified source3f037ac, exact
+  log/pixel hashes and unchanged source/test/schema/bench tree. Final bounded
+  implementation audit PASS, with8 representative independent tests passing in
+  88.46s and scoped Ruff PASS. No exact integration or later full PASS is claimed.
 
 ## Remaining acceptance
 
-Finish focused proof, resolve any actual consumer defects without weakening
-contracts, independently re-audit, run adjacent frozen regressions and exact
-integration/full regression. Retain the offline and unchanged public annotation
+Focused and broader frozen proof, unchanged offline frames and independent
+implementation re-audit are complete. Finish exact main integration and its own
+full regression. Retain the offline and unchanged public annotation
 frame hashes. Stored proof does not admit public Group or resolve missing
 post-Group connector/isolate/replace/morph consumers. Trusted private painting
 still needs bound validation provenance before any public promotion.
