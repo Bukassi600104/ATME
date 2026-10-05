@@ -410,3 +410,21 @@ admission remain closed; real stored/duplicate/return receipts and connector/
 isolate follow-through remain required. This is private mechanical proof, not
 Caleb-style creative acceptance, Phase 3 completion or an installed release.
 See the paired Group/annotation progress report and its next stored-project map.
+
+## Stored Group/annotation integration checkpoint — 2026-10-05
+
+Source `eb811ce` integrates isolated `3f037ac` plus documentation follow-through:
+real stored Group/ungroup and authored note/leader A/B/A receipts, atomic coherent
+stale claims, duplicate identity/hash/authority rebinding, same-time causal order
+and full no-return histories. Both independently authored profiles have stored
+and duplicate private offline pixel proof. Focused61 plus four no-return cases,
+the49-suite1,046-pass regression (five existing Windows symlink skips), scoped
+Ruff and independent bounded implementation audit PASS. All10+40 previous
+JSON/PNG hashes remain unchanged. Primary exact integration comparison is empty;
+independent exact-integration audit is pending. Fresh full main `24031` is RUNNING
+on frozen `eb811ce`; previous1,318-pass full run covers only `2c21c2c`.
+The blanket causal paired storage rejection is removed, not the sampled history
+validators or public Group admission. Public preview/export, post-Group connector/
+isolate/replace/morph, other Phase3 primitives/actions, compiler/installed and all
+Phase4–12 requirements remain. No v1/Caleb, schema, database, MCP or capability
+change; no creative or full Phase3 acceptance. See the stored-pair progress report.

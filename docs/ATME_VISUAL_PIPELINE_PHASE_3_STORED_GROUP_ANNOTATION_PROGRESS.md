@@ -2,9 +2,11 @@
 
 Date: 2026-10-04–05
 
-Status: isolated implementation, focused/broader proof and independent final
-implementation audit PASS at source3f037ac. Exact main integration and its fresh
-full regression remain required. No public Group,
+Status: independent implementation audit PASS at source3f037ac; integrated into
+main as eb811ce, with documentation-only follow-through0398ed3. Primary exact
+source/test/schema/bench/report comparison and scoped Ruff PASS. Independent
+exact-integration audit is pending; fresh full main24031 RUNNING on frozen
+eb811ce. No public Group,
 installed application, creative acceptance, Phase 3 or full-goal completion.
 The preceding source2c21c2c full main regression56029 is a separate frozen source
 boundary and cannot certify this later change.
@@ -93,13 +95,17 @@ Portrait uses the independently placed paired fixture, not a landscape crop.
   auditor resumed after reset and independently verified source3f037ac, exact
   log/pixel hashes and unchanged source/test/schema/bench tree. Final bounded
   implementation audit PASS, with8 representative independent tests passing in
-  88.46s and scoped Ruff PASS. No exact integration or later full PASS is claimed.
+  88.46s and scoped Ruff PASS. Primary exact integration comparison also PASS;
+  independent exact-integration audit and the new full result remain pending.
 
 ## Remaining acceptance
 
-Focused and broader frozen proof, unchanged offline frames and independent
-implementation re-audit are complete. Finish exact main integration and its own
-full regression. Retain the offline and unchanged public annotation
+Focused and broader frozen proof, unchanged offline frames, independent
+implementation re-audit and primary exact integration comparison are complete.
+Finish independent exact-integration audit and full main24031. This generated
+test log records its actual pytest exit status before the process completes,
+so resumed observation can retain both terminal result and exit status.
+Retain the offline and unchanged public annotation
 frame hashes. Stored proof does not admit public Group or resolve missing
 post-Group connector/isolate/replace/morph consumers. Trusted private painting
 still needs bound validation provenance before any public promotion.

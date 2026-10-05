@@ -97,20 +97,26 @@ stored Group+annotation production, Phase 3, installed or creative acceptance.
 ## Remaining acceptance
 
 Exact integration and the fresh full frozen regression are complete for2c21c2c.
-Real stored Group+annotation writes and
-duplicate/return-receipt history, both-profile stored SVG/PNG, post-Group connector
-and isolate/replace/morph consumers before public/production admission. Trusted
+Stored Group+annotation writes, duplicate/return-receipt history and both-profile
+stored/private SVG/PNG now have bounded independent implementation PASS in
+source3f037ac, integrated as eb811ce. Fresh main24031 is RUNNING on that later
+frozen source, and its independent exact-integration audit remains pending.
+Post-Group connector and isolate/replace/morph consumers remain required before
+public/production admission. Trusted
 private snapshots must not become a caller-supplied public validation bypass.
 All remaining Phase 3 actions/primitives and approved R-01–R-15/Phase 4–12
-requirements remain in the original plan. A later isolated candidate3f037ac has
+requirements remain in the original plan. The later candidate3f037ac has
 61 focused plus4 no-return cases and49-suite regression1,046 passed/five existing
-Windows symlink skips; its independent implementation review is pending after
-a usage-limit interruption, so it is not integrated or certified by this earlier
-full run. No installer or release was rebuilt.
+Windows symlink skips; its independent implementation review resumed after a
+usage-limit interruption and passed. It is integrated as eb811ce, but it is not
+certified by the earlier2c21c2c full run. No installer or release was rebuilt.
 
 ## Independently mapped next stored-project slice
 
-This is an implementation map, not delivered storage/public functionality.
+This was the independently authored implementation map. The bounded stored
+slice now satisfies its caller/receipt/profile/duplicate/atomic-history proof;
+exact-integration/full-main verification is in progress. Public Group and the
+other remaining hierarchy consumers are not implied. See the3AB progress report.
 
 1. Reuse `stored_v2_basis` for real WAV/project/cleaned-authority identity and the
    existing group-return project's plan-building pattern. Use exact authored
