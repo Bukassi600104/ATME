@@ -56,11 +56,17 @@ No new runtime/schema/compiler/public capability has been added by this draft.
   Eight strengthened SVG/geometry cases PASS16.71s; two coherent direct-hidden-root
   rejection cases PASS3.24s; scoped Ruff PASS. Bounded independent test-design
   re-audit PASS, no production defect or factual authority-binding mismatch found.
-  One nonblocking hardening remains: directly assert hidden C's Group-change
-  membership and version2 before the chain, then version3 after replacement.
-- Strengthened full60-case worker10336 started2026-10-05 21:02:45UTC, log
-  `phase-3ad-group-replacement-strengthened.log`, RUNNING with exact draft hash
-  checked at start/end. No terminal result is claimed for this stronger candidate.
+  The nonblocking hardening was added after the full run: hidden C is explicitly
+  in Group's changed-ID closure and version2 before the chain, then version3 after
+  replacement. Eight final chain cases PASS8.20s; scoped Ruff PASS. Final draft
+  SHA256 `B2E94D73691A5A20C5748AE2C92ADD5188E44A1026B9E3649A3F264C75F44626`.
+- Strengthened full60-case worker10336 completed:60 PASS,345.65s, explicit terminal
+  exit0 at2026-10-05 21:08:36UTC; start/end exact draft hash verified. Log
+  `phase-3ad-group-replacement-strengthened.log`, SHA256
+  `5A1816605619DFB514CA3204D4150323EF80BFDB8773FE500485C854B27D2A7B`.
+  That run precedes only the five final chain-assertion lines proved above; it is
+  not a full tracked-suite or installed acceptance. Final independent read-only
+  assertion/rejection-path follow-through is requested.
   Connector broad and main stored-pair full regressions remain separate boundaries.
 
 ## Implemented review follow-through awaiting final verification
@@ -78,9 +84,9 @@ No new runtime/schema/compiler/public capability has been added by this draft.
 5. Assert actual post-Group SVG crossfade opacity vs single morph geometry and
    effective nonterminal adjacency, not just repeated private raster output.
 
-Keep the running strengthened draft byte-frozen until its terminal result. The
-previous48-case run cannot certify these later stronger assertions. Add and prove
-the final direct hidden-C version assertion only afterward. Do not alter production merely
+The strengthened draft was byte-frozen through its terminal result. The previous
+48-case run does not certify the later stronger assertions. The final direct
+hidden-C version assertion was added and proved only afterward. Do not alter production merely
 to make a test pass or describe this partial review as final acceptance.
 
 ## Remaining acceptance
