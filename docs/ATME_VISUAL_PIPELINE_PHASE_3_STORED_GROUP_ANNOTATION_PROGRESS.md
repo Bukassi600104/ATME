@@ -5,8 +5,11 @@ Date: 2026-10-04–05
 Status: independent implementation audit PASS at source3f037ac; integrated into
 main as eb811ce, with documentation-only follow-through0398ed3. Primary exact
 source/test/schema/bench/report comparison and scoped Ruff PASS. Independent
-exact-integration audit PASS at main0398ed3/referenceade8e25; fresh full main24031 RUNNING on frozen
-eb811ce. No public Group,
+exact-integration audit PASS at main0398ed3/referenceade8e25. Full main24031
+stopped during continuation at95%, without final summary or exit marker; it is
+not acceptance. Verified missing handle/process absence preceded hidden worker
+PID10628 (2026-10-05 20:34:55UTC), RUNNING on frozen eb811ce, log
+phase-3ab-stored-pair-full-sidecar-rerun.log. No public Group,
 installed application, creative acceptance, Phase 3 or full-goal completion.
 The preceding source2c21c2c full main regression56029 is a separate frozen source
 boundary and cannot certify this later change.
@@ -102,9 +105,13 @@ Portrait uses the independently placed paired fixture, not a landscape crop.
 
 Focused and broader frozen proof, unchanged offline frames, independent
 implementation re-audit and primary exact integration comparison are complete.
-Independent exact-integration audit is complete; finish full main24031. This generated
-test log records its actual pytest exit status before the process completes,
-so resumed observation can retain both terminal result and exit status.
+Independent exact-integration audit is complete; finish the continuation-safe
+full rerun PID10628, not the interrupted24031 run. The preserved interrupted log
+SHA256 is120D1C5B3DFEEC40CFED1D716D7D8A4AD2BF65FD91AE4C27BB4578205021DDC8.
+The hidden worker records source, start/end UTC and actual pytest exit status;
+its live process/command line, not a stale log alone, establishes a verified wait.
+Post-Group connector source4a11891 is isolated; bounded independent review found
+no production defect but final frozen focused/broader proof remains pending.
 Retain the offline and unchanged public annotation
 frame hashes. Stored proof does not admit public Group or resolve missing
 post-Group connector/isolate/replace/morph consumers. Trusted private painting

@@ -130,8 +130,15 @@ and duplicate private offline pixel proof. Focused61 plus four no-return cases,
 the49-suite1,046-pass regression (five existing Windows symlink skips), scoped
 Ruff and independent bounded implementation audit PASS. All10+40 previous
 JSON/PNG hashes remain unchanged. Primary exact integration comparison is empty;
-independent exact-integration audit PASS. Fresh full main `24031` is RUNNING
-on frozen `eb811ce`; previous1,318-pass full run covers only `2c21c2c`.
+independent exact-integration audit PASS. Full main `24031` stopped during
+continuation at 95% without terminal summary/exit marker; it is not acceptance.
+The preserved log SHA256 is `120D1C5B3DFEEC40CFED1D716D7D8A4AD2BF65FD91AE4C27BB4578205021DDC8`.
+Process absence and missing handle were verified before restart. A hidden,
+continuation-safe full worker (PID10628, started2026-10-05 20:34:55UTC) is RUNNING
+on frozen `eb811ce`, log `phase-3ab-stored-pair-full-sidecar-rerun.log`.
+Previous1,318-pass full run covers only `2c21c2c`. Post-Group connector candidate
+`4a11891` is isolated, bounded review PARTIAL pending frozen final verification;
+it has not been integrated or installed.
 The blanket causal paired storage rejection is removed, not the sampled history
 validators or public Group admission. Public preview/export, post-Group connector/
 isolate/replace/morph, other Phase3 primitives/actions, compiler/installed and all

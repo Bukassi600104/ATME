@@ -99,8 +99,14 @@ stored Group+annotation production, Phase 3, installed or creative acceptance.
 Exact integration and the fresh full frozen regression are complete for2c21c2c.
 Stored Group+annotation writes, duplicate/return-receipt history and both-profile
 stored/private SVG/PNG now have bounded independent implementation PASS in
-source3f037ac, integrated as eb811ce. Fresh main24031 is RUNNING on that later
-frozen source, and its independent exact-integration audit PASS.
+source3f037ac, integrated as eb811ce, with independent exact-integration PASS.
+Main24031 stopped at95% during continuation without terminal result; it is not
+acceptance. Its preserved log SHA256 is120D1C5B3DFEEC40CFED1D716D7D8A4AD2BF65FD91AE4C27BB4578205021DDC8.
+Verified process absence/missing handle preceded the hidden continuation-safe
+rerun PID10628 (2026-10-05 20:34:55UTC), frozen eb811ce,
+log phase-3ab-stored-pair-full-sidecar-rerun.log. This rerun is RUNNING.
+Post-Group connector source4a11891 is isolated and still requires frozen final
+verification and independent acceptance; no integration or installer change.
 Post-Group connector and isolate/replace/morph consumers remain required before
 public/production admission. Trusted
 private snapshots must not become a caller-supplied public validation bypass.
