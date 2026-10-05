@@ -100,7 +100,7 @@ Exact integration and the fresh full frozen regression are complete for2c21c2c.
 Stored Group+annotation writes, duplicate/return-receipt history and both-profile
 stored/private SVG/PNG now have bounded independent implementation PASS in
 source3f037ac, integrated as eb811ce. Fresh main24031 is RUNNING on that later
-frozen source, and its independent exact-integration audit remains pending.
+frozen source, and its independent exact-integration audit PASS.
 Post-Group connector and isolate/replace/morph consumers remain required before
 public/production admission. Trusted
 private snapshots must not become a caller-supplied public validation bypass.

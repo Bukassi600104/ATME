@@ -5,7 +5,7 @@ Date: 2026-10-04–05
 Status: independent implementation audit PASS at source3f037ac; integrated into
 main as eb811ce, with documentation-only follow-through0398ed3. Primary exact
 source/test/schema/bench/report comparison and scoped Ruff PASS. Independent
-exact-integration audit is pending; fresh full main24031 RUNNING on frozen
+exact-integration audit PASS at main0398ed3/referenceade8e25; fresh full main24031 RUNNING on frozen
 eb811ce. No public Group,
 installed application, creative acceptance, Phase 3 or full-goal completion.
 The preceding source2c21c2c full main regression56029 is a separate frozen source
@@ -96,13 +96,13 @@ Portrait uses the independently placed paired fixture, not a landscape crop.
   log/pixel hashes and unchanged source/test/schema/bench tree. Final bounded
   implementation audit PASS, with8 representative independent tests passing in
   88.46s and scoped Ruff PASS. Primary exact integration comparison also PASS;
-  independent exact-integration audit and the new full result remain pending.
+  independent exact-integration audit also PASS. The new full result remains pending.
 
 ## Remaining acceptance
 
 Focused and broader frozen proof, unchanged offline frames, independent
 implementation re-audit and primary exact integration comparison are complete.
-Finish independent exact-integration audit and full main24031. This generated
+Independent exact-integration audit is complete; finish full main24031. This generated
 test log records its actual pytest exit status before the process completes,
 so resumed observation can retain both terminal result and exit status.
 Retain the offline and unchanged public annotation
@@ -112,3 +112,30 @@ still needs bound validation provenance before any public promotion.
 All other Phase3 primitives/actions and the approved R01–R15/Phase4–12 plan
 remain required. No production artwork or creative-style acceptance is inferred
 from these simple software-mechanics fixtures.
+
+## Independently mapped next hierarchy consumers
+
+These are remaining implementation requirements, not delivered functionality.
+
+1. Post-Group connector: extract shared non-SVG dynamic route/head/bounds
+   validation from `_connector_shape`; call it at each connection's exact captured
+   start in `_validate_pair_temporal`, and reuse it in paint. Static form and
+   relationship states already validate, but storage currently lacks this dynamic
+   geometry proof. Preserve existing Group/connector overlap rejection and public
+   Group gate. Prove transformed/nested endpoint chains, both profiles, bounds,
+   visibility/reveal failures, actual SVG/PNG seeks, stored no-return/A-B-A,
+   receipt versions, atomic stale rejection and duplicate parity.
+2. Post-Group replace/morph: sampled paint adjacency and co-parentage already
+   exist. Prove both directions/profiles, nested world co-location, intermediate
+   live/terminal paint slots, parent visibility, real pixels, receipt/duplicate
+   retention. Investigate remaining authored z-index comparisons using executable
+   cases; do not discard a semantic-layer invariant by assumption.
+3. Hierarchy-aware isolate: current container blanket prevents focus indirectly
+   dimming through an ancestor. Define protected focus ancestry/apertures and
+   maximal non-focus context roots; never dim ancestor and descendants twice.
+   Restore exact captured opacity/state and existing version semantics. Reject
+   undefined cross-focus connector/mask cases; prove Group-before/after/overlap,
+   both profiles, pixels, stored receipts and duplicates before removing blanket.
+
+This sequence does not waive any other Phase3 action/primitive, public render
+admission, validated compositor provenance or later approved phase exit.

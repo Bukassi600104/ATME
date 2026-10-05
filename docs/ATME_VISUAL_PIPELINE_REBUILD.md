@@ -231,7 +231,7 @@ and duplicate private offline pixel proof. Focused61 plus four no-return cases,
 the49-suite1,046-pass regression (five existing Windows symlink skips), scoped
 Ruff and independent bounded implementation audit PASS. All10+40 previous
 JSON/PNG hashes remain unchanged. Primary exact integration comparison is empty;
-independent exact-integration audit is pending. Fresh full main `24031` is RUNNING
+independent exact-integration audit PASS. Fresh full main `24031` is RUNNING
 on frozen `eb811ce`; previous1,318-pass full run covers only `2c21c2c`.
 The blanket causal paired storage rejection is removed, not the sampled history
 validators or public Group admission. Public preview/export, post-Group connector/
