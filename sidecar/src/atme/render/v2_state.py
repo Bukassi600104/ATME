@@ -33,6 +33,7 @@ from atme.render.v2_emphasis import (
 )
 from atme.render.v2_evidence_reading import validate_evidence_reading
 from atme.render.v2_hierarchy import HierarchySnapshot, UnsupportedHierarchy
+from atme.render.v2_isolation import UnsupportedIsolation, isolation_context_roots
 from atme.render.v2_lifecycle import (
     UnsupportedLifecycle,
     geometry_dependencies,
@@ -755,7 +756,9 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                         mutations = _action_object_references(other.action)
                     observed_hierarchy = replay.before_action(other.action.action_id).hierarchy
                     live_dependencies = geometry_dependencies(observed_hierarchy, {leader_id, *endpoint_ids})
-                    if live_dependencies.intersection(mutations):
+                    board_isolate = (isinstance(other.action, TargetAction) and other.action.verb == "isolate"
+                                     and other.action.board_id == action.board_id)
+                    if board_isolate or live_dependencies.intersection(mutations):
                         raise V2FrameError(
                             f"retained annotation pointer {leader_id} requires completed explicit removal before endpoint edits"
                         )
@@ -822,6 +825,11 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                 observed = {target, *(layout_objects[parent].mask_source_object_id
                             for parent in ancestors if isinstance(layout_objects[parent], MaskContainer))}
                 hold_end = item.end_ms + treatment.intent.readable_hold_intent_ms
+                if any(isinstance(other.action, TargetAction) and other.action.verb == "isolate"
+                       and other.action.board_id == action.board_id
+                       and other.start_ms < hold_end and item.start_ms < other.end_ms
+                       for other in timeline.actions):
+                    raise V2FrameError(f"evidence {target} readable insert and hold overlaps isolate")
                 validate_group_lifetime(context.objects, timeline.actions, observed, item.start_ms, hold_end,
                                         description=f"evidence {target} readable insert and hold")
                 for reading in lifecycle_samples(replay, item, hold_end):
@@ -912,11 +920,6 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                 raise V2FrameError(f"highlight {item.action.action_id} needs an active board")
             if isinstance(item.action, TargetAction) and item.action.verb == "isolate":
                 action = item.action
-                if any(isinstance(obj, ContainerObject) and obj.board_id == action.board_id
-                       for obj in layout.objects):
-                    raise V2FrameError(
-                        f"isolate {action.action_id} needs hierarchy-aware focus composition"
-                    )
                 if (action.expected_state, action.post_state) != ("visible", "visible"):
                     raise V2FrameError(
                         f"isolate {action.action_id} needs canonical visible-to-visible states"
@@ -930,14 +933,10 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                            and item.end_ms <= activation.end_ms
                            for activation in layout.activations):
                     raise V2FrameError(f"isolate {action.action_id} needs an active board")
-                focus_ids = set(action.target_ids)
-                if not any(
-                    obj.board_id == action.board_id and object_id not in focus_ids
-                    and completed_visible[object_id] and completed_opacity[object_id] > 0
-                    and completed_reveal[object_id] == 1.0
-                    for object_id, obj in layout_objects.items()
-                ):
-                    raise V2FrameError(f"isolate {action.action_id} needs visible secondary context")
+                try:
+                    isolation_context_roots(context.objects, sample.hierarchy, sampled, action)
+                except UnsupportedIsolation as exc:
+                    raise V2FrameError(str(exc)) from exc
             for target in item.action.target_ids:
                 obj = layout_objects[target]
                 if target in highlighted_targets:

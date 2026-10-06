@@ -30,6 +30,7 @@ from atme.render.v2_hierarchy_replay import (
     apply_hierarchy_step,
     completed_hierarchy_basis,
 )
+from atme.render.v2_isolation import UnsupportedIsolation, isolation_context_roots
 from atme.render.v2_morph import interpolate_geometry
 from atme.render.v2_return import UnsupportedReturn, validate_return_sample
 from atme.store.contracts_v2 import (
@@ -63,6 +64,7 @@ class CapturedAction:
     resolved_index: int
     resolved_json: str
     baseline: tuple[FrameObject, ...]
+    context_root_ids: tuple[str, ...] = ()
 
     @property
     def resolved(self) -> ResolvedAction:
@@ -206,16 +208,9 @@ def _sample_operator(capture: CapturedAction, at_ms: int, objects: dict) -> dict
                 reveal_fraction=1.0 if progress > 0 or completed else 0.0)
         return result
     if isinstance(action, TargetAction) and action.verb == "isolate":
-        if not completed:
-            for key, before in baseline.items():
-                if (before.board_id == action.board_id and key not in action.target_ids and before.visible
-                        and before.opacity > 0 and before.reveal_fraction == 1):
-                    result[key] = replace(before, opacity=before.opacity * _dim_ratio(progress))
-        else:
-            # Restore only context actually dimmed from this captured baseline.
-            result.update({key: before for key, before in baseline.items()
-                           if before.board_id == action.board_id and key not in action.target_ids
-                           and before.visible and before.opacity > 0 and before.reveal_fraction == 1})
+        for key in capture.context_root_ids:
+            before = baseline[key]
+            result[key] = before if completed else replace(before, opacity=before.opacity * _dim_ratio(progress))
         for key in action.target_ids:
             if completed:
                 result[key] = replace(baseline[key], state=action.post_state)
@@ -438,7 +433,13 @@ def replay_chronology(objects: dict, hierarchy: HierarchySnapshot, frames: dict,
         if phase == 2:
             sample = _sample_active(committed, tuple(active.values()), time, objects)
             _assert_start_state(resolved, sample, versions, hierarchy)
-            active[index] = CapturedAction(index, action_json[index], _ordered(sample))
+            context_roots = ()
+            if isinstance(action, TargetAction) and action.verb == "isolate":
+                try:
+                    context_roots = isolation_context_roots(objects, hierarchy, sample, action)
+                except UnsupportedIsolation as exc:
+                    raise ReplayError(str(exc)) from exc
+            active[index] = CapturedAction(index, action_json[index], _ordered(sample), context_roots)
         elif phase == 0:
             capture = active.pop(index)
             committed.update(_sample_operator(capture, time, objects))
