@@ -66,7 +66,10 @@ def test_evidence_hold_has_explicit_isolate_conflict_independent_of_opacity(tmp_
                 v2_state._validate_consumer_history(context)
         assert layout == original[0]
         if focus == "object-evidence":
-            with pytest.raises(V2FrameError, match="supported focus object"):
+            # During the hold its existing read-dependency diagnostic comes
+            # first. After the hold the unsupported focus-type gate is exposed.
+            match = "supported focus object" if after_hold else "uninterrupted readable insert and hold"
+            with pytest.raises(V2FrameError, match=match):
                 evaluate_frame(layout, timeline, 0)
     finally:
         service.store.close()

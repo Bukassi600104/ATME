@@ -58,9 +58,16 @@ connector/replacement full regression is a separate frozen source boundary.
    duplicate rebinding, atomic stale state/version rejection, offline SVG/PNG
    parity and unchanged source documents. Evidence-focus lifetime is an internal
    temporal-only probe; a separate public negative preserves its unsupported type.
-7. Scoped Ruff PASS. Corrected combined candidate/legacy Isolate/replay/evidence/
-   annotation verification is running; terminal result remains pending. Log
-   `phase-3ae-isolate-lifetime-hierarchy-combined.log`.
+7. Scoped Ruff PASS. Combined candidate/legacy Isolate/replay/evidence/annotation
+   run at01f9a2e completed:192 PASS/one assertion failure,222.41s. Log
+   `phase-3ae-isolate-lifetime-hierarchy-combined.log`. All runtime assertions
+   passed; the final public-negative assertion expected the unsupported focus
+   diagnostic during an evidence hold, where the existing read-dependency
+   diagnostic correctly has precedence. The corrected test preserves that order
+   and exposes the unsupported type separately after the hold. This failed run
+   is not overall acceptance; exact corrected frozen focused/broader runs remain.
+   Corrected lifetime8 PASS,30.14s; scoped Ruff PASS. No runtime change was needed
+   for this diagnostic-precedence assertion correction.
 
 ## Remaining acceptance
 
