@@ -205,3 +205,17 @@ validators or public Group admission. Public preview/export, post-Group connecto
 isolate/replace/morph, other Phase3 primitives/actions, compiler/installed and all
 Phase4–12 requirements remain. No v1/Caleb, schema, database, MCP or capability
 change; no creative or full Phase3 acceptance. See the stored-pair progress report.
+
+
+## Next isolated hierarchy consumer — 2026-10-06
+
+Hierarchy-aware Isolate candidate7832905 remains isolated, not integrated or
+installed. It captures maximal context roots from actual hierarchy, preserves
+focus/ancestor/mask alpha and exact restoration, and closes independently found
+retained-pointer/evidence-hold lifetime conflicts. First101 tests PASS; expanded
+fixture failures and the193-run diagnostic assertion failure are preserved as
+non-acceptance. Corrected lifetime8 PASS and scoped Ruff PASS;50 previous offline
+frame hashes unchanged. Frozen focused7388 and broader21112 workers are live;
+final independent correction audit and terminal results remain pending. Main's
+connector/replacement full worker20316 remains frozen at6c83b86 and independent
+of this candidate. Original public/installed/creative/Phase3/Phase4–12 gates remain.
