@@ -49,8 +49,11 @@ connector/replacement full regression is a separate frozen source boundary.
    than the required explicit reservation. Log
    `phase-3ae-isolate-lifetime-red-bound.log`. Earlier canonical-state probe errors
    were fixture binding errors, not lifetime evidence.
+   Correctly bound red log SHA256
+   `35DE55FBAA276ADB3A9075583834C38422D67815CDE92D0E2C22327F737CDF3A`.
 5. Dedicated aperture helper red:3 DID NOT RAISE failures/40 deselected,3.71s;
    log `phase-3ae-isolate-aperture-red.log`.
+   SHA256 `B9D57155F7B64F38ECDF476BD2AA50C1C987FAF7CE262BEDFF4C11FEEEEB26DE`.
 6. Corrected candidate adds43 hierarchy cases and8 lifetime cases. They cover
    protected partial alpha, mixed subtree and multifocus behavior, repeated exact
    restoration, hidden/zero parents, actual Group and ungroup in both profiles,
@@ -68,6 +71,16 @@ connector/replacement full regression is a separate frozen source boundary.
    is not overall acceptance; exact corrected frozen focused/broader runs remain.
    Corrected lifetime8 PASS,30.14s; scoped Ruff PASS. No runtime change was needed
    for this diagnostic-precedence assertion correction.
+   The failed193-run log SHA256 is
+   `B2E2C00DF21CC28828BBD0BD01C16E53EE2D9B0C97AF2F668D40889875E3C781`.
+8. Final corrected source783290536fb655ffa901aeaed8149b87ed9893d8 is frozen.
+   Hidden focused worker7388 started2026-10-06 11:19:33UTC, log
+   `phase-3ae-isolate-focused-frozen.log`; broader worker21112 started11:19:38UTC,
+   log `phase-3ae-isolate-v2-frozen.log`. Both live command lines and source/tests/
+   schema/bench freeze were verified; terminal results remain pending. Independent
+   correction re-audit requested and pending, not inferred from the prior PARTIAL.
+   Ten public and40 private offline annotation frames reproduced; all retained
+   JSON/PNG hashes remain byte-identical, with no bench or v1 source change.
 
 ## Remaining acceptance
 
