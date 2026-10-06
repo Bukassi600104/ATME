@@ -107,11 +107,12 @@ rerun PID10628 (2026-10-05 20:34:55UTC), frozen eb811ce,
 log phase-3ab-stored-pair-full-sidecar-rerun.log. This rerun PASSED:1,346 tests,
 five existing Windows symlink skips,2420.49s, terminal exit0; source freeze empty.
 Log SHA25633F5E96C65A3FDEAF3336CE8C8F73063A0BFA1F9F812CEF555256BC0B2368884.
-Isolated connector4a11891 now has focused151 and broader1,106 PASS with terminal
-exit0/five existing Windows symlink skips. Final independent evidence acceptance
-and exact integration remain pending. Test-only replacement724e7fc has draft60
-plus final chain8 PASS/bounded review PASS; tracked focused verification is running.
-No later source integration or installer change is claimed.
+Connector4a11891 focused151/broad1,106 PASS/five existing Windows symlink skips,
+tracked replacement724e7fc60 PASS and final independent source/evidence acceptance
+are integrated exactly as6c83b86. Independent integration audit and scoped Ruff PASS;
+all50 retained offline frame hashes unchanged. Combined main full worker20316 is
+running on frozen6c83b86 since2026-10-06 10:53:27UTC; terminal result pending.
+Log phase-3ad-group-connection-replacement-full-sidecar.log. No installer change.
 Post-Group connector and isolate/replace/morph consumers remain required before
 public/production admission. Trusted
 private snapshots must not become a caller-supplied public validation bypass.

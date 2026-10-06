@@ -115,11 +115,12 @@ are complete. The interrupted24031 run certifies nothing; its preserved log
 SHA256 is120D1C5B3DFEEC40CFED1D716D7D8A4AD2BF65FD91AE4C27BB4578205021DDC8.
 The hidden worker records source, start/end UTC and actual pytest exit status;
 its live process/command line, not a stale log alone, establishes a verified wait.
-Isolated connector4a11891 now has focused151 and broader1,106 PASS/five existing
-Windows symlink skips with terminal exit0; final independent evidence acceptance
-and exact integration remain pending. Reviewed replacement724e7fc has draft60
-plus final chain8 PASS/bounded test-design PASS; tracked focused verification is
-running. Neither later slice is integrated or installed yet.
+Connector4a11891 focused151/broad1,106 PASS/five existing Windows symlink skips,
+tracked replacement724e7fc60 PASS and final independent source/evidence acceptance
+are integrated exactly as6c83b86. Independent integration audit and scoped Ruff PASS;
+all50 retained offline frame hashes unchanged. Combined main full worker20316 is
+running on frozen6c83b86 since2026-10-06 10:53:27UTC; terminal result pending.
+Log phase-3ad-group-connection-replacement-full-sidecar.log. No installer change.
 Retain the offline and unchanged public annotation
 frame hashes. Stored proof does not admit public Group or resolve missing
 post-Group connector/isolate/replace/morph consumers. Trusted private painting
@@ -130,7 +131,9 @@ from these simple software-mechanics fixtures.
 
 ## Independently mapped next hierarchy consumers
 
-These are remaining implementation requirements, not delivered functionality.
+The first two mapped slices now have bounded source acceptance and exact main
+integration; the combined full-main gate is running. The third remains to implement.
+These are not public, installed or creative acceptance claims.
 
 1. Post-Group connector: extract shared non-SVG dynamic route/head/bounds
    validation from `_connector_shape`; call it at each connection's exact captured

@@ -8,7 +8,8 @@ Status: reviewed test-only candidate promoted to the tracked isolated suite
 PASS regressions (five existing Windows symlink skips). Draft verification happened
 outside that acceptance inventory at `sidecar/test-artifacts/test_group_replacement_candidate.py`.
 The tracked promotion changes only the module docstring, not behavior. It is not
-integrated into main, published, installed or part of the older connector result.
+part of the older connector result. It was subsequently integrated exactly into
+main6c83b86, with independent exact-integration PASS; it is not installed.
 No new runtime/schema/compiler/public capability has been added by this draft.
 
 ## Independent design findings
@@ -106,7 +107,11 @@ Final independent connector evidence review PASS; unchanged production from4a
 through724 preserves focused151/broad1,106 evidence. The auditor explicitly accepts
 exact integration audit plus a fresh combined main full regression as the remaining
 whole-suite gate, without repeating an unchanged-production isolated broad run.
-Retain exact main integration/full regression evidence. Public Group admission, compiler,
+Exact main integration audit PASS at6c83b86, with scoped Ruff and50 unchanged
+offline frame hashes. Fresh combined full-main worker20316 is running since
+2026-10-06 10:53:27UTC, frozen6c83b86; terminal result pending. Log
+`phase-3ad-group-connection-replacement-full-sidecar.log`.
+Retain full regression evidence. Public Group admission, compiler,
 installed renderer and creative/Caleb quality gates remain closed. This proof does
 not complete hierarchy-aware isolate, remaining Phase3 primitives/actions or any
 Phase4–12 requirement from the original approved rebuild plan.

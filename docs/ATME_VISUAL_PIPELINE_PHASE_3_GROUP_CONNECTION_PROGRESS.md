@@ -113,8 +113,12 @@ connector candidate.
 - Focused/broader candidate evidence is complete; final independent evidence
   acceptance PASS on2026-10-05 after verification of both terminal logs, exact
   hashes and unchanged production through724e7fc. This is bounded source acceptance.
-- Exact main integration audit and full main regression before release claims.
-- Subsequent post-Group replace/morph and hierarchy-aware isolate consumers.
+- Exact main integration audit PASS at6c83b86; scoped Ruff PASS and50 reproduced
+  offline frame hashes unchanged. Fresh frozen combined main full worker20316 is
+  running since2026-10-06 10:53:27UTC; terminal result pending. Log
+  `phase-3ad-group-connection-replacement-full-sidecar.log`.
+- Post-Group replacement/morph tracked60 proof is integrated; hierarchy-aware
+  isolate remains. No release/installed acceptance is inferred from these slices.
 - Bound validated sampling bundle/public Group/compiler/installed production
   acceptance, remaining Phase 3 scope and Phases 4–12. These mechanical fixtures
   do not establish illustration/Caleb visual quality acceptance.

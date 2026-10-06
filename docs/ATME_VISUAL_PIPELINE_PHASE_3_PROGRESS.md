@@ -657,12 +657,17 @@ five existing Windows symlink skips,2420.49s, explicit terminal exit0 at2026-10-
 21:15:23UTC. Log `phase-3ab-stored-pair-full-sidecar-rerun.log`, SHA256
 `33F5E96C65A3FDEAF3336CE8C8F73063A0BFA1F9F812CEF555256BC0B2368884`.
 Final source/tests/schema/bench freeze is empty. Previous1,318-pass full run
-covers only `2c21c2c`. Isolated connector `4a11891` now has focused151 and
-broader1,106 PASS/five existing Windows symlink skips with terminal exit0;
-final independent evidence acceptance and main integration remain pending.
-Reviewed test-only replacement/morph slice `724e7fc` has draft60 plus final
-chain8 PASS and bounded test-design PASS; tracked focused verification is running.
-Neither later slice has been integrated or installed.
+covers only `2c21c2c`. Connector `4a11891` has focused151 and broader1,106
+PASS/five existing Windows symlink skips with explicit exit0; final independent
+source/evidence acceptance PASS. Replacement/morph tracked724e7fc has60 PASS,
+160.34s, explicit exit0, log SHA256
+`4E9E38AEB3B8B309562071A3D52978070B264825F53DC10C36F2F2DFFD42D328`.
+Both are integrated exactly as main `6c83b86ef9441603bade71ca51844254e62df996`;
+independent exact-integration PASS, scoped Ruff PASS. All10public+40private
+annotation JSON/PNG hashes reproduced unchanged. Hidden full main worker20316
+started2026-10-06 10:53:27UTC at frozen6c83b86; log
+`phase-3ad-group-connection-replacement-full-sidecar.log`. Verified live worker/
+command line; terminal combined result remains pending. Neither slice is installed.
 The blanket causal paired storage rejection is removed, not the sampled history
 validators or public Group admission. Public preview/export, post-Group connector/
 isolate/replace/morph, other Phase3 primitives/actions, compiler/installed and all
