@@ -438,9 +438,12 @@ source/evidence acceptance PASS. Replacement/morph tracked724e7fc has60 PASS,
 Both are integrated exactly as main `6c83b86ef9441603bade71ca51844254e62df996`;
 independent exact-integration PASS, scoped Ruff PASS. All10public+40private
 annotation JSON/PNG hashes reproduced unchanged. Hidden full main worker20316
-started2026-10-06 10:53:27UTC at frozen6c83b86; log
-`phase-3ad-group-connection-replacement-full-sidecar.log`. Verified live worker/
-command line; terminal combined result remains pending. Neither slice is installed.
+completed at frozen6c83b86:1,466 PASS/five existing Windows symlink skips,2779.95s,
+explicit exit0 at2026-10-06 11:40:14UTC. Log
+`phase-3ad-group-connection-replacement-full-sidecar.log`, SHA256
+`4C41F4764D812C07A2322FC3C91033234958CF575FB2245BDEF4560AACA328D4`.
+Final source/tests/schema/bench freeze empty; worker absence verified. This is the
+connector/replacement source boundary, not later Isolate or installed acceptance.
 The blanket causal paired storage rejection is removed, not the sampled history
 validators or public Group admission. Public preview/export, post-Group connector/
 isolate/replace/morph, other Phase3 primitives/actions, compiler/installed and all

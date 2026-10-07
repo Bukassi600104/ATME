@@ -114,9 +114,12 @@ connector candidate.
   acceptance PASS on2026-10-05 after verification of both terminal logs, exact
   hashes and unchanged production through724e7fc. This is bounded source acceptance.
 - Exact main integration audit PASS at6c83b86; scoped Ruff PASS and50 reproduced
-  offline frame hashes unchanged. Fresh frozen combined main full worker20316 is
-  running since2026-10-06 10:53:27UTC; terminal result pending. Log
-  `phase-3ad-group-connection-replacement-full-sidecar.log`.
+  offline frame hashes unchanged. Fresh frozen combined main full worker20316
+  PASSED at6c83b86:1,466 PASS/five existing Windows symlink skips,2779.95s,
+  explicit exit0 at2026-10-06 11:40:14UTC. Log
+  `phase-3ad-group-connection-replacement-full-sidecar.log`, SHA256
+  `4C41F4764D812C07A2322FC3C91033234958CF575FB2245BDEF4560AACA328D4`.
+  Final source freeze empty and worker absent; no later-source certification.
 - Post-Group replacement/morph tracked60 proof is integrated; hierarchy-aware
   isolate remains. No release/installed acceptance is inferred from these slices.
 - Bound validated sampling bundle/public Group/compiler/installed production

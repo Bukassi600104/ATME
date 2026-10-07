@@ -110,9 +110,12 @@ Log SHA25633F5E96C65A3FDEAF3336CE8C8F73063A0BFA1F9F812CEF555256BC0B2368884.
 Connector4a11891 focused151/broad1,106 PASS/five existing Windows symlink skips,
 tracked replacement724e7fc60 PASS and final independent source/evidence acceptance
 are integrated exactly as6c83b86. Independent integration audit and scoped Ruff PASS;
-all50 retained offline frame hashes unchanged. Combined main full worker20316 is
-running on frozen6c83b86 since2026-10-06 10:53:27UTC; terminal result pending.
-Log phase-3ad-group-connection-replacement-full-sidecar.log. No installer change.
+all50 retained offline frame hashes unchanged. Combined main full worker20316
+PASSED on frozen6c83b86:1,466 PASS/five existing Windows symlink skips,2779.95s,
+explicit exit0 at2026-10-06 11:40:14UTC. Log
+phase-3ad-group-connection-replacement-full-sidecar.log, SHA256
+4C41F4764D812C07A2322FC3C91033234958CF575FB2245BDEF4560AACA328D4.
+Source freeze empty and worker absent. No later Isolate or installer acceptance.
 Post-Group connector and isolate/replace/morph consumers remain required before
 public/production admission. Trusted
 private snapshots must not become a caller-supplied public validation bypass.

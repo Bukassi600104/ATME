@@ -197,9 +197,12 @@ source/evidence acceptance PASS. Replacement/morph tracked724e7fc has60 PASS,
 Both are integrated exactly as main `6c83b86ef9441603bade71ca51844254e62df996`;
 independent exact-integration PASS, scoped Ruff PASS. All10public+40private
 annotation JSON/PNG hashes reproduced unchanged. Hidden full main worker20316
-started2026-10-06 10:53:27UTC at frozen6c83b86; log
-`phase-3ad-group-connection-replacement-full-sidecar.log`. Verified live worker/
-command line; terminal combined result remains pending. Neither slice is installed.
+completed at frozen6c83b86:1,466 PASS/five existing Windows symlink skips,2779.95s,
+explicit exit0 at2026-10-06 11:40:14UTC. Log
+`phase-3ad-group-connection-replacement-full-sidecar.log`, SHA256
+`4C41F4764D812C07A2322FC3C91033234958CF575FB2245BDEF4560AACA328D4`.
+Final source/tests/schema/bench freeze empty; worker absence verified. This is the
+connector/replacement source boundary, not later Isolate or installed acceptance.
 The blanket causal paired storage rejection is removed, not the sampled history
 validators or public Group admission. Public preview/export, post-Group connector/
 isolate/replace/morph, other Phase3 primitives/actions, compiler/installed and all
@@ -209,13 +212,15 @@ change; no creative or full Phase3 acceptance. See the stored-pair progress repo
 
 ## Next isolated hierarchy consumer — 2026-10-06
 
-Hierarchy-aware Isolate candidate7832905 remains isolated, not integrated or
+Hierarchy-aware Isolate candidatea74526f remains isolated, not integrated or
 installed. It captures maximal context roots from actual hierarchy, preserves
 focus/ancestor/mask alpha and exact restoration, and closes independently found
-retained-pointer/evidence-hold lifetime conflicts. First101 tests PASS; expanded
-fixture failures and the193-run diagnostic assertion failure are preserved as
-non-acceptance. Corrected lifetime8 PASS and scoped Ruff PASS;50 previous offline
-frame hashes unchanged. Frozen focused7388 and broader21112 workers are live;
-final independent correction audit and terminal results remain pending. Main's
-connector/replacement full worker20316 remains frozen at6c83b86 and independent
-of this candidate. Original public/installed/creative/Phase3/Phase4–12 gates remain.
+retained-pointer/evidence-hold lifetime conflicts. Frozen7832905 focused193 and
+broader1,217 PASS/five existing Windows symlink skips, explicit exit0; freeze/log
+hashes and worker absence verified. Added cross-board/two-mask3 cases and hardened
+stored4 cases PASS; independent bounded implementation/evidence audit PASS,
+including its independent7-case rerun56.44s. Production unchanged after783; final
+tracked focused worker18172 is running on exacta74526f.50 old offline hashes stay
+identical. Main's connector/replacement full1,466 PASS covers only6c83b86. Exact
+Isolate integration/full regression remain; no public/installed/creative/Phase3/
+Phase4–12 gate is waived.
