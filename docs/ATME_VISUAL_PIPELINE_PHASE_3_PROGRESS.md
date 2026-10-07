@@ -692,3 +692,21 @@ tracked focused worker18172 is running on exacta74526f.50 old offline hashes sta
 identical. Main's connector/replacement full1,466 PASS covers only6c83b86. Exact
 Isolate integration/full regression remain; no public/installed/creative/Phase3/
 Phase4–12 gate is waived.
+
+
+## Hierarchy-aware Isolate integration checkpoint — 2026-10-07
+
+Mainf97a850 integrates the exact independently accepted isolatedd152a43 result:
+actual sampled focus/ancestor/aperture protection, maximal single-dim context roots,
+exact transient restoration and focus-only versions, readable-hold/retained-pointer
+conflicts, cross-board independence and nested-mask closure. Frozen193/1,217 proof
+(five existing Windows skips in the broader run), final tracked196 PASS and an
+independent7-case rerun56.44s certify the bounded source/test slices. Independent
+exact-integration audit and scoped Ruff PASS;50 previous offline hashes unchanged.
+Final196 log SHA2567B60B49EECC313C6727BE30E85F5F0E10CF5D6CCBD305FCFEB6CC46228762970.
+Fresh hidden full worker17772 is running on frozenf97a850, started2026-10-07
+22:36:29UTC; log phase-3ae-hierarchy-isolate-full-sidecar.log, terminal pending.
+The old1,466-pass main run covers only6c83b86, not this later source. Public Group/
+validated compositor provenance, all remaining Phase3 primitives/actions and
+Phase4–12 gates remain. No installed rebuild or creative-quality acceptance.
+See the Isolate progress report and independently cross-referenced Count/Split map.

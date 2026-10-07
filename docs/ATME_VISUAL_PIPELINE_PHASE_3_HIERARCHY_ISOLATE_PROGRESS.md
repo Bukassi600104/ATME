@@ -2,7 +2,8 @@
 
 Date: 2026-10-06
 
-Status: isolated candidate; not integrated, published or installed. The original
+Status: integrated source f97a850 after exact independent integration PASS;
+fresh full-main regression is running, not installed acceptance. The original
 Phase3/R01–R15/Phase4–12 scope and public Group gate remain unchanged. Main's
 connector/replacement full regression is a separate frozen source boundary.
 
@@ -128,7 +129,12 @@ connector/replacement full regression is a separate frozen source boundary.
 
 Frozen193/1,217 matrices and independent implementation re-audit are complete.
 Final tracked focused proof and independent evidence acceptance are complete.
-Finish exact main integration audit and fresh combined main suite.
+Exact main integration audit PASS atf97a850f13777aa9c18fa78033f8301103bf6523,
+byte-identical to isolatedd152a43 across audited source/tests/schema/bench/report.
+Scoped Ruff PASS. Hidden full-main worker17772 started2026-10-07 22:36:29UTC,
+frozenf97a850; log `phase-3ae-hierarchy-isolate-full-sidecar.log`. Verified live
+worker creation time/command line and source freeze; terminal result pending.
+Old1,466 PASS covers only6c83b86. Finish the fresh combined main suite.
 Evidence-hold cross-board overlap is impossible under the existing single-active
 board contract: its hold must fit A's activation and activations cannot overlap.
 Do not invent an invalid concurrent-board fixture to claim that acceptance.
