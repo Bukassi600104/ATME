@@ -107,12 +107,28 @@ connector/replacement full regression is a separate frozen source boundary.
     Scoped Ruff PASS. Production source/schema/bench remain identical to783.
     These additions were not present in the older193/1,217 collection. Final
     tracked focused verification and independent added-proof acceptance remain.
+11. Final tracked focused worker18172 completed on exacta74526f:196 PASS,
+    223.27s, explicit exit0 at2026-10-07 08:29:06UTC. Log
+    `phase-3ae-isolate-focused-final.log`, SHA256
+    `7B60B49EECC313C6727BE30E85F5F0E10CF5D6CCBD305FCFEB6CC46228762970`.
+    Source/tests/schema/bench freeze remained empty afterward. PID18172 was later
+    reused by an unrelated command; its new creation time/command line is not the
+    original regression worker and was left untouched.
+    Independent bounded implementation/evidence acceptance PASS, including an
+    independent7-case rerun56.44s of the promoted proof and hardened stored tests.
+    Corrected extra3 log SHA256
+    `228C145E47B32ACDA6D7563AF779CE838746021D3B51AA72724D11BC8733510D`;
+    tracked extra7 log SHA256
+    `3326ACB7C0B01585C0169D7A185DDD3FAAC6B640B25FA572B9EAA80A5D4D0B6A`.
+    Auditor accepts existing1,217 broad proof plus final tracked196 and exact
+    integration/fresh main full suite; production unchanged after783 means no
+    repeated unchanged-production isolated broad run is needed.
 
 ## Remaining acceptance
 
 Frozen193/1,217 matrices and independent implementation re-audit are complete.
-Finish final tracked focused proof/independent evidence acceptance for the added
-test-only assertions, exact main integration audit and fresh combined main suite.
+Final tracked focused proof and independent evidence acceptance are complete.
+Finish exact main integration audit and fresh combined main suite.
 Evidence-hold cross-board overlap is impossible under the existing single-active
 board contract: its hold must fit A's activation and activations cannot overlap.
 Do not invent an invalid concurrent-board fixture to claim that acceptance.
