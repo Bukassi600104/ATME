@@ -77,17 +77,46 @@ connector/replacement full regression is a separate frozen source boundary.
    Hidden focused worker7388 started2026-10-06 11:19:33UTC, log
    `phase-3ae-isolate-focused-frozen.log`; broader worker21112 started11:19:38UTC,
    log `phase-3ae-isolate-v2-frozen.log`. Both live command lines and source/tests/
-   schema/bench freeze were verified; terminal results remain pending. Independent
-   correction re-audit requested and pending, not inferred from the prior PARTIAL.
+   schema/bench freeze were verified. Both completed with explicit exit0: focused
+   193 PASS,291.72s,2026-10-06 11:24:27UTC; broader1,217 PASS/five existing Windows
+   symlink skips,1732.55s,11:48:33UTC. End source/tests/schema/bench freeze and
+   worker absence were verified before adding the later test-only proof.
+   Focused log SHA256
+   `FFE8DAC2B7CFA836540E74ABE9F72628C730FD7205918E0145C8C6B1C9F07E83`;
+   broader log SHA256
+   `6BADA5F795EFF31E1570A9041F8B2A068D077E2E05D6AD9E7D7FD61E2031A601`.
+   Independent frozen implementation re-audit PASS; no runtime defect remains.
+   Final evidence acceptance requested three additional cross-board/nested-mask
+   cases. No implementation change was requested by this follow-through.
    Ten public and40 private offline annotation frames reproduced; all retained
    JSON/PNG hashes remain byte-identical, with no bench or v1 source change.
+9. Additional proof was authored outside the frozen test inventory in
+   `test-artifacts/test_isolate_acceptance_candidate.py`. One nested-mask case
+   passed initially; two B-board cases initially omitted the Isolate action's
+   B board ID and were correctly rejected for crossing ownership. Correcting
+   only that fixture field gives3 PASS,25.90s, draft SHA256
+   `E100B82A849F6B1CC6BAA881DFC73D9E8F2470E349AB3B63CCF12C8D980C7997`.
+   Promoted to `tests/test_v2_isolate_acceptance.py` with docstring/import-format
+   changes only. It proves retained A pointer frames/versions stay exact during
+   an actual later B activation, and two nested focus masks preserve both sources
+   and ancestor chains with SVG/PNG restoration and random seek parity.
+10. Stored original/duplicate tests now explicitly assert output profiles,
+    narrative/timing media IDs/hashes/revisions, plan/layout revisions and IDs,
+    cleaned authority revisions/fingerprints and compilation fingerprints.
+    The added3 plus hardened stored4 tests PASS:7 PASS/39 deselected,60.52s.
+    Scoped Ruff PASS. Production source/schema/bench remain identical to783.
+    These additions were not present in the older193/1,217 collection. Final
+    tracked focused verification and independent added-proof acceptance remain.
 
 ## Remaining acceptance
 
-Complete the corrected combined matrix, independent frozen re-audit, full broader
-isolated regression, exact main integration audit and fresh combined main suite.
-Cross-board reservation independence and remaining mask/focus matrix evidence
-must be checked explicitly before the bounded gate closes. Retain previous offline
+Frozen193/1,217 matrices and independent implementation re-audit are complete.
+Finish final tracked focused proof/independent evidence acceptance for the added
+test-only assertions, exact main integration audit and fresh combined main suite.
+Evidence-hold cross-board overlap is impossible under the existing single-active
+board contract: its hold must fit A's activation and activations cannot overlap.
+Do not invent an invalid concurrent-board fixture to claim that acceptance.
+Retain previous offline
 frame hashes. No compositor caller-snapshot bypass, public Group admission,
 compiler capability promotion, installed app or creative-style acceptance is
 implied. All other remaining Phase3 actions/primitives and later phase exits remain.

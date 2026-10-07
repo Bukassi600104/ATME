@@ -14,7 +14,8 @@ from test_v2_group_replacement import grouped_replacement_documents
 from test_v2_mask_contract import masked_documents
 from v2_fixtures import digest
 
-from atme.project_service import ProjectError
+from atme.narrative_source import describe
+from atme.project_service import ProjectError, _resolved_compilation_fingerprint
 from atme.render import v2_svg
 from atme.render.v2_hierarchy import HierarchySnapshot
 from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
@@ -287,7 +288,27 @@ def test_real_stored_isolate_return_and_duplicate_restore_exact_context(tmp_path
         assert copied["resolved_timeline"]["actions"] == originals["resolved_timeline"]["actions"]
         for current, documents in ((updated, originals), (duplicate, copied)):
             plan, layout_doc, resolved_doc = (documents[kind] for kind in ("storyboard", "layout", "resolved_timeline"))
-            assert all(doc["project_id"] == current["project_id"] for doc in documents.values())
+            current_id = current["project_id"]
+            assert all(doc["project_id"] == current_id for doc in documents.values())
+            current_source = service.source_timeline.get(current_id)
+            actual_authority = describe(service, current_id)
+            media = actual_authority["timing_authority"]["media"]
+            authority = plan["narrative_authority"]
+            assert authority["mode"] == "approved_script_plus_recording"
+            assert authority["authority_id"] == f"script-revision-{actual_authority['semantic_structure']['revision']}"
+            assert authority["timing_media_id"] == media["media_id"]
+            assert authority["timing_media_sha256"] == media["sha256"]
+            assert media["revision"] == describe(service, pid)["timing_authority"]["media"]["revision"]
+            assert resolved_doc["plan_revision"] == layout_doc["plan_revision"] == service.artifact(current_id, "storyboard")["revision"]
+            assert resolved_doc["layout_revision"] == service.artifact(current_id, "layout")["revision"]
+            assert resolved_doc["plan_id"] == layout_doc["plan_id"] == plan["plan_id"]
+            assert resolved_doc["layout_id"] == layout_doc["layout_id"]
+            assert resolved_doc["output_profile"] == layout_doc["output_profile"] == plan["output_profile"]
+            assert resolved_doc["output_profile"]["profile_id"] == current["profile"]
+            assert resolved_doc["cleaned_timeline_revision"] == authority["cleaned_timeline_revision"] == current_source["timeline_revision"]
+            assert resolved_doc["cleaned_timeline_fingerprint"] == authority["cleaned_timeline_fingerprint"] == digest(current_source["document"])
+            assert resolved_doc["compilation_fingerprint"] == _resolved_compilation_fingerprint(resolved_doc)
+            assert current_source["document"] == source["document"]
             assert layout_doc["plan_sha256"] == resolved_doc["plan_sha256"] == digest(plan)
             assert resolved_doc["layout_sha256"] == digest(layout_doc)
             assert resolved_doc["cleaned_timeline_fingerprint"] == digest(
