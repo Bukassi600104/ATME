@@ -340,3 +340,13 @@ retained. The full main run is LIVE at frozenfc480037, actual pytestPID19188,
 created21:53:54UTC,1,658 tests collected; terminal outcome pending. No public v2
 or Count installation, creative-quality/full-Phase3/Phase4–12 acceptance is claimed.
 See the Count progress report for exact immutable evidence and remaining gates.
+
+## Count frozen-main regression outcome — 2026-10-09
+
+The frozenfc480037 main suite finished1,653 passed/five existing symlink/redirect
+skips,4279.28s, explicit root/pytest exit0. Source/tests/schemas/bench are unchanged;
+Count progress record33 retains three log hashes and947 diagnostic raster calls.
+Original native faults, production locking, public/installed/creative/full-Phase3
+and Phase4–12 gates remain. Fresh independent terminal review is pending at the
+auditor's usage limit. Split still needs written-contract approval and execution
+planning; no Split product code, installer or capability advertisement was added.

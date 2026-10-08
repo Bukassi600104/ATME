@@ -12,8 +12,9 @@ be advertised as executable merely because their verb names parse today.
 - `count` now has explicit numeric policy, immutable sampled text/rational content,
   static/temporal consumers, glyph preflight and chronological/SVG execution at
   main `fc480037`. Corrected clean338 and independent bounded integration audits
-  passed; all50 old offline hashes remain unchanged. Fresh full main verification
-  and original native reliability remain open. This is not installed/public
+  passed; all50 old offline hashes remain unchanged. Frozen full main verification
+  passed1,653 tests/five skips,4279.28s, exit0. Original native reliability and fresh
+  independent terminal-evidence review remain open. This is not installed/public
   Count or full-Phase3 acceptance; see the Count progress report.
 - `split` is a `GroupAction` literal, but hierarchy contract validation rejects
   Split policies and chronological replay supports only actual Group/ungroup.

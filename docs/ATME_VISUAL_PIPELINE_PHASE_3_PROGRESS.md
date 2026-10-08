@@ -757,3 +757,14 @@ retained. The full main run is LIVE at frozenfc480037, actual pytestPID19188,
 created21:53:54UTC,1,658 tests collected; terminal outcome pending. No public v2
 or Count installation, creative-quality/full-Phase3/Phase4–12 acceptance is claimed.
 See the Count progress report for exact immutable evidence and remaining gates.
+
+## Count frozen-main regression outcome — 2026-10-09
+
+The formerly live fc480037 worker19188 completed:1,653 passed, five existing
+directory-symlink/ancestor-redirect skips,4279.28s, explicit root/pytest exit0.
+Source/tests/schemas/bench stayed frozen and exact. The diagnostic session records
+947 raster calls. Count progress record33 retains all three terminal log hashes.
+This closes the main regression checkpoint, not original native reliability,
+production dependency locking, public/installed/creative/full-Phase3 or Phase4–12
+acceptance. Fresh independent terminal-evidence review is pending because the
+auditor reached its usage limit. No Split runtime implementation was added.

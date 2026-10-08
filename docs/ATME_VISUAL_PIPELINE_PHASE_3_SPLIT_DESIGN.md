@@ -294,8 +294,9 @@ policy also preserve the broader approved matrix.
 This is a main-agent written-contract correction, not independent acceptance or
 runtime proof. The auditor reached its account usage limit after providing those
 findings; fresh independent review remains pending. No Split product/schema/test
-code was changed. The full main Count regression continues against frozen source
-`fc480037af0d4d6447559c8ab6d88cf067a39eda`; these documentation edits do not change it.
+code was changed. The full main Count regression ran against frozen source
+`fc480037af0d4d6447559c8ab6d88cf067a39eda` and subsequently completed1,653 passed,
+five skipped, exit0; see Count progress record33. This is not Split acceptance.
 
 Review this written contract for phase/state/identity/coverage fidelity and family
 scope. After approval, write the task-by-task implementation plan using the existing

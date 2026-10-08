@@ -733,6 +733,8 @@ Schema/provenance validation is deterministic, never internal research/verificat
 
 Independent functional/promotion/exact-main audits PASS and corrected clean338
 source tests PASS. All50 earlier offline hashes are unchanged. Mainfc480037's fresh
-full run is pending. Original native reliability remains unresolved; public v2,
+full run passed1,653 tests/five existing symlink skips,4279.28s, explicit exit0.
+Fresh independent terminal-evidence review is pending due to the auditor's usage
+limit. Original native reliability remains unresolved; public v2,
 renderer capability, frozen/installed, compiler/creative-quality/full-Phase3 and
 Phase4–12 gates remain open. These semantics do not authorize a final release.

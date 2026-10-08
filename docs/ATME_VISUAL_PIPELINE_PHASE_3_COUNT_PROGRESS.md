@@ -4,7 +4,8 @@ Date: 2026-10-08
 
 Status: non-release Count development-source integration checkpoint. Exact
 isolated/main source/test/schema equality and scoped Ruff/schema checks passed;
-fresh full main verification remains; independent exact-integration review PASS.
+fresh frozen full main regression PASS (1,653 passed, five skipped, exit0);
+independent exact-integration review PASS. Original native reliability stays open.
 Count is not advertised, installed or a complete Count/Phase3 gate. Main's
 hierarchy-aware Isolate full regression passed
 1,520 tests/five existing Windows symlink skips,2866.49s, explicit exit0 at
@@ -383,12 +384,39 @@ Count is a later isolated source boundary and is not certified by that main run.
     certifies onlyf97; clean338 certifies only the bounded Count checkpoint.
     Independent PASS is not native/release/installed/full-Phase3 acceptance.
 
+33. Frozen full main verification completed on2026-10-09 (Africa/Lagos):
+    `python.exe -m pytest -o addopts= -vv -p atme_native_diagnostics` collected
+    1,658 tests and finished **1,653 passed, five skipped in4279.28s**, explicit
+    `FULL_MAIN_EXIT=0`. Debugger events independently record pytestPID19188 and
+    launcher/parent exit0; the pytest worker is no longer live. Source/tests/
+    schemas/bench still match frozenfc480037af0d4d6447559c8ab6d88cf067a39eda exactly.
+    The five skips are the existing directory-symlink/ancestor-redirect evidence
+    cases; their helper skips when directory symlinks are unavailable. This run
+    does not prove those skipped cases. Diagnostic session_finish records exit0,
+    947 raster calls and resvg loaded; no invalid-XML/control-character raster
+    inputs or raster-failure/fatal-capture/timeout markers were found in these logs.
+    Immutable private evidence:
+    - `sidecar/test-artifacts/native-main-count-full/child.log` SHA256
+      `A94D1CEA2366C2373CFED20199A0A87575C1D20E66F4FBAA6E7AC1477F6B1728`.
+    - `sidecar/test-artifacts/native-main-count-full/events.jsonl` SHA256
+      `35708659D6B01DCD3A4721EDE67F790EAE85950CA82A94541D3FF557E9AB2658`.
+    - `sidecar/test-artifacts/native-main-count-full.jsonl` SHA256
+      `BAF7B76B05FCC419FF4F086765AD5C323AE4491B09B05267260F3570A8EFD061`.
+    This closes the frozen-main regression checkpoint only, not the original
+    resvg XML/execute-AV investigation. It is bounded non-reproduction evidence,
+    not a native fix, reproducible production lock, installed app or creative
+    acceptance. Fresh independent review of this terminal evidence is pending:
+    the auditor reached its usage limit after its Split design findings. Prior
+    bounded Count functional/promotion/exact-integration audits remain valid;
+    none is relabelled as a fresh terminal-run audit.
+
 ## Remaining implementation and acceptance
 
 Bounded Count functional assertions are now independently closed and the promoted
-tracked41 verification passed. Native failure investigation, reproducible native
-dependency locking, fresh main source freeze/regressions and independent exact
-main audit remain. Retain all50 earlier offline frame hashes.
+tracked41 verification passed. Exact independent main integration and the frozen
+full-main regression passed. Native failure investigation, reproducible production
+dependency locking and fresh independent terminal-evidence review remain. Retain
+all50 earlier offline frame hashes and every original failure artifact.
 Do not advertise/install Count or clear the native failures from a later green
 retry alone. Split, public Group/validated compositor provenance, remaining
 Phase3, compiler/director/MCP/quality/frozen-install and Phase4–12 scope stay open.
