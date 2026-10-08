@@ -287,9 +287,27 @@ conflicts, cross-board independence and nested-mask closure. Frozen193/1,217 pro
 independent7-case rerun56.44s certify the bounded source/test slices. Independent
 exact-integration audit and scoped Ruff PASS;50 previous offline hashes unchanged.
 Final196 log SHA2567B60B49EECC313C6727BE30E85F5F0E10CF5D6CCBD305FCFEB6CC46228762970.
-Fresh hidden full worker17772 is running on frozenf97a850, started2026-10-07
-22:36:29UTC; log phase-3ae-hierarchy-isolate-full-sidecar.log, terminal pending.
-The old1,466-pass main run covers only6c83b86, not this later source. Public Group/
+Fresh hidden full worker17772 PASSED on frozenf97a850:1,520 PASS/five existing
+Windows symlink skips,2866.49s, explicit exit0 at2026-10-07 23:24:43UTC. Log
+phase-3ae-hierarchy-isolate-full-sidecar.log, SHA256
+44C2FB1B56733096B4DF94DB7940FCE0975123CCB14224108A0B0F9FAF512CAD.
+Final source/tests/schema/bench freeze empty and original worker stopped. The old
+1,466-pass run covers only6c83b86; no later Count source is certified. Public Group/
 validated compositor provenance, all remaining Phase3 primitives/actions and
 Phase4–12 gates remain. No installed rebuild or creative-quality acceptance.
 See the Isolate progress report and independently cross-referenced Count/Split map.
+
+
+## Next isolated Count consumer — 2026-10-08
+
+Isolated9914a8c implements explicit decimal policy, exact integer-clock steps,
+Count-only immutable text/rational provenance and canonical visible→visible state.
+Independent pre-freeze FAIL exposed rounded numeric-chain discontinuity, ignored
+step easing and non-Count frame serialization drift; all are reproduced and
+corrected, not hidden by new goldens. Corrected Count/replay124 PASS includes all
+27 untouched legacy frame/SVG/PNG families; migration/read/new-write4 PASS and
+scoped Ruff PASS. Two schemas are extended without rewriting legacy examples.
+Frozen initial focused worker38448 is running; correction re-audit and the full
+Count matrix/Group/attention/glyph/store/return/duplicate/offline proofs remain.
+No Count integration, advertisement, installation or full-Phase3 claim. The approved
+R01–R15/Phase4–12 scope is unchanged.

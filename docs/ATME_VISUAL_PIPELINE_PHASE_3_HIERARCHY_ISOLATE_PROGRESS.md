@@ -133,8 +133,13 @@ Exact main integration audit PASS atf97a850f13777aa9c18fa78033f8301103bf6523,
 byte-identical to isolatedd152a43 across audited source/tests/schema/bench/report.
 Scoped Ruff PASS. Hidden full-main worker17772 started2026-10-07 22:36:29UTC,
 frozenf97a850; log `phase-3ae-hierarchy-isolate-full-sidecar.log`. Verified live
-worker creation time/command line and source freeze; terminal result pending.
-Old1,466 PASS covers only6c83b86. Finish the fresh combined main suite.
+worker creation time/command line and source freeze. This worker PASSED:1,520
+PASS/five existing Windows symlink skips,2866.49s, explicit exit0 at2026-10-07
+23:24:43UTC. Log SHA256
+`44C2FB1B56733096B4DF94DB7940FCE0975123CCB14224108A0B0F9FAF512CAD`.
+Final source/tests/schema/bench freeze empty and original worker stopped. This
+completes the bounded Isolate source-integration regression, not later Count,
+public Group, creative or installed/full-Phase3 acceptance.
 Evidence-hold cross-board overlap is impossible under the existing single-active
 board contract: its hold must fit A's activation and activations cannot overlap.
 Do not invent an invalid concurrent-board fixture to claim that acceptance.
