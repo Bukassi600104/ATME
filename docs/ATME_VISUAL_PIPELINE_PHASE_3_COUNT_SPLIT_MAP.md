@@ -2,20 +2,24 @@
 
 Date: 2026-10-07
 
-Status: independently cross-referenced implementation map, not delivered behavior.
+Status: independently cross-referenced implementation map. Count now has an
+audited non-release source checkpoint; Split is still contract-design work.
 The approved Phase3/R01–R15/Phase4–12 scope is unchanged. Count and Split cannot
 be advertised as executable merely because their verb names parse today.
 
 ## Current verified gaps
 
-- `count` is a `TargetAction` literal with no numeric policy, sampled text state,
-  static/temporal consumer, glyph override or chronological operator. It fails
-  execution rather than silently substituting static text.
+- `count` now has explicit numeric policy, immutable sampled text/rational content,
+  static/temporal consumers, glyph preflight and chronological/SVG execution at
+  main `fc480037`. Corrected clean338 and independent bounded integration audits
+  passed; all50 old offline hashes remain unchanged. Fresh full main verification
+  and original native reliability remain open. This is not installed/public
+  Count or full-Phase3 acceptance; see the Count progress report.
 - `split` is a `GroupAction` literal, but hierarchy contract validation rejects
   Split policies and chronological replay supports only actual Group/ungroup.
   An authored one-to-many visual operation is not a parent transfer.
 
-## Count implementation sequence
+## Count source sequence — delivered checkpoint, remaining exits retained
 
 1. Add an explicit strict count policy, with omitted optional serialization for
    legacy bare declarations. New writes/execution require it. Bind one supported,
@@ -42,6 +46,10 @@ be advertised as executable merely because their verb names parse today.
    fingerprints and deterministic offline SVG/PNG. No semantic number is inferred.
 
 ## Split implementation sequence
+
+The dedicated operator approach was approved on2026-10-08. Its written contract
+proposal is `ATME_VISUAL_PIPELINE_PHASE_3_SPLIT_DESIGN.md`; written review and the
+implementation plan precede runtime code. The sequence below is unchanged.
 
 1. Introduce a dedicated discriminated Split operation with explicit policy while
    retaining parse/dump compatibility for old bare Group-shaped Split declarations.
