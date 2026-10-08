@@ -361,10 +361,27 @@ Count is a later isolated source boundary and is not certified by that main run.
     fresh source-schema repeatability check is retained. Main's preexisting
     dirty packaging/binary/build outputs were left untouched and unstaged.
     This is a non-release source integration only. Independent exact-main audit
-    is pending the auditor's account usage reset, not claimed. Fresh full-main
+    completed with independent bounded PASS after the auditor's usage reset. Fresh full-main
     regression with crash capture and retained earlier offline hashes must pass;
     original native failures and frozen/installed/production-lock/full-Phase3
     and Phase4–12 gates remain open.
+32. Exact independent main integration audit PASS forfc480037af0d4d6447559c8ab6d88cf067a39eda:
+    no conflict resolutions; all source/tests/schemas/bench byte-identical to the
+    audited isolated boundary; only Count files and the two v2 schemas changed.
+    All50 older public/private offline frames were regenerated on main with every
+    JSON/contact-sheet/frame hash unchanged. Public JSON SHA256
+    `86D4E25C6C969281891862F8DE2F589B5EFC66404A7F6B7D3A4560F7127B0B70`,
+    PNG `112A6C9F980F05D62F6D0FBBAF83A317F7D9F5D859122C2F7507C3A2C4EF6A4F`;
+    paired JSON `7489307543D1D562A10B22EB782C79392CC0EC0144E3ABA9BC2223ADB5AED08A`,
+    PNG `4B04705E56C18687C7BB289C375C5F16E14B83C5DFA92CBA4CA00033CF43549C`.
+    Fresh dump-enabled full main worker is LIVE on frozenfc48003: actual pytest
+    PID19188, created2026-10-08 21:53:54UTC, exact command/profile verified.
+    It collected1,658 tests; terminal outcome pending. Log directory
+    `sidecar/test-artifacts/native-main-count-full`, with verbose test order,
+    native binary hashes and raster input/output diagnostics. No main source/test/
+    schema/bench changes are allowed during this run. Earlier1,520-pass full run
+    certifies onlyf97; clean338 certifies only the bounded Count checkpoint.
+    Independent PASS is not native/release/installed/full-Phase3 acceptance.
 
 ## Remaining implementation and acceptance
 

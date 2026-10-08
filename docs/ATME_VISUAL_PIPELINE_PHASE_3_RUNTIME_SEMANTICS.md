@@ -707,3 +707,32 @@ Final source/tests/schema/bench freeze empty and original worker stopped. The ol
 validated compositor provenance, all remaining Phase3 primitives/actions and
 Phase4–12 gates remain. No installed rebuild or creative-quality acceptance.
 See the Isolate progress report and independently cross-referenced Count/Split map.
+
+## Bounded 3AF numeric Count — non-release source checkpoint
+
+An explicit CountPolicy binds one supported single-line text target to authored
+canonical finite decimals, formatted endpoints, precision, named rounding,
+grouping/unit/separator and quantization levels. No number, unit, label, locale or
+semantic meaning is inferred. Bare legacy Count remains readable/dump-compatible,
+but new semantic writes/execution require policy completeness and text binding.
+
+Count is visible-to-visible. Integer-millisecond Fraction sampling uses the shared
+continuous easing curves; step easing rejects. A Count-only frozen frame subtype
+retains exact rational value and XML-safe display text. The legacy FrameObject
+serialization shape is unchanged. Consecutive Counts must match captured numeric
+value and text; equivalent decimal spellings are allowed, hidden rounded jumps
+are not. Only the text target versions once at completion. Pinned glyph bounds
+are checked for every declared step and cached with immutable contract/style keys.
+
+Sampled ancestry, board availability, clip/mask readiness, owned target/Group
+overlap, retained connector/pointer, Isolate and the board-wide evidence reading
+hold retain their existing guards. Completed Group/ungroup and stored board-return
+history preserve the Count subtype/value exactly. Authored layout starts can be
+declared by any policy; resolved chronology proves which one actually starts first.
+Schema/provenance validation is deterministic, never internal research/verification.
+
+Independent functional/promotion/exact-main audits PASS and corrected clean338
+source tests PASS. All50 earlier offline hashes are unchanged. Mainfc480037's fresh
+full run is pending. Original native reliability remains unresolved; public v2,
+renderer capability, frozen/installed, compiler/creative-quality/full-Phase3 and
+Phase4–12 gates remain open. These semantics do not authorize a final release.

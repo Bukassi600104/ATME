@@ -273,3 +273,19 @@ isolated from main and cannot be packaged based
 on a later green retry alone. Native diagnostic/final integration gates remain.
 No Count integration, advertisement, installation or full-Phase3 claim. The approved
 R01–R15/Phase4–12 scope is unchanged.
+
+## Count non-release source integration — 2026-10-08
+
+Mainfc480037 integrates the byte-identical independently audited isolated Count
+kernel/tests/two schemas, with no v1/Caleb, app, MCP/project authority or public
+capability change. Corrected clean59-package/215-native-binary environment passed
+338 tracked cases,397.95s, root exit0; all native bytes match unchanged main.
+Exact-main independent audit, scoped Ruff and generated-schema checks PASS. All50
+older offline frame/contact-sheet/report hashes remain unchanged. Main's preexisting
+dirty packaging outputs are untouched/unstaged. Source integration does not clear
+the original native parser/execute-AV failures or production-lock/frozen/installed
+gates; setup failures and a distinct diagnostic WMI invalid-handle dump remain
+retained. The full main run is LIVE at frozenfc480037, actual pytestPID19188,
+created21:53:54UTC,1,658 tests collected; terminal outcome pending. No public v2
+or Count installation, creative-quality/full-Phase3/Phase4–12 acceptance is claimed.
+See the Count progress report for exact immutable evidence and remaining gates.
