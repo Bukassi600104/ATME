@@ -87,6 +87,14 @@ understands or verifies the semantic correctness of an illustration.
   Mode/family compatibility uses the faithful primitive implementation; unsupported
   modes reject rather than substitute another effect. Completion leaves that
   result root visible and fully constructed, retaining its authored alpha.
+- `enter` additionally declares its own construction-end transform. Other
+  construction modes do not write transform channels. A movement phase following
+  `enter` starts at or after that construction ends, declares a source transform
+  identical to the construction endpoint, and names a separate final destination.
+  Thus two phases never interpolate the same transform channel concurrently or
+  jump back to the root action's original pose. Reveal/draw/write may overlap
+  movement because they own different channels. Without movement, final pose is
+  the captured start for those modes or the declared `enter` endpoint.
 - Movement, if present, interpolates only the result's captured local transform
   to its explicit destination using the existing shared transform/easing rules.
   No destination, displacement, staggering, fragment shape or label is generated.
@@ -103,6 +111,11 @@ understands or verifies the semantic correctness of an illustration.
   hidden, every result is fully visible at its declared final pose, and versions
   increment once for exactly the source root and named result roots. No other
   object receives a synthetic version increment.
+- Compound construction is derived root-owned paint: child local states/content/
+  poses and versions remain captured, while the root's construction envelope
+  affects its painted closure. A mode requiring unmodelled child-state mutation
+  rejects until faithful compound construction exists; it must not fake a draw
+  by changing independent child versions or substitute a box.
 - Source/result descendants, ancestors and referenced dependencies are reserved
   where their changes could alter the operation, even when their own versions do
   not change. Same-time completions precede captures using existing chronology.
