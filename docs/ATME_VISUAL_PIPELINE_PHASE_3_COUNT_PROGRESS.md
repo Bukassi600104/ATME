@@ -4,7 +4,7 @@ Date: 2026-10-08
 
 Status: non-release Count development-source integration checkpoint. Exact
 isolated/main source/test/schema equality and scoped Ruff/schema checks passed;
-fresh full main verification and independent exact-integration review remain.
+fresh full main verification remains; independent exact-integration review PASS.
 Count is not advertised, installed or a complete Count/Phase3 gate. Main's
 hierarchy-aware Isolate full regression passed
 1,520 tests/five existing Windows symlink skips,2866.49s, explicit exit0 at
