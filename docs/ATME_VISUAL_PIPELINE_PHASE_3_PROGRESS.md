@@ -724,7 +724,17 @@ step easing and non-Count frame serialization drift; all are reproduced and
 corrected, not hidden by new goldens. Corrected Count/replay124 PASS includes all
 27 untouched legacy frame/SVG/PNG families; migration/read/new-write4 PASS and
 scoped Ruff PASS. Two schemas are extended without rewriting legacy examples.
-Frozen initial focused worker38448 is running; correction re-audit and the full
-Count matrix/Group/attention/glyph/store/return/duplicate/offline proofs remain.
+Initial isolated9914 focused255 passed,233.14s, explicit exit0. Expandedaa352
+adds Group/subtype/glyph/storage proof; broader1,312 passed/five existing Windows
+symlink skips,2117.64s, explicit exit0. However focused297 had296 passed/one native
+morph rasterizer failure, and its exact repeat crashed with a WER-confirmed
+Windows execute access violation. The native root cause remains unconfirmed.
+Dump-enabled replay-only20, same-process raster-prefix/replay142 and unchanged
+legacy27 golden-family arms passed; these bounded negative reproductions do not
+clear the failures.41 further ignored candidate acceptance tests passed106.34s,
+including actual Count glyph pixels, hierarchy/mask/connector and coherent stored
+chronology/policy/return atomics, exact schemas and numeric boundaries. They are
+not yet promoted. Count remains isolated from main and cannot be packaged based
+on a later green retry alone. Native diagnostic/final integration gates remain.
 No Count integration, advertisement, installation or full-Phase3 claim. The approved
 R01–R15/Phase4–12 scope is unchanged.
