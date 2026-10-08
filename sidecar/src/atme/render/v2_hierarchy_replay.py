@@ -35,11 +35,11 @@ class HierarchyStep:
 
 def completed_hierarchy_basis(hierarchy: HierarchySnapshot, frames: dict) -> HierarchyBasis:
     """Canonical authored-basis shape from immutable, completed frame values."""
-    from atme.render.v2_state import FrameObject, FrameTransform
+    from atme.render.v2_state import CountFrameObject, FrameObject, FrameTransform
 
     nodes = {node.object_id: node for node in hierarchy.nodes}
     if {node.object_id for node in hierarchy.nodes} != frames.keys() or any(
-        type(frame) is not FrameObject or frame.object_id != object_id
+        type(frame) not in (FrameObject, CountFrameObject) or frame.object_id != object_id
         or frame.board_id != nodes[object_id].board_id or type(frame.transform) is not FrameTransform
         or type(frame.visible) is not bool or type(frame.state) is not str or not frame.state
         or any(type(value) not in (float, int) or not isfinite(value) or not 0 <= value <= 1

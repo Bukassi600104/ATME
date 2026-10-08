@@ -20,6 +20,8 @@ from pydantic import (
     model_validator,
 )
 
+from atme.render.v2_count import validate_count_policy
+
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
@@ -317,6 +319,26 @@ class AnnotationPolicy(StrictModel):
         return self
 
 
+class CountPolicy(StrictModel):
+    text_object_id: str = Field(min_length=1)
+    start_value: str = Field(min_length=1, max_length=64, pattern=r"^-?(0|[1-9][0-9]*)(\.[0-9]+)?$")
+    end_value: str = Field(min_length=1, max_length=64, pattern=r"^-?(0|[1-9][0-9]*)(\.[0-9]+)?$")
+    decimal_places: int = Field(ge=0, le=6, strict=True)
+    rounding: Literal["half_even", "half_up", "half_down", "floor", "ceiling", "truncate"]
+    step_count: int = Field(ge=1, le=4096, strict=True)
+    grouping: Literal["none", "thousands"]
+    unit: str = Field(max_length=32)
+    unit_placement: Literal["none", "before", "after"]
+    separator: str = Field(max_length=3)
+    start_text: str = Field(min_length=1, max_length=128)
+    end_text: str = Field(min_length=1, max_length=128)
+
+    @model_validator(mode="after")
+    def exact_formatted_endpoints(self):
+        validate_count_policy(self)
+        return self
+
+
 class TargetAction(ActionBase):
     verb: Literal[
         "reveal", "write", "draw", "enter", "exit", "highlight", "dim", "isolate",
@@ -327,18 +349,23 @@ class TargetAction(ActionBase):
     # Optional parsing preserves old bare annotate documents. New writes and
     # execution require explicit authored objects and ordered construction.
     annotation_policy: AnnotationPolicy | None = None
+    count_policy: CountPolicy | None = None
 
     @model_serializer(mode="wrap")
     def preserve_legacy_shape(self, handler):
         result = handler(self)
         if self.annotation_policy is None:
             result.pop("annotation_policy", None)
+        if self.count_policy is None:
+            result.pop("count_policy", None)
         return result
 
     @model_validator(mode="after")
     def exit_is_permanent_removal(self):
         if self.annotation_policy is not None:
             _require_annotation_contract(self)
+        if self.count_policy is not None:
+            _require_count_contract(self)
         if self.verb == "exit" and self.post_state != "removed":
             raise ValueError("exit must declare the canonical removed post-state")
         return self
@@ -1660,6 +1687,19 @@ def validate_plan_layout(plan_document: dict, layout_document: dict) -> None:
             from atme.render.v2_hierarchy import validate_authored_hierarchy
 
             validate_authored_hierarchy(action, executable)
+        if isinstance(action, TargetAction) and action.verb == "count" and action.count_policy is not None:
+            _require_count_contract(action)
+            obj = executable[action.target_ids[0]]
+            if (not isinstance(obj, TextObject) or obj.object_type != "text" or obj.items
+                    or not obj.text.strip() or len(obj.text.splitlines()) != 1):
+                raise ValueError("count layout requires one supported single-line text object")
+            starts = {candidate.count_policy.start_text for candidate in plan.actions
+                      if isinstance(candidate, TargetAction) and candidate.verb == "count"
+                      and candidate.count_policy is not None and candidate.target_ids == action.target_ids}
+            if obj.text not in starts:
+                raise ValueError("count layout initial text must be an explicitly authored starting value")
+            # Plan array order is not necessarily resolved trigger order. The
+            # shared chronology proves which declared start is actually first.
         if isinstance(action, TargetAction) and action.verb == "annotate":
             _validate_annotation_plan_objects(action, {obj.object_id: obj for obj in plan.objects},
                                               next(beat for beat in plan.beats if action.action_id in beat.action_ids))
@@ -1728,6 +1768,11 @@ def validate_plan_evidence_completeness(plan_document: dict) -> None:
         if isinstance(action, TargetAction) and action.verb == "annotate":
             _validate_annotation_plan_objects(action, {obj.object_id: obj for obj in plan.objects},
                                               next(beat for beat in plan.beats if action.action_id in beat.action_ids))
+        if isinstance(action, TargetAction) and action.verb == "count":
+            _require_count_contract(action)
+            obj = next(obj for obj in plan.objects if obj.object_id == action.target_ids[0])
+            if obj.object_type != "text" or obj.board_id != action.board_id:
+                raise ValueError("count requires one semantic text object on its declared board")
         if isinstance(action, ReplaceAction) and action.verb == "morph":
             _require_morph_contract(action)
             objects = {obj.object_id: obj for obj in plan.objects}
@@ -1788,6 +1833,16 @@ def validate_plan_evidence_completeness(plan_document: dict) -> None:
                     or any(action.expected_object_state_versions[object_id] != version
                            for object_id, version in expected_versions.items())):
                 raise ValueError("return_board must match its board, continuity, and full object inventory")
+
+
+def _require_count_contract(action: TargetAction) -> None:
+    if (action.verb != "count" or action.count_policy is None
+            or action.target_ids != [action.count_policy.text_object_id]
+            or (action.expected_state, action.post_state) != ("visible", "visible")
+            or action.annotation is not None or action.annotation_policy is not None):
+        raise ValueError("count requires one exact text target, explicit policy and visible-to-visible states")
+    if action.easing == "step":
+        raise ValueError("count cannot discard its declared quantization levels with step easing")
 
 
 def _require_morph_contract(action: ReplaceAction) -> None:

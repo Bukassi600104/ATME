@@ -467,6 +467,109 @@
       "title": "ConnectionAction",
       "type": "object"
     },
+    "CountPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "text_object_id": {
+          "minLength": 1,
+          "title": "Text Object Id",
+          "type": "string"
+        },
+        "start_value": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "title": "Start Value",
+          "type": "string"
+        },
+        "end_value": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "title": "End Value",
+          "type": "string"
+        },
+        "decimal_places": {
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Decimal Places",
+          "type": "integer"
+        },
+        "rounding": {
+          "enum": [
+            "half_even",
+            "half_up",
+            "half_down",
+            "floor",
+            "ceiling",
+            "truncate"
+          ],
+          "title": "Rounding",
+          "type": "string"
+        },
+        "step_count": {
+          "maximum": 4096,
+          "minimum": 1,
+          "title": "Step Count",
+          "type": "integer"
+        },
+        "grouping": {
+          "enum": [
+            "none",
+            "thousands"
+          ],
+          "title": "Grouping",
+          "type": "string"
+        },
+        "unit": {
+          "maxLength": 32,
+          "title": "Unit",
+          "type": "string"
+        },
+        "unit_placement": {
+          "enum": [
+            "none",
+            "before",
+            "after"
+          ],
+          "title": "Unit Placement",
+          "type": "string"
+        },
+        "separator": {
+          "maxLength": 3,
+          "title": "Separator",
+          "type": "string"
+        },
+        "start_text": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Start Text",
+          "type": "string"
+        },
+        "end_text": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "End Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text_object_id",
+        "start_value",
+        "end_value",
+        "decimal_places",
+        "rounding",
+        "step_count",
+        "grouping",
+        "unit",
+        "unit_placement",
+        "separator",
+        "start_text",
+        "end_text"
+      ],
+      "title": "CountPolicy",
+      "type": "object"
+    },
     "CoverageRecord": {
       "additionalProperties": false,
       "properties": {
@@ -2392,6 +2495,17 @@
           "anyOf": [
             {
               "$ref": "#/$defs/AnnotationPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "count_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CountPolicy"
             },
             {
               "type": "null"

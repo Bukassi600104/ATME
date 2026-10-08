@@ -16,11 +16,13 @@ from __future__ import annotations
 
 import json
 from bisect import bisect_right
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, replace
+from fractions import Fraction
 from typing import TYPE_CHECKING
 
 from pydantic import TypeAdapter
 
+from atme.render.v2_count import count_at_ms, count_decimal, count_value_at_ms
 from atme.render.v2_hierarchy import (
     HierarchySnapshot,
     UnsupportedHierarchy,
@@ -43,6 +45,7 @@ from atme.store.contracts_v2 import (
     ResolvedAction,
     SoundAction,
     TargetAction,
+    TextObject,
     TransformAction,
     _action_object_references,
     _annotation_object_ids,
@@ -146,6 +149,8 @@ def version_targets(action) -> tuple[str, ...]:
 def _sample_operator(capture: CapturedAction, at_ms: int, objects: dict) -> dict:
     """Only the operator's owned objects; unrelated sampled poses never commit."""
     from atme.render.v2_state import (
+        CountFrameObject,
+        FrameObject,
         FramePoint,
         FrameTransform,
         _dim_ratio,
@@ -163,6 +168,14 @@ def _sample_operator(capture: CapturedAction, at_ms: int, objects: dict) -> dict
     if isinstance(action, (GroupAction, CameraAction)) or (
         isinstance(action, EvidenceAction) and action.verb == "return_board"
     ):
+        return result
+    if isinstance(action, TargetAction) and action.verb == "count":
+        before = baseline[action.target_ids[0]]
+        values = {field.name: getattr(before, field.name) for field in fields(FrameObject)}
+        values["state"] = action.post_state if completed else before.state
+        result[before.object_id] = CountFrameObject(**values,
+            display_text=count_at_ms(action.count_policy, resolved.start_ms, resolved.end_ms, at_ms, action.easing),
+            count_value=count_value_at_ms(action.count_policy, resolved.start_ms, resolved.end_ms, at_ms, action.easing))
         return result
     if isinstance(action, TargetAction) and action.annotation_policy is not None:
         for phase, start, end in _annotation_phase_windows(resolved):
@@ -260,7 +273,8 @@ def supports_operator(action) -> bool:
                      or isinstance(action, EvidenceAction) and action.verb in {"insert_evidence", "return_board"}
                      or isinstance(action, GroupAction) and action.hierarchy_policy is not None
                      and action.verb in {"group", "ungroup"}
-                     or isinstance(action, TargetAction) and (action.annotation_policy is not None or action.verb in {
+                     or isinstance(action, TargetAction) and (action.annotation_policy is not None
+                         or action.verb == "count" and action.count_policy is not None or action.verb in {
                          "reveal", "write", "draw", "enter", "exit", "progressive_reveal",
                          "highlight", "cross_out", "dim", "isolate"}))
 
@@ -301,8 +315,20 @@ def _validate_owned_overlaps(actions: tuple, frames: dict) -> None:
                 raise ReplayError(f"overlapping actions on {min(overlap)} need an explicit composition rule")
 
 
-def _assert_start_state(resolved, sample: dict, versions: dict, hierarchy) -> None:
+def _assert_start_state(resolved, sample: dict, versions: dict, hierarchy, objects: dict) -> None:
     action = resolved.action
+    if isinstance(action, TargetAction) and action.verb == "count":
+        key = action.target_ids[0]
+        obj = objects[key]
+        if not isinstance(obj, TextObject) or obj.object_type != "text":
+            raise ReplayError("count needs one supported single-line text object")
+        captured_text = getattr(sample[key], "display_text", obj.text)
+        if captured_text != action.count_policy.start_text:
+            raise ReplayError(f"count {action.action_id} has stale captured starting text")
+        captured_value = getattr(sample[key], "count_value", None)
+        if (captured_value is not None
+                and Fraction(*captured_value) != Fraction(count_decimal(action.count_policy.start_value))):
+            raise ReplayError(f"count {action.action_id} has stale captured numeric value")
     if isinstance(action, TransformAction) and action.verb != "fade":
         # Channel purity depends on the captured chronological source, not the
         # initial layout (a prior Group can change its local coordinate system).
@@ -432,7 +458,7 @@ def replay_chronology(objects: dict, hierarchy: HierarchySnapshot, frames: dict,
         action = resolved.action
         if phase == 2:
             sample = _sample_active(committed, tuple(active.values()), time, objects)
-            _assert_start_state(resolved, sample, versions, hierarchy)
+            _assert_start_state(resolved, sample, versions, hierarchy, objects)
             context_roots = ()
             if isinstance(action, TargetAction) and action.verb == "isolate":
                 try:

@@ -528,6 +528,8 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
         color = _color(obj.style.text, style.colors, default=style.colors["ink"])
         role = _text_role(obj, style)
         font = next(font for font in style.fonts if font.id == role.font_id)
+        if getattr(state, "display_text", None) is not None:
+            obj = obj.model_copy(update={"text": state.display_text}, deep=True)
         inner = _text(obj, color, font.family, font.weight, role.size_px * scale, role.line_height,
                       role.max_characters_per_line, root / font.file,
                       state.reveal_fraction if active_verb == "write" else None,

@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, replace
+from math import gcd
 
 from atme.render.style_bundle import resolve_contract_bundle
 from atme.render.v2_annotation import validate_annotation_geometry
@@ -23,6 +24,12 @@ from atme.render.v2_connector import (
     UnsupportedConnector,
     connector_route,
     validate_static_arrow,
+)
+from atme.render.v2_count import (
+    MAX_COUNT_DENOMINATOR,
+    MAX_COUNT_NUMERATOR,
+    validate_count_display,
+    validate_count_glyphs,
 )
 from atme.render.v2_emphasis import (
     SUPPORTED_HIGHLIGHT_MARKS,
@@ -80,6 +87,7 @@ from atme.store.contracts_v2 import (
     _annotation_object_ids,
     _annotation_phase_windows,
     _require_annotation_contract,
+    _require_count_contract,
     _require_morph_contract,
     _require_return_board_policy,
     _require_return_contract,
@@ -152,6 +160,26 @@ class FrameObject:
     emphasis_fraction: float = 0.0
     cross_out_fraction: float = 0.0
     morph_geometry: MorphGeometry | None = None
+
+
+@dataclass(frozen=True)
+class CountFrameObject(FrameObject):
+    """Count-only payload; non-Count frame serialization stays byte-identical."""
+    display_text: str = ""
+    # Exact rational numeric value, independent of rounded displayed text.
+    count_value: tuple[int, int] = (0, 1)
+
+    def __post_init__(self):
+        try:
+            validate_count_display(self.display_text, nonblank=True)
+        except ValueError as exc:
+            raise V2FrameError(str(exc)) from exc
+        if (type(self.count_value) is not tuple
+                or len(self.count_value) != 2 or any(type(value) is not int for value in self.count_value)
+                or not 0 < self.count_value[1] <= MAX_COUNT_DENOMINATOR
+                or abs(self.count_value[0]) > MAX_COUNT_NUMERATOR or gcd(*self.count_value) != 1
+                or abs(self.count_value[0]) > 1000000000000000000 * self.count_value[1]):
+            raise V2FrameError("Count frame requires exact immutable text and canonical bounded rational value")
 
 
 @dataclass(frozen=True)
@@ -353,6 +381,23 @@ def _validate_static_action(item, layout, timeline, objects, mask_sources, manag
     if action.annotation is not None and action.verb != "annotate":
         raise V2FrameError(f"action {action.action_id} carries an annotation it cannot display")
     if action.annotation_policy is not None:
+        return
+    if action.verb == "count":
+        try:
+            _require_count_contract(action)
+        except ValueError as exc:
+            raise V2FrameError(str(exc)) from exc
+        obj = objects[action.target_ids[0]]
+        if (not isinstance(obj, TextObject) or obj.object_type != "text" or obj.items
+                or not obj.text.strip() or len(obj.text.splitlines()) != 1):
+            raise V2FrameError("count needs one supported single-line text object")
+        if not any(a.board_id == action.board_id and a.start_ms <= item.start_ms
+                   and item.end_ms <= a.end_ms for a in layout.activations):
+            raise V2FrameError(f"count {action.action_id} needs one active board")
+        try:
+            validate_count_glyphs(obj, action.count_policy, layout)
+        except ValueError as exc:
+            raise V2FrameError(str(exc)) from exc
         return
     for target in action.target_ids:
         obj = objects[target]
@@ -937,6 +982,21 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                     isolation_context_roots(context.objects, sample.hierarchy, sampled, action)
                 except UnsupportedIsolation as exc:
                     raise V2FrameError(str(exc)) from exc
+            if isinstance(item.action, TargetAction) and item.action.verb == "count":
+                action = item.action
+                target = action.target_ids[0]
+                chain = (target, *sample.hierarchy.ancestors(target))
+                if any(not sampled[key].visible or sampled[key].opacity <= 0
+                       or sampled[key].reveal_fraction != 1 for key in chain):
+                    raise V2FrameError(f"visible complete count content and parents required for {action.action_id}")
+                if any(other is not item and isinstance(other.action, (TargetAction, TransformAction))
+                       and set(chain[1:]).intersection(other.action.target_ids)
+                       and other.start_ms < item.end_ms and item.start_ms < other.end_ms
+                       for other in timeline.actions):
+                    raise V2FrameError(f"count {action.action_id} overlaps an ancestor edit")
+                last_target_end[target] = item.end_ms
+                last_target_verb[target] = "count"
+                continue
             for target in item.action.target_ids:
                 obj = layout_objects[target]
                 if target in highlighted_targets:
