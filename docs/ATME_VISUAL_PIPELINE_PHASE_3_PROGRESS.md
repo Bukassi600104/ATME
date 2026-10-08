@@ -731,10 +731,13 @@ morph rasterizer failure, and its exact repeat crashed with a WER-confirmed
 Windows execute access violation. The native root cause remains unconfirmed.
 Dump-enabled replay-only20, same-process raster-prefix/replay142 and unchanged
 legacy27 golden-family arms passed; these bounded negative reproductions do not
-clear the failures.41 further ignored candidate acceptance tests passed106.34s,
+clear the failures. The further41 candidate acceptance tests passed106.34s,
 including actual Count glyph pixels, hierarchy/mask/connector and coherent stored
 chronology/policy/return atomics, exact schemas and numeric boundaries. They are
-not yet promoted. Count remains isolated from main and cannot be packaged based
+now promoted as isolatedb7d9bbf: tracked41 passed53.78s and independent exact
+promotion/functional audits PASS. Instrumented297 also passed347.00s with106
+valid raster inputs, still negative reproduction evidence only. Count remains
+isolated from main and cannot be packaged based
 on a later green retry alone. Native diagnostic/final integration gates remain.
 No Count integration, advertisement, installation or full-Phase3 claim. The approved
 R01–R15/Phase4–12 scope is unchanged.
