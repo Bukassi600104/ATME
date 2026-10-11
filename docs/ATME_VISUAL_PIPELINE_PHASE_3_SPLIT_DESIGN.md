@@ -2,8 +2,9 @@
 
 Date: 2026-10-08
 
-Status: design proposal following approval of the dedicated operator approach;
-written-contract review is required before the implementation plan/runtime work.
+Status: revised written contract approved by the human on2026-10-09, after approval
+of the dedicated operator approach. Implementation-plan review precedes runtime work;
+fresh independent post-correction review remains pending at the auditor's usage limit.
 This is not delivered Split behavior or Phase 3 acceptance.
 
 ## Intent and preservation boundary
@@ -298,7 +299,8 @@ code was changed. The full main Count regression ran against frozen source
 `fc480037af0d4d6447559c8ab6d88cf067a39eda` and subsequently completed1,653 passed,
 five skipped, exit0; see Count progress record33. This is not Split acceptance.
 
-Review this written contract for phase/state/identity/coverage fidelity and family
-scope. After approval, write the task-by-task implementation plan using the existing
-inline implementation method with the independent cross-reference auditor. No
-Split runtime code or main frozen-source changes are authorized by this draft alone.
+The human approved the revised written contract on2026-10-09. Its task-by-task
+implementation plan is `superpowers/plans/2026-10-09-authored-visual-split.md`, using
+the existing inline implementation method with the independent cross-reference
+auditor. Human implementation-plan review precedes Split product code; approval of
+this contract is not a claim that the runtime or independent re-audit is complete.
