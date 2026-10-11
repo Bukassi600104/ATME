@@ -1,22 +1,22 @@
 # Phase 3 Progress Ledger — authoritative completion record
 
-Baseline: 2026-10-11. Source inspected: `fc480037`; baseline documentation committed separately as `080ed4d`. Current uncommitted Split Task 1 work is isolated from main source; see [Split evidence](ATME_VISUAL_PIPELINE_PHASE_3_SPLIT_PROGRESS.md). Owner: primary implementation agent. Independent auditor: `/root/independent_plan_auditor`.
+Baseline: 2026-10-11. Source inspected: `fc480037`; baseline documentation committed separately as `080ed4d`. Isolated Split Task 1 source is committed as `5183cb6`; Task 2 is in progress, main product source unchanged. See [Split evidence](ATME_VISUAL_PIPELINE_PHASE_3_SPLIT_PROGRESS.md). Owner: primary implementation agent. Independent auditor: `/root/independent_plan_auditor`.
 
 ## PHASE 3 — RENDERER & ACTION RUNTIME
 
-Overall progress: **26.3%** — █████░░░░░░░░░░░░░░░
+Overall progress: **27.2%** — █████░░░░░░░░░░░░░░░
 
 | Status | Required items |
 |---|---:|
 | ACCEPTED | 0 |
-| REGRESSION PASSED | 23 |
-| IMPLEMENTED | 6 |
-| IN PROGRESS | 0 |
+| REGRESSION PASSED | 25 |
+| IMPLEMENTED | 4 |
+| IN PROGRESS | 1 |
 | BLOCKED | 1 |
-| NOT STARTED | 49 |
+| NOT STARTED | 48 |
 | **Total required** | **79** |
 
-Completed (ACCEPTED): **0**. Implemented/under acceptance: **29** (23 regression-passed + 6 implemented). Active implementation: **0**; Split Task 1 is under verification. Blocked: **1**. Not started: **49**. Remaining to final acceptance: **79**. Current numerator: **2075/7900**. These are capability/gate units, not tests or commits. A bounded historical PASS is retained as evidence; it does not establish all applicable Phase 3 parity/admission requirements.
+Completed (ACCEPTED): **0**. Implemented/under acceptance: **29** (25 regression-passed + 4 implemented). Active implementation: **1** (Split identities). Blocked: **1**. Not started: **48**. Remaining to final acceptance: **79**. Current numerator: **2150/7900**. These are capability/gate units, not tests or commits. A bounded historical PASS is retained as evidence; it does not establish all applicable Phase 3 parity/admission requirements.
 
 ## Fixed calculation and scope rules
 
@@ -91,10 +91,10 @@ Every row below contributes to Phase 3 exit (**Yes**, including blocked and queu
 | P3-45 | Offline composition and bounded compositor performance | R-15; Remaining sequence acceptance | IMPLEMENTED | Offline source benches; bounded renderer | Retained offline proofs; complete budget matrix missing | 10+40 repeated SVG/PNG hashes | All runtime rows | Complete scope/budget proof absent | 2026-10-11 | Network-denied full required renderer matrix and recorded bounded budgets; long-project budgets stay Phase 11 | Yes |
 | P3-46 | Full regression and native reliability closure | R-15; Count record 33; Phase 3 acceptance | BLOCKED | fc480037 source freeze | 1653 passed / 5 existing host skips; original XML and native AV unresolved | Native captures and hashes in Count progress | All implemented source changes | Original resvg XML corruption / execute AV unresolved; blocked score 50 | 2026-10-11 | Required final frozen regression plus resolve native defect/admission concern; skipped protections need truthful disposition | Yes |
 | P3-47 | Independent final Phase 3 acceptance audit | Rebuild phase gate; R-15; user ledger exit | NOT STARTED | Bounded historical reviews only | No whole-phase acceptance | No complete final matrix artifact | All other rows | none; queued | 2026-10-11 | Independent accepts every finite item, parity, random seek, pixels, profiles, regressions and unsupported behavior | Yes |
-| S3-K01 | Split Contracts | R-01/02/10/13/15; approved Split plan Task 1: strict model/schema/legacy binding | IMPLEMENTED | Isolated contracts_v2.py dedicated Split types and two generated schemas; uncommitted | 34 initial expected RED; 202 focused passed, exit 0; repeatable schemas and pinned legacy hash; see Split evidence | Not claimed; contract-only | Approved plan | Bounded review incomplete after auditor usage limit; no commit/admission/acceptance claim | 2026-10-11 | Task 1: strict model/schema/legacy binding | Yes |
-| S3-K02 | Split Identities | R-01/02/10/13/15; approved Split plan Task 2: content/basis/completion separation | NOT STARTED | No Split product implementation | none | none | Approved plan | none; queued | 2026-10-11 | Task 2: content/basis/completion separation | Yes |
+| S3-K01 | Split Contracts | R-01/02/10/13/15; approved Split plan Task 1: strict model/schema/legacy binding | REGRESSION PASSED | Isolated 5183cb6: contracts_v2.py dedicated types and two schemas; legacy references restored | 226 focused passed, exit 0; independent bounded PASS; repeatable schemas and pinned legacy hash; see Split evidence | Not claimed; contract-only | Approved plan | Full Split integration and applicable shared Phase 3 exit evidence remain; no public admission | 2026-10-11 | Task 1: strict model/schema/legacy binding | Yes |
+| S3-K02 | Split Identities | R-01/02/10/13/15; approved Split plan Task 2: content/basis/completion separation | IN PROGRESS | Initial identity/receipt tests authored against isolated 5183cb6; implementation pending | 9 expected missing identity-module/receipt RED cases, isolated origins verified | none | Approved plan | none; active Task 2, remaining test obligations retained | 2026-10-11 | Task 2: content/basis/completion separation | Yes |
 | S3-K03 | Split Capture | R-01/02/10/13/15; approved Split plan Task 4: immutable closures and read/write reservations | NOT STARTED | No Split product implementation | none | none | Approved plan | none; queued | 2026-10-11 | Task 4: immutable closures and read/write reservations | Yes |
-| S3-K04 | Split Phase clock | R-01/02/10/13/15; approved Split plan Task 1: exact integer ticks and phase-local easing | IMPLEMENTED | Isolated v2_split_clock.py integer phase resolution and four phase-local easings; uncommitted | Included in 202 focused passed, exit 0; floor/collapse/clamp/easing cases; see Split evidence | Not claimed; clock-only | Approved plan | Bounded review incomplete after auditor usage limit; no sampling/atomic-completion claim | 2026-10-11 | Task 1: exact integer ticks and phase-local easing | Yes |
+| S3-K04 | Split Phase clock | R-01/02/10/13/15; approved Split plan Task 1: exact integer ticks and phase-local easing | REGRESSION PASSED | Isolated 5183cb6: v2_split_clock.py integer resolution and four phase-local easings | Included in 226 focused passed, exit 0; bounded independent PASS; floor/collapse/clamp/easing and no runtime-contract import | Not claimed; clock-only | Approved plan | Runtime sampling/atomic completion and applicable shared Phase 3 exit evidence remain | 2026-10-11 | Task 1: exact integer ticks and phase-local easing | Yes |
 | S3-K05 | Split Sampling | R-01/02/10/13/15; approved Split plan Task 5: owned deltas, no unrelated partial commit | NOT STARTED | No Split product implementation | none | none | Approved plan | none; queued | 2026-10-11 | Task 5: owned deltas, no unrelated partial commit | Yes |
 | S3-K06 | Split Atomic completion | R-01/02/10/13/15; approved Split plan Task 5: exact root-only semantic/version commit | NOT STARTED | No Split product implementation | none | none | Approved plan | none; queued | 2026-10-11 | Task 5: exact root-only semantic/version commit | Yes |
 | S3-R01 | Split Hierarchy | R-01/02/10/13/15; approved Split plan Tasks 3/4/6: parent/order/aperture and common/distinct-parent proof | NOT STARTED | No Split product implementation | none | none | S3-K01–06 | none; queued | 2026-10-11 | Tasks 3/4/6: parent/order/aperture and common/distinct-parent proof | Yes |
@@ -128,13 +128,13 @@ Every row below contributes to Phase 3 exit (**Yes**, including blocked and queu
 
 | Area | Accepted | Implemented or regression passed | In progress | Blocked | Not started |
 |---|---:|---:|---:|---:|---:|
-| Core Kernel (S3-K01–06) | 0/6 | 2 | 0 | 0 | 4 |
+| Core Kernel (S3-K01–06) | 0/6 | 2 | 1 | 0 | 3 |
 | Runtime Integration (S3-R01–07) | 0/7 | 0 | 0 | 0 | 7 |
 | Family Coverage (S3-F01–08) | **0/8** | 0 | 0 | 0 | 8 |
 | Persistence (S3-P01–04) | 0/4 | 0 | 0 | 0 | 4 |
 | Production Acceptance (S3-A01–07) | 0/7 | 0 | 0 | 0 | 7 |
 
-Each family has its own row/state above. The approved written spec and independently passed plan are design evidence only. Task 1 implementation followed the separately committed baseline and is now under verification. Tasks 2–11 remain in their approved order. Kernel/family/production completion cannot substitute for one another.
+Each family has its own row/state above. The approved written spec and independently passed plan are design evidence only. Task 1 followed the separately committed baseline and passed its bounded review/regression; Task 2 has begun. Tasks 2–11 retain their approved order and full requirements. Kernel/family/production completion cannot substitute for one another.
 
 ## Phase 3 exit
 
@@ -153,6 +153,8 @@ Each family has its own row/state above. The approved written spec and independe
 | 2026-10-11 baseline, source fc480037 | 0 | 79 | 25.0% | 1975 | Reconciled bounded source work/Count full regression; final parity and native reliability remain open. No new product changes. |
 | 2026-10-11 Split Task 1 RED | 0 | 79 | 25.6% | 2025 | S3-K01/K04 in progress: authored contract/clock cases exercised; 34 expected missing-model failures, isolated imports verified. No acceptance claim. Baseline docs commit 080ed4d. |
 | 2026-10-11 Split Task 1 implementation / bounded regression | 0 | 79 | 26.3% | 2075 | S3-K01/K04 implementation exists with 202 focused tests passed; schemas repeatable and legacy hash preserved. Bounded review incomplete; no acceptance, public runtime or family progress. +2 implemented, +0 accepted; denominator unchanged. |
+| 2026-10-11 Split Task 1 reviewed completion, isolated 5183cb6 | 0 | 79 | 26.9% | 2125 | S3-K01/K04 REGRESSION PASSED after bounded independent PASS and final 226-test exit0. Six discovered legacy reference regressions reproduced and fixed before commit; fixture aliasing removed. +0 accepted, no scope change. |
+| 2026-10-11 Split Task 2 RED | 0 | 79 | 27.2% | 2150 | S3-K02 IN PROGRESS: 9 expected missing identity/receipt failures. Remaining compound/style/asset/completion obligations retained; initial RED is not full coverage or acceptance. |
 
 ## Reporting and maintenance
 
