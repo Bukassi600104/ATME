@@ -1,5 +1,8 @@
 # Phase 3 — renderer and action runtime progress
 
+Current completion/status authority: [Phase 3 Progress Ledger](ATME_VISUAL_PIPELINE_PHASE_3_LEDGER.md).
+The chronological reports below are retained evidence, not current completion percentages.
+
 Status: Slices 3A–3U and bounded 3V/3W/3X stages independent PASS;
 Slice 3Y implementation, bounded audit, and full sidecar regression PASS;
 Slice 3Z bounded annotation contract/runtime audits and full regression PASS;

@@ -1,5 +1,8 @@
 # Phase 3 remaining runtime matrix
 
+Current finite completion/status authority: [Phase 3 Progress Ledger](ATME_VISUAL_PIPELINE_PHASE_3_LEDGER.md).
+Historical checkpoints below preserve their original evidence boundaries.
+
 Date: 2026-10-04
 
 Scope: independent read-only cross-reference after Slice 3Y, against the
@@ -60,7 +63,11 @@ installed preview/export or final creative-quality acceptance.
    changed source/test files exactly in Git.
 3. Split: explicit authored result objects, correspondence, ownership and source
    removal. Do not infer fragments.
-4. Count: numeric range, unit, formatting, rounding/steps and a bound text object.
+4. Count: numeric range, unit, formatting, rounding/steps and a bound text object
+   now have bounded source implementation and independent exact-integration PASS.
+   Frozen `fc480037` full regression passed 1,653 tests with five existing host
+   skips and exit 0. Native reliability/public acceptance remain open; see P3-23
+   and P3-46 in the current ledger, and the Count progress report.
 5. Non-list progressive disclosure: authored part inventory/order and state.
 6. Deterministic sound-event ledger: immutable asset identity, times, bus/role,
    gain/fades, loop/state changes, narration priority and purposeful silence.

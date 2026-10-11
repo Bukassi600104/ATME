@@ -2,6 +2,12 @@
 
 Status: active requirements ledger
 
+Current Phase 3 completion and finite denominator: [Phase 3 Progress Ledger](ATME_VISUAL_PIPELINE_PHASE_3_LEDGER.md).
+The original evidence table and dated checkpoints below retain historical scope.
+Current R-02 reconciliation: annotation, Group/ungroup and Count have bounded
+source implementations/regression evidence; their final public/full-matrix
+acceptance is incomplete. Split's reviewed plan is approved for implementation.
+
 Owner: primary implementation agent
 
 Independent verifier: `/root/independent_plan_auditor`

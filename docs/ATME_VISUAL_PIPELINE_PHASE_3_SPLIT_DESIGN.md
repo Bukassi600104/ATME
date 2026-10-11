@@ -5,8 +5,8 @@ Date: 2026-10-08
 Status: revised written contract approved by the human on2026-10-09, after approval
 of the dedicated operator approach. Implementation-plan review precedes runtime work;
 independent bounded written-spec/implementation-plan review PASS at main4b9b258
-on2026-10-11. Human implementation-plan review remains pending; no runtime
-acceptance is implied.
+on2026-10-11. Human implementation-plan approval is now explicit, with a finite
+Phase 3 ledger baseline required before Task 1. No runtime acceptance is implied.
 This is not delivered Split behavior or Phase 3 acceptance.
 
 ## Intent and preservation boundary
