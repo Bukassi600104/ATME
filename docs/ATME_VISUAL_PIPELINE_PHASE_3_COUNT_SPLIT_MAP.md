@@ -51,8 +51,8 @@ be advertised as executable merely because their verb names parse today.
 The dedicated operator approach was approved on2026-10-08 and the revised written
 contract on2026-10-09: `ATME_VISUAL_PIPELINE_PHASE_3_SPLIT_DESIGN.md`. Its implementation
 plan is `superpowers/plans/2026-10-09-authored-visual-split.md`; human plan review
-precedes product code. Fresh independent post-correction review remains pending at
-the auditor's usage limit. The sequence below is unchanged.
+precedes product code. Independent plan review resumed on2026-10-11 and returned
+PARTIAL; corrections require bounded re-review. The sequence below is unchanged.
 
 1. Introduce a dedicated discriminated Split operation with explicit policy while
    retaining parse/dump compatibility for old bare Group-shaped Split declarations.
