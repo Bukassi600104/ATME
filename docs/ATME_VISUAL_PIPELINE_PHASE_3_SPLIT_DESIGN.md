@@ -51,7 +51,11 @@ Such replacement would lose correspondence, ownership, version and return proof.
 `SplitPolicy` contains `source_object_id`, `parent_policy`, one `source_exit` phase,
 an ordered `results` inventory of 2–256 entries, its ordered `correspondences`, and
 a complete `source_basis` plus its canonical SHA256. Each result entry names its object, correspondence binding,
-construction phase/mode, optional movement phase and explicit destination pose.
+construction phase/mode, optional movement phase, explicit destination pose and
+`post_state`. Ordinary result families require `post_state: "visible"`; evidence
+results require the exact existing evidence intent's destination state (for
+example `evidence_visible`). Painted visibility is separate from that semantic
+state; Split must not weaken existing evidence state semantics.
 Every ID must be nonblank, unique and already present in the authored layout.
 The source cannot be a result. Source/result owned closures are pairwise disjoint:
 no source inside a result, result inside the source, nested result roots, shared
@@ -157,8 +161,9 @@ proof of semantic correspondence. No creative decision branches on its text.
   changes. At exact start and throughout `[start_ms, end_ms)`, semantic states and
   versions remain captured; sampled visibility/reveal/opacity/transforms reflect
   paint envelopes only. At exact outer end, one atomic commit sets the source to
-  removed/nonvisible with zero alpha/reveal and every result to visible, reveal 1,
-  authored alpha and its final pose. Content is unchanged. Root versions
+  removed/nonvisible with zero alpha/reveal and every result to its declared
+  family-valid post_state, painted visible, reveal 1, authored alpha and its final
+  pose. Content is unchanged. Root versions
   increment once for exactly the source root and named result roots. No other
   object receives a synthetic version increment.
 - Compound construction is derived root-owned paint: child local states/content/
