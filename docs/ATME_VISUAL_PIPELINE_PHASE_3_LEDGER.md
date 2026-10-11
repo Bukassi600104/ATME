@@ -4,19 +4,19 @@ Baseline: 2026-10-11. Source inspected: `fc480037` (documentation base inspected
 
 ## PHASE 3 — RENDERER & ACTION RUNTIME
 
-Overall progress: **25.0%** — █████░░░░░░░░░░░░░░░
+Overall progress: **25.6%** — █████░░░░░░░░░░░░░░░
 
 | Status | Required items |
 |---|---:|
 | ACCEPTED | 0 |
 | REGRESSION PASSED | 23 |
 | IMPLEMENTED | 4 |
-| IN PROGRESS | 0 |
+| IN PROGRESS | 2 |
 | BLOCKED | 1 |
-| NOT STARTED | 51 |
+| NOT STARTED | 49 |
 | **Total required** | **79** |
 
-Completed (ACCEPTED): **0**. Implemented/under acceptance: **27** (23 regression-passed + 4 implemented). Active implementation: **0** at baseline. Blocked: **1**. Not started: **51**. Remaining to final acceptance: **79**. These are capability/gate units, not tests or commits. A bounded historical PASS is retained as evidence; it does not establish all applicable Phase 3 parity/admission requirements.
+Completed (ACCEPTED): **0**. Implemented/under acceptance: **27** (23 regression-passed + 4 implemented). Active implementation: **2**. Blocked: **1**. Not started: **49**. Remaining to final acceptance: **79**. These are capability/gate units, not tests or commits. A bounded historical PASS is retained as evidence; it does not establish all applicable Phase 3 parity/admission requirements.
 
 ## Fixed calculation and scope rules
 
@@ -91,10 +91,10 @@ Every row below contributes to Phase 3 exit (**Yes**, including blocked and queu
 | P3-45 | Offline composition and bounded compositor performance | R-15; Remaining sequence acceptance | IMPLEMENTED | Offline source benches; bounded renderer | Retained offline proofs; complete budget matrix missing | 10+40 repeated SVG/PNG hashes | All runtime rows | Complete scope/budget proof absent | 2026-10-11 | Network-denied full required renderer matrix and recorded bounded budgets; long-project budgets stay Phase 11 | Yes |
 | P3-46 | Full regression and native reliability closure | R-15; Count record 33; Phase 3 acceptance | BLOCKED | fc480037 source freeze | 1653 passed / 5 existing host skips; original XML and native AV unresolved | Native captures and hashes in Count progress | All implemented source changes | Original resvg XML corruption / execute AV unresolved; blocked score 50 | 2026-10-11 | Required final frozen regression plus resolve native defect/admission concern; skipped protections need truthful disposition | Yes |
 | P3-47 | Independent final Phase 3 acceptance audit | Rebuild phase gate; R-15; user ledger exit | NOT STARTED | Bounded historical reviews only | No whole-phase acceptance | No complete final matrix artifact | All other rows | none; queued | 2026-10-11 | Independent accepts every finite item, parity, random seek, pixels, profiles, regressions and unsupported behavior | Yes |
-| S3-K01 | Split Contracts | R-01/02/10/13/15; approved Split plan Task 1: strict model/schema/legacy binding | NOT STARTED | No Split product implementation | none | none | Approved plan | none; queued | 2026-10-11 | Task 1: strict model/schema/legacy binding | Yes |
+| S3-K01 | Split Contracts | R-01/02/10/13/15; approved Split plan Task 1: strict model/schema/legacy binding | IN PROGRESS | Isolated Task 1 authored tests/fixtures; implementation pending | 34 expected missing-model RED cases; no green acceptance | none | Approved plan | none; queued | 2026-10-11 | Task 1: strict model/schema/legacy binding | Yes |
 | S3-K02 | Split Identities | R-01/02/10/13/15; approved Split plan Task 2: content/basis/completion separation | NOT STARTED | No Split product implementation | none | none | Approved plan | none; queued | 2026-10-11 | Task 2: content/basis/completion separation | Yes |
 | S3-K03 | Split Capture | R-01/02/10/13/15; approved Split plan Task 4: immutable closures and read/write reservations | NOT STARTED | No Split product implementation | none | none | Approved plan | none; queued | 2026-10-11 | Task 4: immutable closures and read/write reservations | Yes |
-| S3-K04 | Split Phase clock | R-01/02/10/13/15; approved Split plan Task 1: exact integer ticks and phase-local easing | NOT STARTED | No Split product implementation | none | none | Approved plan | none; queued | 2026-10-11 | Task 1: exact integer ticks and phase-local easing | Yes |
+| S3-K04 | Split Phase clock | R-01/02/10/13/15; approved Split plan Task 1: exact integer ticks and phase-local easing | IN PROGRESS | Isolated Task 1 authored tests/fixtures; implementation pending | 34 expected missing-model RED cases; no green acceptance | none | Approved plan | none; queued | 2026-10-11 | Task 1: exact integer ticks and phase-local easing | Yes |
 | S3-K05 | Split Sampling | R-01/02/10/13/15; approved Split plan Task 5: owned deltas, no unrelated partial commit | NOT STARTED | No Split product implementation | none | none | Approved plan | none; queued | 2026-10-11 | Task 5: owned deltas, no unrelated partial commit | Yes |
 | S3-K06 | Split Atomic completion | R-01/02/10/13/15; approved Split plan Task 5: exact root-only semantic/version commit | NOT STARTED | No Split product implementation | none | none | Approved plan | none; queued | 2026-10-11 | Task 5: exact root-only semantic/version commit | Yes |
 | S3-R01 | Split Hierarchy | R-01/02/10/13/15; approved Split plan Tasks 3/4/6: parent/order/aperture and common/distinct-parent proof | NOT STARTED | No Split product implementation | none | none | S3-K01–06 | none; queued | 2026-10-11 | Tasks 3/4/6: parent/order/aperture and common/distinct-parent proof | Yes |
@@ -128,7 +128,7 @@ Every row below contributes to Phase 3 exit (**Yes**, including blocked and queu
 
 | Area | Accepted | Implemented or regression passed | In progress | Blocked | Not started |
 |---|---:|---:|---:|---:|---:|
-| Core Kernel (S3-K01–06) | 0/6 | 0 | 0 | 0 | 6 |
+| Core Kernel (S3-K01–06) | 0/6 | 0 | 2 | 0 | 4 |
 | Runtime Integration (S3-R01–07) | 0/7 | 0 | 0 | 0 | 7 |
 | Family Coverage (S3-F01–08) | **0/8** | 0 | 0 | 0 | 8 |
 | Persistence (S3-P01–04) | 0/4 | 0 | 0 | 0 | 4 |
@@ -151,6 +151,7 @@ Each family has its own row/state above. The approved written spec and independe
 | Date/checkpoint | Accepted | Total | Overall % | Numerator | Major change |
 |---|---:|---:|---:|---:|---|
 | 2026-10-11 baseline, source fc480037 | 0 | 79 | 25.0% | 1975 | Reconciled bounded source work/Count full regression; final parity and native reliability remain open. No new product changes. |
+| 2026-10-11 Split Task 1 RED | 0 | 79 | 25.6% | 2025 | S3-K01/K04 in progress: authored contract/clock cases exercised; 34 expected missing-model failures, isolated imports verified. No acceptance claim. Baseline docs commit 080ed4d. |
 
 ## Reporting and maintenance
 
