@@ -56,6 +56,21 @@ class Affine:
         )):
             raise UnsupportedWorldGeometry("world affine is outside the supported range")
 
+    def inverse(self) -> Affine:
+        """Map actual composed coordinates back without re-quantizing factors."""
+        self.validate()
+        determinant = self.a * self.d - self.b * self.c
+        if not isfinite(determinant) or determinant == 0:
+            raise UnsupportedWorldGeometry("world affine is singular or nonfinite")
+        result = Affine(
+            self.d / determinant, -self.b / determinant,
+            -self.c / determinant, self.a / determinant,
+            (self.c * self.f - self.d * self.e) / determinant,
+            (self.b * self.e - self.a * self.f) / determinant,
+        )
+        result.validate()
+        return result
+
     def point(self, x: float, y: float) -> tuple[float, float]:
         result = (self.a * x + self.c * y + self.e,
                   self.b * x + self.d * y + self.f)

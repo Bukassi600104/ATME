@@ -7,6 +7,14 @@ from functools import partial
 from io import BytesIO
 
 import pytest
+from atme.narrative_source import describe
+from atme.project_service import ProjectError, _resolved_compilation_fingerprint
+from atme.render import v2_svg
+from atme.render.v2_hierarchy import HierarchySnapshot, changed_hierarchy_objects
+from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
+from atme.render.v2_lifecycle import nonterminal_paint_order
+from atme.render.v2_world import world_bounds
+from atme.store.contracts_v2 import ExecutableLayoutV2, GroupAction, HierarchyBasis
 from PIL import Image
 from test_v2_annotation_contract import grouped_annotation_documents
 from test_v2_group_annotation import consumer_clock, private_svg
@@ -16,16 +24,6 @@ from test_v2_morph_action import morph_documents
 from test_v2_replace_action import documents as replace_documents
 from test_v2_timeline_replay import resolved
 from v2_fixtures import digest
-
-from atme.narrative_source import describe
-from atme.project_service import ProjectError, _resolved_compilation_fingerprint
-from atme.render import v2_svg
-from atme.render.v2_hierarchy import HierarchySnapshot, changed_hierarchy_objects
-from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
-from atme.render.v2_lifecycle import nonterminal_paint_order
-from atme.render.v2_state import UnsupportedVisualAction
-from atme.render.v2_world import world_bounds
-from atme.store.contracts_v2 import ExecutableLayoutV2, GroupAction, HierarchyBasis
 
 
 def grouped_replacement_documents(*, verb="replace", regroup=False, portrait=False, chain=False, intermediate=None):
@@ -222,8 +220,7 @@ def test_grouped_replacement_captured_geometry_and_offline_pixels(verb, regroup,
     assert dict(end.state_versions)["object-replacement"] == 3
     for at in (7999, 6000, 7000, 6500):
         assert v2_svg._rasterize_svg_frame(context.layout, private_svg(context, replay, camera, at)).png == frames[at]
-    with pytest.raises(UnsupportedVisualAction):
-        v2_svg.compose_png_frame(layout, timeline, 6500)
+    assert v2_svg.compose_png_frame(layout, timeline, 6500).png == frames[6500]
     assert (layout, timeline) == original
 
 

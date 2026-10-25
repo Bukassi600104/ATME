@@ -350,11 +350,43 @@ def test_schema_registry_dispatch_is_explicit_and_renderer_capability_truthful()
 
 def test_real_mcp_returns_v2_schemas_and_truthful_renderer_capability(tmp_path):
     frozen = os.environ.get("ATME_FROZEN_MCP")
+    source_root = str(Path(__file__).resolve().parents[1] / "src")
+    # The stdio SDK does not inherit PYTHONPATH. Without an explicit source
+    # carrier this shared venv can silently launch the main editable checkout.
+    bootstrap = r"""
+import json, os, sys, time
+from pathlib import Path
+started = time.perf_counter()
+def startup_trace(frame, event, arg):
+    filename = frame.f_code.co_filename.replace('\\', '/')
+    name = frame.f_code.co_name
+    lifecycle = (name in {'main', 'create_mcp'} and filename.endswith('/atme/mcp_server.py')
+                 or name == '__init__' and filename.endswith(('/atme/store/db.py', '/atme/project_service.py')))
+    handshake = (filename.endswith('/atme/mcp_server.py') and name == '__call__'
+                 and getattr(frame.f_locals.get('ctx'), 'method', None) == 'initialize')
+    if event in {'call', 'return'} and (lifecycle or handshake):
+        print(json.dumps({'mcp_startup_stage': name, 'event': event,
+                          'file': filename.rsplit('/', 1)[-1],
+                          'elapsed_s': round(time.perf_counter()-started, 6)}), file=sys.stderr, flush=True)
+sys.setprofile(startup_trace)
+from atme import mcp_server
+root = Path(os.environ['ATME_SPLIT_EXPECTED_SOURCE']).resolve()
+origins = [(name, getattr(module, '__file__', None)) for name, module in tuple(sys.modules.items())
+           if name == 'atme' or name.startswith('atme.')]
+assert origins and all(origin and Path(origin).resolve().is_relative_to(root) for _, origin in origins), origins
+print(json.dumps({'mcp_child_source': str(root), 'verified_module_count': len(origins),
+                  'import_elapsed_s': round(time.perf_counter()-started, 6)}, sort_keys=True),
+      file=sys.stderr, flush=True)
+mcp_server.main()
+"""
+    compile(bootstrap, "<mcp-source-bootstrap>", "exec")
     params = StdioServerParameters(
         command=frozen or sys.executable,
         args=(["mcp", "--database", str(tmp_path / "frozen-v2.db")] if frozen else
-              ["-m", "atme.mcp_server", "--database", str(tmp_path / "source-v2.db")]),
+              ["-c", bootstrap, "--database", str(tmp_path / "source-v2.db")]),
         cwd=Path(__file__).resolve().parents[1],
+        env={"ATME_DATA_DIR": str(tmp_path / "mcp-data"), **({} if frozen else {
+            "PYTHONPATH": source_root, "ATME_SPLIT_EXPECTED_SOURCE": source_root})},
     )
 
     async def exercise():
@@ -364,6 +396,16 @@ def test_real_mcp_returns_v2_schemas_and_truthful_renderer_capability(tmp_path):
                 assert not result.is_error
                 schema = result.structured_content["result"]
                 assert schema["properties"]["contract_version"]["const"] == "2.0.0"
+                if not frozen and kind in {"storyboard", "layout"}:
+                    assert schema["$defs"]["RegistryBinding"]["properties"]["anchor_mappings"]["minItems"] == 1
+                    playback = schema["$defs"]["MediaPlayback"]["properties"]
+                    assert playback["frame_selection"]["const"] == "last_pts_at_or_before"
+                    assert "source_stream" in playback and "placement" in playback
+                if not frozen and kind == "resolved_timeline":
+                    resolved = schema["$defs"]["ResolvedAsset"]["properties"]
+                    assert "media_stream" in resolved and "duration_ms" in resolved
+                if not frozen and kind != "migration_report":
+                    assert schema["$defs"]["MediaStreamPin"]["properties"]["stream_index"]["minimum"] == 0
             caps = await client.call_tool("atme.get_capabilities", {})
             visual = caps.structured_content["result"]["visual_contracts"]
             assert visual["authoring_versions"] == ["1", "2.0.0"]

@@ -1,0 +1,35 @@
+name: Bug report
+description: Report a reproducible ATME failure.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "Include only redacted evidence. Do not upload tokens, private recordings, project databases or personal project content."
+  - type: input
+    id: version
+    attributes:
+      label: Version and environment
+      description: Exact source commit or application version, Windows version, and relevant runtime versions.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps or command; include the output profile and script/recording authority mode if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: State what should happen and what happened, including errors or an incomplete run.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Source or log evidence
+      description: Relevant source location, redacted log excerpt, terminal exit and counts, or a synthetic fixture. Explain if evidence is unavailable.
+    validations:
+      required: true

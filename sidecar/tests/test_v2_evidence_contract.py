@@ -5,15 +5,6 @@ from __future__ import annotations
 from copy import deepcopy
 
 import pytest
-from pydantic import ValidationError
-from test_visual_contracts_v2 import _store_v2_plan
-from v2_fixtures import (
-    digest,
-    executable_layout_v2,
-    resolved_timeline_v2,
-    visual_plan_v2,
-)
-
 from atme.project_service import ProjectError
 from atme.render.v2_state import UnsupportedVisualAction, V2FrameError, evaluate_frame
 from atme.render.v2_svg import compose_svg_frame
@@ -23,6 +14,14 @@ from atme.store.contracts_v2 import (
     VisualPlanV2,
     validate_plan_evidence_completeness,
     validate_plan_layout,
+)
+from pydantic import ValidationError
+from test_visual_contracts_v2 import _store_v2_plan
+from v2_fixtures import (
+    digest,
+    executable_layout_v2,
+    resolved_timeline_v2,
+    visual_plan_v2,
 )
 
 
@@ -199,12 +198,19 @@ def test_evidence_provenance_rejects_fabricated_or_non_reference_sources(field, 
         VisualPlanV2.model_validate(plan)
 
 
-def test_evidence_treatment_identity_is_unique():
+@pytest.mark.parametrize("fault", ["duplicate_pair", "duplicate_owner", "orphan_object"])
+def test_evidence_treatment_identity_is_unique(fault):
     layout = executable_layout_v2()
+    ExecutableLayoutV2.model_validate(layout)
     duplicate = deepcopy(layout["evidence_treatments"][0])
-    duplicate["object_id"] = "object-other"
+    if fault == "duplicate_owner":
+        duplicate["action_id"] = "other-causal-action"
+        duplicate["intent"]["claim_id"] = "other-claim"
+    elif fault == "orphan_object":
+        duplicate["object_id"] = "object-other"
+        duplicate["intent"]["claim_id"] = "other-claim"
     layout["evidence_treatments"].append(duplicate)
-    with pytest.raises(ValidationError, match="beat_id values must be unique"):
+    with pytest.raises(ValidationError):
         ExecutableLayoutV2.model_validate(layout)
 
 

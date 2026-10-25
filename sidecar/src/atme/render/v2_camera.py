@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from atme.render.v2_morph import geometry_object
+from atme.render.v2_technical_frame import validate_technical_frame_world
 from atme.render.v2_world import UnsupportedWorldGeometry, world_bounds
 from atme.store.contracts_v2 import (
     CameraAction,
@@ -16,6 +18,7 @@ from atme.store.contracts_v2 import (
     ExecutableLayoutV2,
     ReplaceAction,
     ResolvedVisualTimelineV2,
+    VisualObject,
 )
 
 if TYPE_CHECKING:
@@ -153,7 +156,7 @@ def _destination(layout, source: CameraViewport, target: CameraViewport,
 
 
 def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
-                    replay: ChronologicalReplay):
+                    replay: ChronologicalReplay, *, split_inputs=None, layout_sha256=None, structural_timeline=None):
     """Frame focus from the shared sampled start boundary, never start-ordered guesses."""
     initial = {obj.object_id: obj for obj in layout.objects}
     segments = []
@@ -192,14 +195,60 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
             if action.expected_state not in (None, "framed") or action.post_state != "framed":
                 raise UnsupportedCamera(f"camera {action.action_id} needs canonical framed state")
             rects = []
+            from atme.render.v2_split import CapturedSplitAction
+            from atme.render.v2_split_paint import _split_focus_bounds
+
+            split_captures = {id(row.split_capture): row.split_capture for checkpoint in replay.checkpoints
+                              for row in checkpoint.active if isinstance(row, CapturedSplitAction)
+                              and row.resolved.start_ms <= resolved.start_ms
+                              and set(action.target_ids).intersection(row.split_capture.owned_object_ids)}
+            split_targets = set()
+            if split_captures:
+                if len(split_captures) != 1 or split_inputs is None:
+                    raise UnsupportedCamera("Split camera needs one attributed capture and frozen paint inputs")
+                capture = next(iter(split_captures.values()))
+                from atme.render.v2_lifecycle import (
+                    geometry_dependencies,
+                    group_affects_geometry,
+                )
+                from atme.render.v2_timeline_replay import version_targets
+                from atme.store.contracts_v2 import (
+                    EvidenceAction,
+                    GroupAction,
+                    TargetAction,
+                )
+
+                participants = set(capture.owned_object_ids) | set(capture.read_dependency_ids)
+                dependencies = geometry_dependencies(sample.hierarchy, participants)
+                for other in timeline.actions:
+                    if other.end_ms <= resolved.start_ms or other.start_ms >= resolved.end_ms:
+                        continue
+                    treatment = next((row for row in timeline.evidence_treatments
+                        if isinstance(other.action, EvidenceAction) and other.action.verb == "insert_evidence"
+                        and (row.action_id, row.object_id) == (other.action.action_id, other.action.target_object_id)), None)
+                    writes = version_targets(other.action, treatment)
+                    regroup = (isinstance(other.action, GroupAction)
+                               and group_affects_geometry(other.action, objects, participants))
+                    isolate = (isinstance(other.action, TargetAction) and other.action.verb == "isolate"
+                               and other.action.board_id == action.board_id)
+                    if dependencies.intersection(writes) or regroup or isolate:
+                        raise UnsupportedCamera(f"camera {action.action_id} overlaps a focus-object edit")
+                rects.append(_split_focus_bounds(capture, layout, timeline, replay, split_inputs, action.action_id,
+                    layout_sha256=layout_sha256, structural_timeline=structural_timeline))
+                split_targets.update(capture.owned_object_ids)
             for target_id in action.target_ids:
+                if target_id in split_targets:
+                    continue
                 obj = objects[target_id]
                 if obj.board_id != action.board_id:
                     raise UnsupportedCamera(f"camera {action.action_id} crosses board ownership")
+                if obj.clip_id is not None:
+                    raise UnsupportedCamera("camera needs external post-clip visible focus geometry")
                 dependency_ids = {target_id}
                 parent_id = obj.parent_id
                 while parent_id is not None:
-                    if (isinstance(objects[parent_id], ContainerObject)
+                    if (objects[parent_id].clip_id is not None
+                            or isinstance(objects[parent_id], ContainerObject)
                             and objects[parent_id].object_type in {"clip", "mask"}):
                         raise UnsupportedCamera(
                             f"camera {action.action_id} needs post-clip visible focus geometry, including masks"
@@ -222,13 +271,25 @@ def camera_segments(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimeline
                        for item in dependency_ids):
                     raise UnsupportedCamera(f"camera {action.action_id} needs revealed visible focus")
                 # The current compositor has faithful geometry for these types.
-                if obj.object_type not in {"freehand", "line", "rectangle", "rounded_rectangle",
-                                           "ellipse", "polygon", "underline", "highlight", "text", "list",
+                focus_obj, focus_objects = obj, objects
+                native = (isinstance(obj, VisualObject) and obj.technical_frame is not None
+                          and obj.object_type in {"browser", "application", "server", "database", "folder", "comparison"})
+                if native:
+                    if obj.clip_id is not None:
+                        raise UnsupportedCamera("technical_frame camera needs post-clip visible focus geometry")
+                    current = {key: geometry_object(value, frames[key].morph_geometry) for key, value in objects.items()}
+                    try:
+                        validate_technical_frame_world(current[target_id], current, transforms)
+                    except ValueError as exc:
+                        raise UnsupportedCamera(str(exc)) from exc
+                    focus_obj, focus_objects = current[target_id], current
+                elif obj.object_type not in {"freehand", "line", "rectangle", "rounded_rectangle",
+                                           "ellipse", "polygon", "underline", "highlight", "text", "list", "code", "callout",
                                            "icon", "pictogram", "character", "device", "document",
                                            "chart", "terminal"}:
                     raise UnsupportedCamera(f"camera {action.action_id} targets unsupported visual geometry")
                 try:
-                    rects.append(world_bounds(obj, objects, transforms))
+                    rects.append(world_bounds(focus_obj, focus_objects, transforms))
                 except UnsupportedWorldGeometry as exc:
                     raise UnsupportedCamera(str(exc)) from exc
             rect = (min(r[0] for r in rects), min(r[1] for r in rects),

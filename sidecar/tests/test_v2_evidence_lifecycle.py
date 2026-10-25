@@ -1,21 +1,20 @@
-"""Evidence holds use sampled geometry; public Group frames remain separate."""
+"""Evidence holds and public Group frames use the same sampled geometry."""
 
 from copy import deepcopy
 from dataclasses import replace
 
 import pytest
+from atme.render import v2_state
+from atme.render.v2_camera import CameraViewport, camera_segments
+from atme.render.v2_evidence_reading import validate_evidence_reading
+from atme.render.v2_state import evaluate_frame
+from atme.store.contracts_v2 import GroupAction
 from test_v2_evidence_compositor import evidence_documents
 from test_v2_hierarchy_contract import rehash
 from test_v2_hierarchy_replay import prepared
 from test_v2_return_hierarchy import private_clock
 from test_v2_timeline_replay import resolved
 from v2_fixtures import digest
-
-from atme.render import v2_state
-from atme.render.v2_camera import CameraViewport, camera_segments
-from atme.render.v2_evidence_reading import validate_evidence_reading
-from atme.render.v2_state import UnsupportedVisualAction, evaluate_frame
-from atme.store.contracts_v2 import GroupAction
 
 
 def grouped_evidence_documents(tmp_path, start=5000, end=5500):
@@ -56,8 +55,8 @@ def test_unrelated_group_during_evidence_hold_preserves_reading_geometry(tmp_pat
     assert trace.at(5500).object("object-evidence") == trace.at(4999).object("object-evidence")
     assert trace.at(5500).hierarchy.children("board-main", "object-group") == ()
     assert (layout, timeline) == original
-    with pytest.raises(UnsupportedVisualAction):
-        evaluate_frame(layout, timeline, 5500)
+    assert evaluate_frame(layout, timeline, 5500) == v2_state._sample_validated_frame(
+        context.layout, context.timeline, trace, camera_plan, 5500)
 
 
 @pytest.mark.parametrize("field,value,match", [("visible", False, "fully visible"),

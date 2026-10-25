@@ -3,6 +3,12 @@
 from copy import deepcopy
 
 import pytest
+from atme.render import v2_state
+from atme.render.v2_camera import camera_segments
+from atme.render.v2_hierarchy import HierarchySnapshot
+from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
+from atme.render.v2_timeline_replay import replay_chronology
+from atme.store.contracts_v2 import ExecutableLayoutV2, ResolvedVisualTimelineV2
 from test_v2_camera_action import append_camera
 from test_v2_connection_actions import relationship_documents
 from test_v2_frame_state import supported_documents
@@ -11,13 +17,6 @@ from test_v2_hierarchy_snapshot import basis
 from test_v2_replace_action import documents as replacement_documents
 from test_v2_timeline_replay import moving, resolved
 from v2_fixtures import digest
-
-from atme.render import v2_state
-from atme.render.v2_camera import camera_segments
-from atme.render.v2_hierarchy import HierarchySnapshot
-from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
-from atme.render.v2_timeline_replay import replay_chronology
-from atme.store.contracts_v2 import ExecutableLayoutV2, ResolvedVisualTimelineV2
 
 
 @pytest.mark.parametrize("kind", ["connection", "fade", "annotation", "replace", "list", "managed"])
@@ -36,7 +35,10 @@ def test_invalid_operator_form_is_rejected_before_constructing_replay(kind, monk
             expected = "mutates a connection-managed connector"
     elif kind == "replace":
         layout, timeline = replacement_documents()
-        layout["objects"][0]["object_type"] = "bracket"
+        # Brackets are supported marks. Use a model-valid unsupported visual,
+        # omitting only the Mark-only null field when changing its typed shape.
+        layout["objects"][0]["object_type"] = "comparison"
+        assert layout["objects"][0].pop("path_data") is None
         timeline["layout_sha256"] = digest(layout)
         expected = "supported paintable leaves"
     else:
@@ -103,6 +105,5 @@ def test_camera_consumes_regrouped_ancestry_and_later_collective_motion():
     assert after[3].x > before[3].x
     replay.at(9000)
     assert camera_segments(parsed_layout, parsed_timeline, replay) == (before, after)
-    # This is a private camera/clock consumer proof, not public Group playback.
-    with pytest.raises(v2_state.UnsupportedVisualAction, match="no frame implementation"):
-        v2_state.evaluate_frame(layout, timeline, 8000)
+    assert v2_state.evaluate_frame(layout, timeline, 8000) == v2_state._sample_validated_frame(
+        parsed_layout, parsed_timeline, replay, (before, after), 8000)

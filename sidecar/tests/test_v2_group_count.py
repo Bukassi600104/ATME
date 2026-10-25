@@ -7,13 +7,6 @@ from dataclasses import dataclass, fields
 from io import BytesIO
 
 import pytest
-from PIL import Image
-from test_v2_count_contract import count_action, count_policy
-from test_v2_group_annotation import consumer_clock, private_svg
-from test_v2_group_annotation_project import stored_group_annotation_return_basis
-from test_v2_group_replacement import grouped_replacement_documents
-from v2_fixtures import digest
-
 from atme.narrative_source import describe
 from atme.project_service import ProjectError, _resolved_compilation_fingerprint
 from atme.render import v2_svg
@@ -23,9 +16,14 @@ from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
 from atme.render.v2_state import (
     CountFrameObject,
     FrameObject,
-    UnsupportedVisualAction,
     V2FrameError,
 )
+from PIL import Image
+from test_v2_count_contract import count_action, count_policy
+from test_v2_group_annotation import consumer_clock, private_svg
+from test_v2_group_annotation_project import stored_group_annotation_return_basis
+from test_v2_group_replacement import grouped_replacement_documents
+from v2_fixtures import digest
 
 
 def group_count_documents(*, regroup=False, portrait=False):
@@ -85,8 +83,7 @@ def test_count_after_group_has_exact_captured_pose_numeric_versions_and_pixels(r
     assert Image.open(BytesIO(pixels[7900])).size == ((720, 1280) if portrait else (1280, 720))
     for at in (7450, 5999, 7900, 6500):
         assert v2_svg._rasterize_svg_frame(context.layout, private_svg(context, replay, camera, at)).png == pixels[at]
-    with pytest.raises(UnsupportedVisualAction):
-        v2_svg.compose_png_frame(layout, timeline, 7900)
+    assert v2_svg.compose_png_frame(layout, timeline, 7900).png == pixels[7900]
     assert (layout, timeline) == original
 
 

@@ -346,7 +346,11 @@ class ProjectRunner:
     def _preview_v2_project(self, project_id, row, expected_revision, layout, at_ms):
         """Use the exact stored compiler result and verified project-owned raster bytes."""
         from atme.render.v2_svg import compose_png_frame
-        from atme.store.contracts_v2 import ExecutableLayoutV2, ResolvedVisualTimelineV2
+        from atme.store.contracts_v2 import (
+            MEDIA_OBJECT_TYPES,
+            ExecutableLayoutV2,
+            ResolvedVisualTimelineV2,
+        )
 
         try:
             timeline_record = self.service.artifact(project_id, "resolved_timeline")
@@ -371,7 +375,7 @@ class ProjectRunner:
         treatments = {item.object_id: item for item in parsed_layout.evidence_treatments}
         verified = {}
         for obj in parsed_layout.objects:
-            if obj.object_type not in {"image", "evidence"}:
+            if obj.object_type not in {"image", "evidence"} | MEDIA_OBJECT_TYPES:
                 continue
             asset = assets.get(obj.asset_id)
             if asset is None:
@@ -383,8 +387,12 @@ class ProjectRunner:
                 verified[asset.asset_id] = self.service.render_evidence_bytes(
                     project_id, asset, treatment,
                 )
+            elif obj.object_type in MEDIA_OBJECT_TYPES:
+                if asset.asset_id not in verified:
+                    verified[asset.asset_id] = self.service.render_media_bytes(
+                        project_id, asset, layout=parsed_layout).payload
             else:
-                verified[asset.asset_id] = self.service.render_image_bytes(project_id, asset).payload
+                verified[asset.asset_id] = self.service.render_image_bytes(project_id, asset, layout=parsed_layout).payload
         try:
             frame = compose_png_frame(layout, timeline, at_ms, verified)
         except ValueError as exc:

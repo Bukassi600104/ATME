@@ -1,14 +1,13 @@
-"""Private Group history can be stored without advertising public Group frames."""
+"""Stored Group history has source-frame parity without release advertisement."""
 
 from copy import deepcopy
 
 import pytest
+from atme.project_service import ProjectError, _resolved_compilation_fingerprint
 from test_v2_resolved_project import stored_v2_basis
 from test_v2_return_hierarchy import group_return_documents
 from test_v2_timeline_replay import resolved
 from v2_fixtures import digest
-
-from atme.project_service import ProjectError, _resolved_compilation_fingerprint
 
 
 def stored_group_return_basis(tmp_path, regroup):
@@ -75,7 +74,7 @@ def stored_group_return_basis(tmp_path, regroup):
 
 
 @pytest.mark.parametrize("regroup", [False, True])
-def test_new_write_stores_exact_group_and_ungroup_a_b_a_receipts_without_public_playback(tmp_path, regroup):
+def test_new_write_stores_exact_group_and_ungroup_a_b_a_receipts_with_public_pixels(tmp_path, regroup):
     service, project, timeline = stored_group_return_basis(tmp_path, regroup)
     try:
         project = service.write(project["project_id"], "resolved_timeline", timeline, project["revision"])
@@ -84,10 +83,10 @@ def test_new_write_stores_exact_group_and_ungroup_a_b_a_receipts_without_public_
         copied = service.artifact(copy["project_id"], "resolved_timeline")["document"]
         assert copied["actions"][-1]["return_hierarchy_receipt"] == timeline["actions"][-1]["return_hierarchy_receipt"]
         assert copied["compilation_fingerprint"] == _resolved_compilation_fingerprint(copied)
-        with pytest.raises(ProjectError, match="cannot be previewed") as failure:
-            service.runner.preview_v2_source(project["project_id"], project["revision"], 7000)
-        assert failure.value.code == "preview_unavailable"
-        assert "no frame implementation" in failure.value.errors[0]["message"]
+        frame = service.runner.preview_v2_source(project["project_id"], project["revision"], 7000)
+        duplicate_frame = service.runner.preview_v2_source(copy["project_id"], copy["revision"], 7000)
+        assert frame["png"] == duplicate_frame["png"]
+        assert (frame["width"], frame["height"]) == (1280, 720)
         assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1"]
     finally:
         service.store.close()

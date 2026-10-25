@@ -1,0 +1,26 @@
+{
+  "contract": "atme.code-font-bundle",
+  "version": "1.0.0",
+  "system_id": "atme-code-font-v1",
+  "font": {
+    "id": "jetbrains-mono-regular",
+    "family": "JetBrains Mono",
+    "role": "code",
+    "weight": 400,
+    "file": "code-font-v1/fonts/JetBrainsMono-Regular.ttf",
+    "sha256": "e6fd0d7e91550b3ed2b735d4312474362c4716edc4fc0577a0f61ed782d5aed1",
+    "license": "OFL-1.1",
+    "license_file": "code-font-v1/fonts/OFL-JetBrainsMono.txt",
+    "license_sha256": "a76abf002c49097d146e86740a3105a5d00450b1592e820a1109a8c5680cd697",
+    "source_url": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/19371302b95d218af43299bce79ddbddd0bc364d/fonts/ttf/JetBrainsMono-Regular.ttf",
+    "license_source_url": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/19371302b95d218af43299bce79ddbddd0bc364d/OFL.txt"
+  },
+  "typography": {
+    "font_id": "jetbrains-mono-regular",
+    "size_px": 28,
+    "line_height": 1.35,
+    "max_characters_per_line": 72,
+    "advance_em": 0.6,
+    "metrics_charset": "ascii-printable-v1"
+  }
+}

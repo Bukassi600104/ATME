@@ -344,13 +344,14 @@ class ProjectService:
                     )
                 self._rebind_duplicated_v2_artifacts(conn, project_id, copy_id)
                 conn.commit()
-            except Exception:
+            except Exception as exc:
                 conn.rollback()
+                if isinstance(exc, ValueError) and not isinstance(exc, ProjectError):
+                    raise ProjectError("invalid_artifact", str(exc)) from exc
                 raise
         return self.open(copy_id)
 
-    @staticmethod
-    def _rebind_duplicated_v2_artifacts(conn, source_id, copy_id):
+    def _rebind_duplicated_v2_artifacts(self, conn, source_id, copy_id):
         """Clone v2 identity and its exact hashes without touching source revisions."""
         rows = conn.execute(
             "SELECT kind,revision,document FROM project_artifact_versions "
@@ -360,6 +361,75 @@ class ProjectService:
         plans = {}
         layouts = {}
         derivations = []
+        split_asset_ids = {pin["asset_id"] for stored in rows if stored["kind"] == "storyboard"
+                           for action in json.loads(stored["document"]).get("actions", [])
+                           for pin in (action.get("split_policy") or {}).get("source_basis", {}).get("asset_pins", [])}
+        destination_pins = {}
+        for table, identity in (("project_assets", "asset_id"), ("project_source_media", "media_id")):
+            for owned in conn.execute(f"SELECT {identity},revision,metadata FROM {table} WHERE job_id=?", (copy_id,)):
+                asset_id = owned[identity]
+                if asset_id not in split_asset_ids:
+                    continue
+                metadata = json.loads(owned["metadata"])
+                pin = {"asset_id": asset_id, "revision": owned["revision"],
+                       "resource_uri": f"atme://projects/{copy_id}/assets/{asset_id}",
+                       "checksum_sha256": metadata["sha256"]}
+                if asset_id in destination_pins:
+                    raise ProjectError("invalid_artifact", "Cloned Split asset ownership is ambiguous")
+                destination_pins[asset_id] = pin
+        for stored in rows:
+            original = json.loads(stored["document"])
+            if (stored["kind"] != "resolved_timeline" or original.get("contract_version") != "2.0.0"
+                    or not any(item["action"]["verb"] == "split" for item in original["actions"])):
+                continue
+            timing_row = conn.execute(
+                "SELECT document FROM project_source_timeline_versions WHERE job_id=? AND timeline_revision=?",
+                (source_id, original["cleaned_timeline_revision"])).fetchone()
+            timing = ({"timeline_revision": original["cleaned_timeline_revision"],
+                       "document": json.loads(timing_row["document"])} if timing_row else
+                      self.source_timeline.get(source_id))
+            historical_plan = self.artifact(source_id, "storyboard", original["plan_revision"])
+            historical_layout = self.artifact(source_id, "layout", original["layout_revision"])
+            for revision, document in ((stored["revision"], original),
+                                       (historical_plan["revision"], historical_plan["document"]),
+                                       (historical_layout["revision"], historical_layout["document"])):
+                if document["project_revision"] != revision - 1:
+                    raise ProjectError("stale_contract_basis", "Split differs from its immutable artifact revision")
+            dependency = conn.execute(
+                "SELECT timeline_revision FROM project_timeline_dependencies "
+                "WHERE job_id=? AND kind='resolved_timeline' AND artifact_revision=?",
+                (source_id, stored["revision"])).fetchone()
+            if (dependency is None or dependency["timeline_revision"] != original["cleaned_timeline_revision"]
+                    or historical_plan.get("basis_timeline_revision") != original["cleaned_timeline_revision"]
+                    or historical_layout.get("basis_timeline_revision") != original["cleaned_timeline_revision"]):
+                raise ProjectError("stale_contract_basis", "Split differs from its immutable cleaned timing dependency")
+            historical_plan.pop("stale", None)
+            historical_layout.pop("stale", None)
+            self._validate_resolved_timeline(
+                source_id, original, {**dict(self._row(source_id)), "profile": original["output_profile"]["profile_id"]},
+                basis_revision=original["project_revision"],
+                require_return_receipts=True,
+                plan_row=historical_plan, layout_row=historical_layout, timing=timing)
+
+        def rebind_split(action):
+            policy = action.get("split_policy")
+            if policy is None:
+                return
+            from atme.store.contracts_v2 import SplitPolicy, _split_packet_digest
+
+            SplitPolicy.model_validate(policy)
+            for index, pin in enumerate(policy["source_basis"]["asset_pins"]):
+                destination = destination_pins.get(pin["asset_id"])
+                if (destination is None or destination["revision"] != pin["revision"]
+                        or destination["checksum_sha256"] != pin["checksum_sha256"]):
+                    raise ProjectError("invalid_artifact", "Cloned Split asset differs from its destination owner")
+                policy["source_basis"]["asset_pins"][index] = deepcopy(destination)
+            for result in policy["results"]:
+                activation = result.get("evidence_activation")
+                if activation is not None:
+                    activation["asset_pin"] = deepcopy(destination_pins[activation["asset_pin"]["asset_id"]])
+            policy["source_basis_sha256"] = _split_packet_digest(policy["source_basis"])
+
         for row in rows:
             if row["kind"] != "storyboard":
                 continue
@@ -370,6 +440,8 @@ class ProjectService:
                 document, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
             ).encode()).hexdigest()
             document["project_id"] = copy_id
+            for action in document.get("actions", []):
+                rebind_split(action)
             for asset in document.get("assets", []):
                 original_ref = f"atme://projects/{source_id}/assets/{asset['asset_id']}"
                 if asset["kind"] != "evidence" and asset.get("managed_ref") == original_ref:
@@ -403,7 +475,9 @@ class ProjectService:
             ).encode()).hexdigest()
             from atme.store.contracts_v2 import validate_plan_layout
             try:
-                validate_plan_layout(plan, document)
+                # This transaction clones existing immutable history. It must
+                # not impose new-write code payloads on old stored documents.
+                validate_plan_layout(plan, document, require_code_payloads=False)
             except ValueError as exc:
                 raise ProjectError("invalid_artifact", "Cloned v2 layout does not preserve its plan") from exc
             serialized = json.dumps(document, ensure_ascii=False, allow_nan=False)
@@ -428,7 +502,26 @@ class ProjectService:
             if plan is None or layout is None:
                 raise ProjectError("invalid_artifact", "Cloned resolved timeline has no matching visual basis")
             old_hash = _visual_digest(document)
+            from atme.store.contracts_v2 import (
+                ResolvedVisualTimelineV2,
+                SplitPolicy,
+                _split_packet_digest,
+            )
+            ResolvedVisualTimelineV2.model_validate(document)
             document["project_id"] = copy_id
+            plan_actions = {action["action_id"]: action for action in plan["actions"]}
+            for item in document["actions"]:
+                if item["action"]["verb"] != "split":
+                    continue
+                item["action"] = deepcopy(plan_actions[item["action"]["action_id"]])
+                policy = item["action"]["split_policy"]
+                receipt = item.get("split_completion_receipt")
+                if receipt is not None:
+                    receipt.update(source_basis_sha256=policy["source_basis_sha256"],
+                                   policy_sha256=_split_packet_digest(SplitPolicy.model_validate(policy).model_dump(mode="json")),
+                                   asset_pins=deepcopy(policy["source_basis"]["asset_pins"]))
+                    receipt["completion_sha256"] = _split_packet_digest({
+                        key: value for key, value in receipt.items() if key != "completion_sha256"})
             plan_assets = {asset["asset_id"]: asset for asset in plan["assets"]}
             for asset in document.get("resolved_assets", []):
                 original_ref = f"atme://projects/{source_id}/assets/{asset['asset_id']}"
@@ -441,6 +534,19 @@ class ProjectService:
             document["compilation_fingerprint"] = _resolved_compilation_fingerprint(document)
             from atme.store.contracts_v2 import ResolvedVisualTimelineV2
             ResolvedVisualTimelineV2.model_validate(document)
+            if any(item["action"]["verb"] == "split" for item in document["actions"]):
+                timing_row = conn.execute(
+                    "SELECT document FROM project_source_timeline_versions WHERE job_id=? AND timeline_revision=?",
+                    (copy_id, document["cleaned_timeline_revision"])).fetchone()
+                timing = ({"timeline_revision": document["cleaned_timeline_revision"],
+                           "document": json.loads(timing_row["document"])} if timing_row else
+                          self.source_timeline.get(copy_id))
+                self._validate_resolved_timeline(
+                    copy_id, document, {**dict(self._row(copy_id)), "profile": document["output_profile"]["profile_id"]},
+                    basis_revision=document["project_revision"],
+                    require_return_receipts=True,
+                    plan_row={"revision": document["plan_revision"], "document": plan},
+                    layout_row={"revision": document["layout_revision"], "document": layout}, timing=timing)
             serialized = json.dumps(document, ensure_ascii=False, allow_nan=False)
             conn.execute(
                 "UPDATE project_artifact_versions SET document=? "
@@ -489,8 +595,13 @@ class ProjectService:
                         )
                         validate_plan_evidence_completeness(document)
                 elif kind == "layout":
-                    from atme.store.contracts_v2 import ExecutableLayoutV2
-                    ExecutableLayoutV2.model_validate(document)
+                    from atme.store.contracts_v2 import (
+                        ExecutableLayoutV2,
+                        validate_layout_registry_completeness,
+                    )
+                    layout = ExecutableLayoutV2.model_validate(document)
+                    if not legacy_migration:
+                        validate_layout_registry_completeness(layout)
                 elif kind == "resolved_timeline":
                     from atme.store.contracts_v2 import ResolvedVisualTimelineV2
                     ResolvedVisualTimelineV2.model_validate(document)
@@ -503,8 +614,8 @@ class ProjectService:
     def _write_transaction(self, conn, project_id, kind, document, serialized, row):
         revision = row["revision"] + 1
         if kind in ("storyboard", "layout", "resolved_timeline"):
-            script = self.artifact(project_id, "script")
             version = document.get("contract_version", "1")
+            script = self.artifact(project_id, "script") if version != "2.0.0" else None
             if version == "2.0.0":
                 if document["project_id"] != project_id or document["project_revision"] != row["revision"]:
                     raise ProjectError("stale_contract_basis",
@@ -524,6 +635,17 @@ class ProjectService:
                     ensure_ascii=False).encode()).hexdigest()
                 authority = (document["narrative_authority"] if kind == "storyboard"
                              else self.artifact(project_id, "storyboard")["document"]["narrative_authority"])
+                script_authority = source["mode"] == "script_authority"
+                if script_authority:
+                    script = self.artifact(project_id, "script")
+                    if row["approved_script_revision"] != script["revision"]:
+                        raise ProjectError("stale_contract_basis", "V2 artifacts require the current approved script")
+                expected_mode = "approved_script_plus_recording" if script_authority else "recording_only"
+                expected_authority = (f"script-revision-{source['semantic_structure']['revision']}"
+                                      if script_authority else media_info["media_id"] if media_info else None)
+                if authority["mode"] != expected_mode or authority["authority_id"] != expected_authority:
+                    raise ProjectError("stale_contract_basis",
+                                       "V2 artifact must reference the current canonical narrative authority")
                 if (not media_info or authority["timing_media_id"] != media_info["media_id"]
                         or authority["timing_media_sha256"] != media_info["sha256"]
                         or authority["cleaned_timeline_revision"] != timeline["timeline_revision"]
@@ -568,8 +690,9 @@ class ProjectService:
                 if ({b["scene_id"] for b in document["beats"]} != set(scenes)
                         or any(b["narration"] != scenes[b["scene_id"]] for b in document["beats"])):
                     raise ProjectError("invalid_artifact", "Storyboard must reference every current script scene and preserve its narration")
-            conn.execute("INSERT INTO project_artifact_dependencies VALUES(?,?,?,?)",
-                         (project_id, kind, revision, script["revision"]))
+            if script is not None:
+                conn.execute("INSERT INTO project_artifact_dependencies VALUES(?,?,?,?)",
+                             (project_id, kind, revision, script["revision"]))
             timeline_revision = self.source_timeline.get(project_id)["timeline_revision"]
             conn.execute("INSERT INTO project_timeline_dependencies VALUES(?,?,?,?)",
                          (project_id, kind, revision, timeline_revision))
@@ -585,9 +708,10 @@ class ProjectService:
         return revision
 
     def _validate_resolved_timeline(self, project_id, document, row, *, basis_revision=None,
-                                    require_return_receipts):
+                                    require_return_receipts, plan_row=None, layout_row=None, timing=None):
         """Pair one immutable compiler result with the exact current plan/layout/timing."""
         from atme.store.contracts_v2 import (
+            MEDIA_OBJECT_TYPES,
             EvidenceAction,
             ExecutableLayoutV2,
             ResolvedVisualTimelineV2,
@@ -596,8 +720,8 @@ class ProjectService:
             validate_resolved_structure,
         )
 
-        plan_row = self.artifact(project_id, "storyboard")
-        layout_row = self.artifact(project_id, "layout")
+        plan_row = self.artifact(project_id, "storyboard") if plan_row is None else plan_row
+        layout_row = self.artifact(project_id, "layout") if layout_row is None else layout_row
         plan_doc, layout_doc = plan_row["document"], layout_row["document"]
         if (plan_doc.get("contract_version") != "2.0.0"
                 or layout_doc.get("contract_version") != "2.0.0"
@@ -615,7 +739,27 @@ class ProjectService:
             validate_plan_layout(plan_doc, layout_doc)
         except ValueError as exc:
             raise ProjectError("invalid_artifact", "The stored v2 plan and layout no longer agree") from exc
-        timing = self.source_timeline.get(project_id)
+        timing = self.source_timeline.get(project_id) if timing is None else timing
+        if any(item.action.verb == "split" for item in resolved.actions):
+            from atme.narrative_source import RECORDING_AUTHORITY_KINDS
+
+            authority = plan.narrative_authority
+            recording_only = row["input_kind"] in RECORDING_AUTHORITY_KINDS
+            media_row = self.store.conn.execute(
+                "SELECT metadata FROM project_source_media WHERE job_id=? AND media_id=?",
+                (project_id, authority.timing_media_id)).fetchone()
+            media = json.loads(media_row["metadata"]) if media_row else {}
+            approved = self.store.conn.execute(
+                "SELECT 1 FROM project_approval_events e JOIN project_artifact_versions v "
+                "ON v.job_id=e.job_id AND v.kind='script' AND v.revision=e.script_revision "
+                "WHERE e.job_id=? AND 'script-revision-' || v.revision=? LIMIT 1",
+                (project_id, authority.authority_id)).fetchone()
+            if (authority.mode != ("recording_only" if recording_only else "approved_script_plus_recording")
+                    or (authority.authority_id != authority.timing_media_id if recording_only else approved is None)
+                    or media.get("sha256") != authority.timing_media_sha256
+                    or authority.cleaned_timeline_revision != timing["timeline_revision"]
+                    or authority.cleaned_timeline_fingerprint != _visual_digest(timing["document"])):
+                raise ProjectError("stale_contract_basis", "Split narrative authority differs from its owned immutable basis")
         try:
             validate_resolved_structure(plan, layout, resolved, timing["document"]["duration_ms"])
         except ValueError as exc:
@@ -646,19 +790,13 @@ class ProjectService:
                 or resolved.fallbacks != plan.fallbacks
                 or resolved.evidence_treatments != layout.evidence_treatments):
             raise ProjectError("invalid_artifact", "Resolved timeline changes authored actions or coverage")
-        if require_return_receipts:
-            from atme.render.v2_state import validate_resolved_return_history
-
-            try:
-                validate_resolved_return_history(layout, resolved, layout_sha256=_visual_digest(layout_doc))
-            except ValueError as exc:
-                raise ProjectError("invalid_artifact", str(exc)) from exc
         resolved_asset_ids = {item.asset_id for item in resolved.resolved_assets}
         raster_objects = [obj for obj in layout.objects
-                          if obj.object_type in {"image", "evidence"}]
+                          if obj.object_type in {"image", "evidence"} | MEDIA_OBJECT_TYPES]
         if any(not obj.asset_id or not obj.asset_id.strip() for obj in raster_objects):
             raise ProjectError("invalid_artifact", "A raster visual has no declared project asset")
         raster_asset_ids = {obj.asset_id for obj in raster_objects}
+        media_asset_ids = {obj.asset_id for obj in raster_objects if obj.object_type in MEDIA_OBJECT_TYPES}
         if not raster_asset_ids.issubset(resolved_asset_ids):
             raise ProjectError("invalid_artifact", "Resolved timeline omits a required project raster asset")
         for asset in resolved.resolved_assets:
@@ -669,6 +807,36 @@ class ProjectService:
                     or declared.kind != asset.kind
                     or declared.allowed_transformations != asset.allowed_transformations):
                 raise ProjectError("invalid_artifact", "Resolved asset differs from its visual plan")
+            if asset.asset_id in media_asset_ids:
+                if ((declared.width, declared.height, declared.duration_ms, declared.media_stream)
+                        != (asset.width, asset.height, asset.duration_ms, asset.media_stream)):
+                    raise ProjectError("invalid_artifact", "Resolved media changes its authored stream pins")
+                # Recompute against the active owned original before an atomic
+                # resolved write or stored preview; never repair authored pins.
+                self.render_media_bytes(project_id, asset, layout=layout)
+        if require_return_receipts:
+            from atme.render.v2_state import validate_resolved_return_history
+
+            try:
+                split_inputs = None
+                if any(item.action.verb == "split" for item in resolved.actions):
+                    from atme.project_assets import read_verified_split_asset_bytes
+                    from atme.render.v2_split_paint import verify_split_paint_inputs
+
+                    owned = {asset["asset_id"]: asset for asset in self.list_assets(project_id)}
+                    pins = [{"asset_id": asset.asset_id, "revision": asset.revision,
+                             "resource_uri": (asset.managed_ref if asset.kind in MEDIA_OBJECT_TYPES else
+                                              owned.get(asset.asset_id, {}).get("resource_uri", "")),
+                             "checksum_sha256": asset.checksum_sha256}
+                            for asset in resolved.resolved_assets]
+                    carrier = read_verified_split_asset_bytes(
+                        self, layout, [asset.model_dump(mode="json") for asset in resolved.resolved_assets],
+                        pins)
+                    split_inputs = verify_split_paint_inputs(layout, carrier)
+                validate_resolved_return_history(layout, resolved, layout_sha256=_visual_digest(layout_doc),
+                                                 split_inputs=split_inputs)
+            except ValueError as exc:
+                raise ProjectError("invalid_artifact", str(exc)) from exc
 
     def write(self, project_id, kind, document, expected_revision):
         serialized = self._serialized_artifact(kind, document)
@@ -937,9 +1105,13 @@ class ProjectService:
         from atme.project_assets import read_asset
         return read_asset(self, project_id, asset_id, max_bytes)
 
-    def render_image_bytes(self, project_id, resolved_asset):
+    def render_image_bytes(self, project_id, resolved_asset, *, layout=None):
         from atme.project_assets import read_verified_image_bytes
-        return read_verified_image_bytes(self, project_id, resolved_asset)
+        return read_verified_image_bytes(self, project_id, resolved_asset, layout=layout)
+
+    def render_media_bytes(self, project_id, resolved_asset, *, layout=None):
+        from atme.project_assets import read_verified_media_bytes
+        return read_verified_media_bytes(self, project_id, resolved_asset, layout=layout)
 
     def render_evidence_bytes(self, project_id, resolved_asset, treatment):
         from atme.project_assets import read_verified_evidence_bytes

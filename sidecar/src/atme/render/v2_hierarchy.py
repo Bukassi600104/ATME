@@ -14,13 +14,47 @@ from atme.store.contracts_v2 import (
     ConnectorObject,
     ContainerObject,
     GroupAction,
+    GroupContainer,
     MaskContainer,
+    TargetAction,
     _require_hierarchy_contract,
 )
 
 
 class UnsupportedHierarchy(ValueError):
     """A hierarchy would change authored meaning or has no complete mapping."""
+
+
+def group_visibility_roots(action, objects: dict) -> tuple[str, ...]:
+    """Only ordinary enter/exit has whole-Group TargetAction semantics.
+
+    This is not membership replay. Public admission keeps other container verbs
+    closed; their existing private replay is unchanged. Mixed leaf/root enter/
+    exit is invalid, and local descendant states are never normalized.
+    """
+    if not isinstance(action, TargetAction) or action.verb not in {"enter", "exit"} or not any(
+        isinstance(objects[key], ContainerObject) for key in action.target_ids
+    ):
+        return ()
+    if any(type(objects[key]) is not GroupContainer for key in action.target_ids):
+        raise UnsupportedHierarchy("Group targets require enter/exit and only real Group roots; other descendant semantics remain closed")
+    if len(set(action.target_ids)) != len(action.target_ids):
+        raise UnsupportedHierarchy("Group enter/exit requires unique targets")
+    if any(objects[key].board_id != action.board_id for key in action.target_ids):
+        raise UnsupportedHierarchy("Group enter/exit targets must belong to the action board")
+    return tuple(action.target_ids)
+
+
+def group_visibility_closure(action, objects: dict, hierarchy) -> frozenset[str]:
+    """Capture the complete *current* contents of disjoint visibility roots."""
+    roots = group_visibility_roots(action, objects)
+    if not roots:
+        return frozenset()
+    hierarchy.validate(objects)
+    if any(set(hierarchy.ancestors(root)).intersection(roots) for root in roots):
+        raise UnsupportedHierarchy("Group enter/exit needs disjoint target closures")
+    return frozenset(key for key in objects
+                     if key in roots or set(hierarchy.ancestors(key)).intersection(roots))
 
 
 @dataclass(frozen=True)
@@ -240,16 +274,51 @@ def validate_authored_hierarchy(action: GroupAction, objects: dict) -> tuple[Hie
             or shell.geometry.corner_radius is not None or shell.clip_id is not None
             or any((shell.style.stroke, shell.style.fill, shell.style.text, shell.style.effect))):
         raise UnsupportedHierarchy("hierarchy shell must be a visible opaque nonpainting group")
+    mask_sources = {obj.mask_source_object_id for obj in objects.values() if isinstance(obj, MaskContainer)}
+    affected = set()
     for snapshot in (before, after):
         for object_id, obj in objects.items():
             ancestors = set(snapshot.ancestors(object_id))
             if object_id in moved_roots or ancestors.intersection(moved_roots):
+                affected.add(object_id)
                 if isinstance(obj, ConnectorObject):
                     raise UnsupportedHierarchy("hierarchy step cannot reparent a connector without inverse-parent semantics")
                 dependencies = {object_id, *ancestors, action.container_id}
                 if any(objects[key].object_type in {"clip", "mask", "evidence"}
-                       or objects[key].clip_id is not None for key in dependencies):
+                       or key in mask_sources for key in dependencies):
                     raise UnsupportedHierarchy("hierarchy transition cannot cross aperture or evidence ownership")
+    has_external_read = False
+    for key in affected:
+        inherited = [tuple(part for part in (key, *snapshot.ancestors(key)) if objects[part].clip_id is not None)
+                     for snapshot in (before, after)]
+        if inherited[0] != inherited[1]:
+            raise UnsupportedHierarchy("hierarchy transition changes external aperture inheritance")
+        has_external_read |= bool(inherited[0])
+    if has_external_read:
+        protected_roots = set()
+        for key, obj in objects.items():
+            if any(getattr(obj, field, None) is not None for field in (
+                    "composition_binding", "character_assembly", "illustration_assembly", "callout_binding")):
+                protected_roots.add(key)
+            for field in ("technical_frame", "structured_list"):
+                binding = getattr(obj, field, None)
+                if binding is not None:
+                    protected_roots.add(binding.container_group_id)
+        if any(protected_roots.intersection((key, *snapshot.ancestors(key)))
+               for snapshot in (before, after) for key in affected):
+            raise UnsupportedHierarchy("external aperture membership cannot move a protected ownership closure")
+    # Read edges are not ownership. Check BOTH actual authored projections,
+    # including dedicated Mask sources which have no clip_id of their own.
+    from atme.render.v2_external_aperture import validate_external_aperture_map
+    from atme.store.contracts_v2 import _validate_mask_layout
+
+    try:
+        for snapshot in (before, after):
+            projected = snapshot.object_map(objects)
+            _validate_mask_layout(tuple(projected.values()), projected)
+            validate_external_aperture_map(projected)
+    except ValueError as exc:
+        raise UnsupportedHierarchy(f"hierarchy aperture read graph: {exc}") from exc
     for board_id in {obj.board_id for obj in objects.values()}:
         if before.paint_order(objects, board_id) != after.paint_order(objects, board_id):
             raise UnsupportedHierarchy("hierarchy transition changes effective leaf paint order")

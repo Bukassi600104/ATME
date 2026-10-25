@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import faulthandler
-
 import json
 import sys
 from pathlib import Path
@@ -10,8 +9,13 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _per_test_hang_tripwire():
+def _per_test_hang_tripwire(request):
     """Fail one genuinely stuck test without timing out a healthy full suite."""
+    timeout = float(request.config.getini("faulthandler_timeout") or 0.0)
+    if timeout > 0:
+        # Pytest owns the explicitly configured timer, including cancellation.
+        yield
+        return
     faulthandler.dump_traceback_later(600, exit=True)
     try:
         yield

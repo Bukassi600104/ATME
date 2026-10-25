@@ -1,4 +1,4 @@
-"""Paired hierarchy/annotation consumers; public Group admission stays separate."""
+"""Paired hierarchy/annotation consumers share the public Group frame clock."""
 
 import socket
 import xml.etree.ElementTree as ET
@@ -7,13 +7,6 @@ from dataclasses import replace
 from io import BytesIO
 
 import pytest
-from PIL import Image
-from test_v2_annotation_action import append_target
-from test_v2_annotation_contract import grouped_annotation_documents
-from test_v2_hierarchy_contract import rehash
-from test_v2_timeline_replay import resolved
-from v2_fixtures import digest
-
 from atme.render import v2_state
 from atme.render.v2_hierarchy import HierarchySnapshot, changed_hierarchy_objects
 from atme.render.v2_world import world_anchor, world_bounds
@@ -23,6 +16,12 @@ from atme.store.contracts_v2 import (
     HierarchyBasis,
     ResolvedVisualTimelineV2,
 )
+from PIL import Image
+from test_v2_annotation_action import append_target
+from test_v2_annotation_contract import grouped_annotation_documents
+from test_v2_hierarchy_contract import rehash
+from test_v2_timeline_replay import resolved
+from v2_fixtures import digest
 
 
 def annotation_group_documents(shell_id="target-group", start=5000, end=6000, *, nested=False, portrait=False):
@@ -250,22 +249,23 @@ def test_parent_fade_guard_survives_real_group_annotation_composition(start):
         consumer_clock(layout, timeline)
 
 
-def test_public_group_frame_admission_remains_closed():
+def test_public_group_frame_matches_the_validated_consumer_history():
     layout, timeline = annotation_group_documents()
-    with pytest.raises(v2_state.UnsupportedVisualAction, match="no frame implementation"):
-        v2_state.evaluate_frame(layout, timeline, 6500)
+    context, replay, camera = consumer_clock(layout, timeline)
+    assert v2_state.evaluate_frame(layout, timeline, 6500) == v2_state._sample_validated_frame(
+        context.layout, context.timeline, replay, camera, 6500)
 
 
-def test_no_return_storage_pair_proof_uses_full_history_without_opening_public_frames():
+def test_no_return_storage_and_public_frames_share_the_full_history():
     layout, timeline = annotation_group_documents()
-    consumer_clock(layout, timeline)
+    context, replay, camera = consumer_clock(layout, timeline)
     original = deepcopy((layout, timeline))
     v2_state.validate_resolved_return_history(
         ExecutableLayoutV2.model_validate(layout), ResolvedVisualTimelineV2.model_validate(timeline),
         layout_sha256=digest(layout))
     assert (layout, timeline) == original
-    with pytest.raises(v2_state.UnsupportedVisualAction, match="no frame implementation"):
-        v2_state.evaluate_frame(layout, timeline, 6750)
+    assert v2_state.evaluate_frame(layout, timeline, 6750) == v2_state._sample_validated_frame(
+        context.layout, context.timeline, replay, camera, 6750)
 
 
 def private_svg(context, replay, camera, at_ms):
@@ -316,8 +316,7 @@ def test_real_private_svg_png_both_authored_profiles_are_offline_immutable_and_s
     assert frames[7000] == frames[7999] == frames[9000]
     assert v2_svg._rasterize_svg_frame(context.layout, private_svg(context, replay, camera, 6750)).png == frames[6750]
     assert (layout, timeline) == original
-    with pytest.raises(v2_state.UnsupportedVisualAction):
-        v2_svg.compose_png_frame(layout, timeline, 6750)
+    assert v2_svg.compose_png_frame(layout, timeline, 6750).png == frames[6750]
 
 
 @pytest.mark.parametrize("shell_id", ["annotation-group", "target-group"])

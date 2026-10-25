@@ -3,6 +3,10 @@
 from copy import deepcopy
 
 import pytest
+from atme.project_service import ProjectError, _resolved_compilation_fingerprint
+from atme.render.v2_hierarchy import HierarchySnapshot
+from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
+from atme.store.contracts_v2 import HierarchyBasis
 from test_v2_annotation_action import append_target
 from test_v2_group_annotation import (
     annotation_group_documents,
@@ -15,11 +19,6 @@ from test_v2_resolved_project import stored_v2_basis
 from test_v2_return_board import return_documents
 from test_v2_timeline_replay import resolved
 from v2_fixtures import digest
-
-from atme.project_service import ProjectError, _resolved_compilation_fingerprint
-from atme.render.v2_hierarchy import HierarchySnapshot
-from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
-from atme.store.contracts_v2 import HierarchyBasis
 
 
 def stored_group_annotation_return_basis(tmp_path, *, regroup, stale=None, mutate=None, portrait=False,
@@ -237,7 +236,7 @@ def test_coherent_group_source_basis_cannot_ignore_prior_source_motion(tmp_path,
 
 @pytest.mark.parametrize("portrait", [False, True])
 @pytest.mark.parametrize("regroup", [False, True])
-def test_real_duplicate_rebind_preserves_receipt_and_private_offline_return_pixels(tmp_path, regroup, portrait, monkeypatch):
+def test_real_duplicate_rebind_preserves_receipt_and_public_offline_return_pixels(tmp_path, regroup, portrait, monkeypatch):
     import socket
 
     from atme.render import v2_svg
@@ -279,10 +278,9 @@ def test_real_duplicate_rebind_preserves_receipt_and_private_offline_return_pixe
             pixels.append(frames)
         assert pixels[0] == pixels[1]
         for current in (project, copy):
-            with pytest.raises(ProjectError, match="cannot be previewed") as failure:
-                service.runner.preview_v2_source(current["project_id"], current["revision"], 9000)
-            assert failure.value.code == "preview_unavailable"
-            assert "no frame implementation" in failure.value.errors[0]["message"]
+            frame = service.runner.preview_v2_source(current["project_id"], current["revision"], 9000)
+            assert frame["png"] == pixels[0][9000]
+            assert (frame["width"], frame["height"]) == ((720, 1280) if portrait else (1280, 720))
         assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1"]
         assert {kind: service.artifact(pid, kind) for kind in originals} == originals
         assert service.source_timeline.get(pid) == source

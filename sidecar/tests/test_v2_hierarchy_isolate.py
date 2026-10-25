@@ -6,6 +6,14 @@ from dataclasses import replace
 from io import BytesIO
 
 import pytest
+from atme.narrative_source import describe
+from atme.project_service import ProjectError, _resolved_compilation_fingerprint
+from atme.render import v2_svg
+from atme.render.v2_hierarchy import HierarchySnapshot
+from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
+from atme.render.v2_isolation import UnsupportedIsolation, isolation_context_roots
+from atme.render.v2_state import V2FrameError, evaluate_frame
+from atme.store.contracts_v2 import TargetAction
 from PIL import Image
 from test_v2_group_annotation import consumer_clock, private_svg
 from test_v2_group_annotation_project import stored_group_annotation_return_basis
@@ -13,15 +21,6 @@ from test_v2_group_hierarchy import grouped_documents
 from test_v2_group_replacement import grouped_replacement_documents
 from test_v2_mask_contract import masked_documents
 from v2_fixtures import digest
-
-from atme.narrative_source import describe
-from atme.project_service import ProjectError, _resolved_compilation_fingerprint
-from atme.render import v2_svg
-from atme.render.v2_hierarchy import HierarchySnapshot
-from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
-from atme.render.v2_isolation import UnsupportedIsolation, isolation_context_roots
-from atme.render.v2_state import UnsupportedVisualAction, V2FrameError, evaluate_frame
-from atme.store.contracts_v2 import TargetAction
 
 
 def nested_isolate_documents(*, focus="object-system", mask=False):
@@ -326,8 +325,8 @@ def test_real_stored_isolate_return_and_duplicate_restore_exact_context(tmp_path
         assert pixels[5999] == pixels[7000] == pixels[7999] == pixels[9000]
         assert pixels[6500] != pixels[7000] != pixels[8500]
         assert v2_svg._rasterize_svg_frame(context.layout, private_svg(context, replay, camera, 6500)).png == pixels[6500]
-        with pytest.raises(UnsupportedVisualAction):
-            v2_svg.compose_png_frame(originals["layout"], originals["resolved_timeline"], 6500)
+        assert v2_svg.compose_png_frame(
+            originals["layout"], originals["resolved_timeline"], 6500).png == pixels[6500]
         assert service.source_timeline.get(pid) == source
         assert {kind: service.artifact(pid, kind)["document"] for kind in originals} == originals
     finally:

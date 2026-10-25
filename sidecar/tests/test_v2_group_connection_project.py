@@ -4,15 +4,13 @@ from copy import deepcopy
 from functools import partial
 
 import pytest
+from atme.project_service import ProjectError
+from atme.render import v2_svg
 from test_v2_annotation_action import append_target
 from test_v2_connection_geometry import grouped_connection_documents
 from test_v2_group_annotation import consumer_clock, private_svg
 from test_v2_group_annotation_project import stored_group_annotation_return_basis
 from v2_fixtures import digest
-
-from atme.project_service import ProjectError
-from atme.render import v2_svg
-from atme.render.v2_state import UnsupportedVisualAction
 
 
 def stored_connection_basis(tmp_path, *, regroup, portrait=False, stale=None, mutate=None):
@@ -62,8 +60,8 @@ def test_stored_connection_return_and_duplicate_preserve_cleaned_source_and_offl
             assert result[7999] == result[9000] != result[8500]
             assert v2_svg._rasterize_svg_frame(context.layout, private_svg(context, replay, camera, 6250)).png == result[6250]
             frames.append(result)
-            with pytest.raises(UnsupportedVisualAction):
-                v2_svg.compose_png_frame(documents["layout"], documents["resolved_timeline"], 6250)
+            assert v2_svg.compose_png_frame(
+                documents["layout"], documents["resolved_timeline"], 6250).png == result[6250]
         assert frames[0] == frames[1]
         assert service.source_timeline.get(pid) == source
         assert {kind: service.artifact(pid, kind)["document"] for kind in originals} == originals

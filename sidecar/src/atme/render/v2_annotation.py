@@ -9,20 +9,28 @@ from __future__ import annotations
 import math
 
 from atme.render.style_bundle import resolve_contract_bundle
-from atme.render.v2_lifecycle import validate_annotation_paint_order
-from atme.render.v2_world import world_anchor, world_bounds, world_matrix
+from atme.render.v2_lifecycle import validate_annotation_paint_order_binding
+from atme.render.v2_registry import registry_relationship_anchor
+from atme.render.v2_world import world_bounds, world_matrix
 from atme.store.contracts_v2 import (
     TextObject,
-    _annotation_object_ids,
+    _annotation_policy_object_ids,
     _validate_annotation_plan_objects,
 )
 
 
-def validate_annotation_geometry(action, layout, objects, transforms, viewports, *, hierarchy):
+def validate_annotation_geometry(action, layout, objects, transforms, viewports, *, hierarchy,
+                                 registry_inputs=None):
     """Validate final authored paint, transformed anchors, and on-screen size."""
     _validate_annotation_plan_objects(action, objects)
-    validate_annotation_paint_order(action, objects, hierarchy)
-    ids = [action.target_ids[0], *_annotation_object_ids(action)]
+    validate_annotation_geometry_binding(action.target_ids[0], action.annotation_policy, action.board_id,
+        layout, objects, transforms, viewports, hierarchy=hierarchy, registry_inputs=registry_inputs)
+
+
+def validate_annotation_geometry_binding(target_id, policy, board_id, layout, objects, transforms, viewports,
+                                          *, hierarchy, registry_inputs=None, source_id=None):
+    validate_annotation_paint_order_binding(target_id, policy, board_id, objects, hierarchy, source_id=source_id)
+    ids = [target_id, *_annotation_policy_object_ids(policy)] + ([source_id] if source_id is not None else [])
     for object_id in ids:
         parent_id = objects[object_id].parent_id
         while parent_id is not None:
@@ -60,11 +68,13 @@ def validate_annotation_geometry(action, layout, objects, transforms, viewports,
                 size = role.size_px * scale * smallest * layout.canvas.width / viewport.width
                 if size < 18 * scale:
                     raise ValueError(f"annotation text {object_id} is too small to read")
-    leader_id = action.annotation_policy.leader_connector_id
+    leader_id = policy.leader_connector_id
     if leader_id is not None:
         leader = objects[leader_id]
-        start = world_anchor(objects[leader.source_object_id], leader.source_anchor_id, objects, transforms)
-        end = world_anchor(objects[leader.destination_object_id], leader.destination_anchor_id, objects, transforms)
+        start = registry_relationship_anchor(objects[leader.source_object_id], leader.source_anchor_id,
+                                             objects, transforms, registry_inputs)
+        end = registry_relationship_anchor(objects[leader.destination_object_id], leader.destination_anchor_id,
+                                           objects, transforms, registry_inputs)
         bounds = leader.geometry.bounds
         if start == end or any(not (bounds.x <= x <= bounds.x + bounds.width
                                    and bounds.y <= y <= bounds.y + bounds.height) for x, y in (start, end)):

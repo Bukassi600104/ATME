@@ -3,12 +3,11 @@
 from copy import deepcopy
 
 import pytest
-from test_v2_return_board import return_documents
-from v2_fixtures import digest
-
 from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
 from atme.render.v2_state import V2FrameError, evaluate_frame
 from atme.store.contracts_v2 import HierarchyBasis, ResolvedVisualTimelineV2
+from test_v2_return_board import return_documents
+from v2_fixtures import digest
 
 
 def private_clock(layout, timeline):
@@ -33,11 +32,10 @@ def private_clock(layout, timeline):
 
 
 def group_return_documents(*, regroup=False):
+    from atme.render.v2_hierarchy import HierarchySnapshot
     from test_v2_hierarchy_replay import prepared, reverse
     from test_v2_hierarchy_snapshot import basis
     from test_v2_timeline_replay import resolved
-
-    from atme.render.v2_hierarchy import HierarchySnapshot
 
     layout, timeline, _, _ = basis()
     action, _, _, _, _ = prepared()
@@ -62,9 +60,8 @@ def group_return_documents(*, regroup=False):
     ])
     timeline["initial_object_states"].append({"object_id": "object-interlude", "state": "visible",
                                               "visible": True, "state_version": 1})
-    from test_v2_hierarchy_contract import rehash
-
     from atme.store.contracts_v2 import GroupAction
+    from test_v2_hierarchy_contract import rehash
 
     action_doc = action.model_dump(mode="json")
     for side in ("source", "destination"):
@@ -232,8 +229,8 @@ def test_real_a_b_a_return_retains_completed_group_history_and_versions(regroup)
     assert replay.at(7000) == returned
     assert replay.before_action("return-1").hierarchy == returned.hierarchy
     assert (layout, timeline) == original
-    with pytest.raises(v2_state.UnsupportedVisualAction, match="no frame implementation"):
-        evaluate_frame(layout, timeline, 7000)
+    assert evaluate_frame(layout, timeline, 7000) == v2_state._sample_validated_frame(
+        context.layout, context.timeline, replay, plan, 7000)
 
 
 def test_group_return_without_receipt_stays_closed_in_shared_kernel():
@@ -369,10 +366,9 @@ def test_source_board_ordinary_end_commits_before_return_capture_without_polluti
     (9000, False, True), (5000, False, True), (5000, True, False), (3000, False, False),
 ])
 def test_return_history_validation_does_not_claim_future_operator_support(start, before_return, accepted):
-    from test_v2_timeline_replay import resolved
-
     from atme.render.v2_state import validate_resolved_return_history
     from atme.store.contracts_v2 import ExecutableLayoutV2
+    from test_v2_timeline_replay import resolved
 
     layout, timeline = return_receipt_documents()
     base = timeline["actions"][2]["action"]

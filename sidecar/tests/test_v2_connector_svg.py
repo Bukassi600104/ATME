@@ -8,14 +8,15 @@ import xml.etree.ElementTree as ET
 from copy import deepcopy
 
 import pytest
+from PIL import Image
+from test_v2_svg import primitive_documents
+from v2_fixtures import common_action, digest
+
 from atme.render.v2_svg import (
     UnsupportedVisualObject,
     compose_png_frame,
     compose_svg_frame,
 )
-from PIL import Image
-from test_v2_svg import primitive_documents
-from v2_fixtures import common_action, digest
 
 
 def connector_documents(routing="straight"):
@@ -85,7 +86,7 @@ def test_arrow_rejects_missing_or_unnormalized_endpoints_even_while_hidden():
 
 
 @pytest.mark.parametrize("change,match", [
-    ({"routing": "straight", "object_type": "network"}, "no SVG implementation"),
+    ({"routing": "straight", "object_type": "network", "role": "pointer"}, "unsupported network/pointer semantics"),
     ({"source_object_id": "object-label", "destination_object_id": "object-label",
       "allow_self_loop": True}, "loop back"),
     ({"geometry": {"bounds": {"x": 300, "y": 240, "width": 5, "height": 5},

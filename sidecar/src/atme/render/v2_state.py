@@ -12,8 +12,12 @@ import json
 from dataclasses import dataclass, replace
 from math import gcd
 
-from atme.render.style_bundle import resolve_contract_bundle
+from atme.render.style_bundle import (
+    registry_endpoint_inputs_for_objects,
+    resolve_contract_bundle,
+)
 from atme.render.v2_annotation import validate_annotation_geometry
+from atme.render.v2_callout_lifecycle import validate_callout_history
 from atme.render.v2_camera import (
     CameraViewport,
     UnsupportedCamera,
@@ -38,8 +42,20 @@ from atme.render.v2_emphasis import (
     cross_out_paths,
     emphasis_path,
 )
+from atme.render.v2_evidence_annotation import validate_evidence_annotation_history
 from atme.render.v2_evidence_reading import validate_evidence_reading
-from atme.render.v2_hierarchy import HierarchySnapshot, UnsupportedHierarchy
+from atme.render.v2_external_aperture import (
+    UnsupportedExternalAperture,
+    external_aperture_projections,
+    validate_external_aperture_history,
+    validate_external_aperture_map,
+)
+from atme.render.v2_hierarchy import (
+    HierarchySnapshot,
+    UnsupportedHierarchy,
+    group_visibility_roots,
+)
+from atme.render.v2_image import validate_image_placement_history
 from atme.render.v2_isolation import UnsupportedIsolation, isolation_context_roots
 from atme.render.v2_lifecycle import (
     UnsupportedLifecycle,
@@ -52,12 +68,23 @@ from atme.render.v2_lifecycle import (
 )
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.render.v2_mask import UnsupportedMask, mask_source_region
+from atme.render.v2_media_view import (
+    media_visual_view,
+    require_media_window,
+    validate_media_ranges,
+    validate_media_relationship_history,
+)
 from atme.render.v2_morph import (
     MorphGeometry,
     geometry_object,
     validate_morph_geometry,
 )
+from atme.render.v2_registry import _registry_endpoint_assets, validate_registry_binding
 from atme.render.v2_return import UnsupportedReturn, validate_return_sample
+from atme.render.v2_technical_frame_lifecycle import (
+    UnsupportedTechnicalFrameLifecycle,
+    validate_technical_frame_history,
+)
 from atme.render.v2_timeline_replay import (
     ChronologicalReplay,
     ReplayError,
@@ -78,6 +105,7 @@ from atme.store.contracts_v2 import (
     ReplaceAction,
     ResolvedVisualTimelineV2,
     SoundAction,
+    SplitAction,
     TargetAction,
     TextObject,
     Transform,
@@ -86,11 +114,18 @@ from atme.store.contracts_v2 import (
     _action_object_references,
     _annotation_object_ids,
     _annotation_phase_windows,
+    _callout_leader_owners,
+    _expected_split_evidence_window,
     _require_annotation_contract,
     _require_count_contract,
     _require_morph_contract,
     _require_return_board_policy,
     _require_return_contract,
+    _split_logical_write_owners,
+    _validate_callout_ownership,
+    _validate_structured_progression_objects,
+    validate_character_assembly_map,
+    validate_illustration_assembly_map,
     validate_resolved_hierarchy,
 )
 
@@ -197,6 +232,11 @@ class FrameSnapshot:
         raise KeyError(object_id)
 
 
+@dataclass(frozen=True)
+class SplitFrameSnapshot(FrameSnapshot):
+    envelopes: tuple
+
+
 def _ease(value: float, easing: str) -> float:
     progress = max(0.0, min(1.0, value))
     if easing == "linear":
@@ -230,9 +270,11 @@ def validate_static_hierarchy(layout: ExecutableLayoutV2, objects: dict | None =
     if objects is None:
         initial = {obj.object_id: obj for obj in layout.objects}
         objects = HierarchySnapshot.from_objects(initial).object_map(initial)
+    try:
+        validate_external_aperture_map(objects)
+    except UnsupportedExternalAperture as exc:
+        raise V2FrameError(str(exc)) from exc
     for obj in objects.values():
-        if obj.clip_id is not None:
-            raise V2FrameError(f"v2 object {obj.object_id} has unsupported clip_id")
         if isinstance(obj, ContainerObject):
             if isinstance(obj, MaskContainer) and obj.mask_source_object_id is None:
                 raise V2FrameError(
@@ -262,10 +304,21 @@ def validate_static_hierarchy(layout: ExecutableLayoutV2, objects: dict | None =
             raise V2FrameError(f"v2 object {obj.object_id} needs a supported container parent")
         if isinstance(obj, ConnectorObject):
             if obj.parent_id is not None:
-                raise V2FrameError(
-                    f"v2 connector {obj.object_id} needs inverse parent geometry"
-                )
+                from atme.render.v2_callout_pointer import validate_callout_pointer
+
+                if obj.source_point is None and obj.object_id not in _callout_leader_owners(objects):
+                    raise V2FrameError(f"v2 connector {obj.object_id} needs inverse parent geometry")
+                try:
+                    if obj.source_point is not None:
+                        validate_static_arrow(obj, objects)
+                    else:
+                        validate_callout_pointer(obj, objects)
+                except ValueError as exc:
+                    raise V2FrameError(str(exc)) from exc
             for endpoint_id in (obj.source_object_id, obj.destination_object_id):
+                if endpoint_id is not None and any(objects[key].clip_id is not None
+                        for key in (endpoint_id, *_ancestor_ids(objects[endpoint_id], objects))):
+                    raise V2FrameError(f"v2 connector {obj.object_id} needs external clipped-endpoint geometry")
                 if endpoint_id is not None and isinstance(objects[endpoint_id], ContainerObject):
                     raise V2FrameError(
                         f"v2 connector {obj.object_id} cannot anchor to a non-painting group"
@@ -313,6 +366,9 @@ class _PairContext:
     managed_connectors: frozenset[str]
     connector_endpoints: frozenset[str]
     treatments_by_action: dict
+    treatments_by_pair: dict
+    registry_inputs: object = None
+    structural_timeline: ResolvedVisualTimelineV2 | None = None
 
 
 def _validate_static_action(item, layout, timeline, objects, mask_sources, managed_connectors,
@@ -382,6 +438,15 @@ def _validate_static_action(item, layout, timeline, objects, mask_sources, manag
         raise V2FrameError(f"action {action.action_id} carries an annotation it cannot display")
     if action.annotation_policy is not None:
         return
+    if action.structured_list_policy is not None:
+        try:
+            _validate_structured_progression_objects(action, objects)
+        except ValueError as exc:
+            raise V2FrameError(str(exc)) from exc
+        if not any(a.board_id == action.board_id and a.start_ms <= item.start_ms
+                   and item.end_ms <= a.end_ms for a in layout.activations):
+            raise V2FrameError("structured list progression requires one active board interval")
+        return
     if action.verb == "count":
         try:
             _require_count_contract(action)
@@ -399,9 +464,13 @@ def _validate_static_action(item, layout, timeline, objects, mask_sources, manag
         except ValueError as exc:
             raise V2FrameError(str(exc)) from exc
         return
+    try:
+        visibility_roots = group_visibility_roots(action, objects)
+    except UnsupportedHierarchy as exc:
+        raise V2FrameError(str(exc)) from exc
     for target in action.target_ids:
         obj = objects[target]
-        if isinstance(obj, ContainerObject):
+        if isinstance(obj, ContainerObject) and target not in visibility_roots:
             raise V2FrameError(f"action {action.action_id} needs defined descendant semantics for a container")
         if action.verb in {"highlight", "cross_out", "dim", "isolate"}:
             supported = (isinstance(obj, MarkObject) and obj.object_type in SUPPORTED_HIGHLIGHT_MARKS
@@ -455,7 +524,8 @@ def _validate_static_action(item, layout, timeline, objects, mask_sources, manag
 
 def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
                    layout_sha256: str, hierarchy: HierarchySnapshot,
-                   *, structural_timeline: ResolvedVisualTimelineV2 | None = None) -> _PairContext:
+                   *, structural_timeline: ResolvedVisualTimelineV2 | None = None,
+                   registry_inputs=None) -> _PairContext:
     if (layout.project_id != timeline.project_id or layout.layout_id != timeline.layout_id
             or layout.plan_id != timeline.plan_id or layout.plan_revision != timeline.plan_revision
             or layout.plan_sha256 != timeline.plan_sha256
@@ -472,9 +542,45 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
     except ValueError as exc:
         raise V2FrameError(str(exc)) from exc
     resolved_actions = {item.action.action_id: item for item in timeline.actions}
-    treatments_by_action = {item.action_id: item for item in layout.evidence_treatments
-                            if structural_timeline is None or item.action_id in resolved_actions}
+    treatments_by_pair = {(item.action_id, item.object_id): item for item in layout.evidence_treatments
+                          if structural_timeline is None or item.action_id in resolved_actions}
+    ordinary_ids = {item.action.action_id for item in timeline.actions
+                    if isinstance(item.action, EvidenceAction) and item.action.verb == "insert_evidence"}
+    treatments_by_action = {item.action_id: item for item in treatments_by_pair.values()
+                            if item.action_id in ordinary_ids}
+    split_ids = {item.action.action_id for item in timeline.actions if isinstance(item.action, SplitAction)}
+    expected_split_pairs, split_hold_ends = set(), {}
+    for item in timeline.actions:
+        if not isinstance(item.action, SplitAction):
+            continue
+        policy = item.action.split_policy
+        results = [result for result in policy.results if result.evidence_activation is not None] if policy else []
+        windows = item.split_evidence_windows or []
+        if [row.result_object_id for row in windows] != [result.object_id for result in results]:
+            raise V2FrameError("Split evidence requires every exact ordered result window")
+        for result, window in zip(results, windows, strict=True):
+            key = item.action.action_id, result.object_id
+            expected_split_pairs.add(key)
+            treatment = treatments_by_pair.get(key)
+            activation = result.evidence_activation
+            if (treatment is None or treatment.intent != activation.intent
+                    or treatment.beat_id != activation.beat_id
+                    or window.model_dump(mode="json") != _expected_split_evidence_window(item, result, treatment)):
+                raise V2FrameError("Split evidence window differs from its exact treatment and authored phase clock")
+            split_hold_ends[key] = window.readable_hold_end_ms
+    if {key for key in treatments_by_pair if key[0] in split_ids} != expected_split_pairs:
+        raise V2FrameError("Split evidence requires its complete selected treatment pairs")
     layout_objects = hierarchy.object_map({item.object_id: item for item in layout.objects})
+    try:
+        validate_media_ranges(layout_objects, {asset.asset_id: asset for asset in timeline.resolved_assets},
+                              timeline.duration_ms)
+    except ValueError as exc:
+        raise V2FrameError(str(exc)) from exc
+    if _callout_leader_owners(layout_objects) or any(row.intent.annotation_policy is not None
+                                                   for row in treatments_by_pair.values()):
+        inventory = structural_timeline if structural_timeline is not None else timeline
+        _validate_callout_ownership(layout_objects, [row.action for row in inventory.actions],
+                                    [(row.object_id, row.intent) for row in layout.evidence_treatments])
     validate_static_hierarchy(layout, layout_objects)
     state_objects = {item.object_id for item in timeline.initial_object_states}
     if set(layout_objects) != state_objects:
@@ -561,16 +667,19 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
                 or action.post_state != action.destination_state
                 or action.destination_state != treatment.intent.destination_state):
             raise V2FrameError(f"insert_evidence {action.action_id} changes its authored binding")
-    for treatment in treatments_by_action.values():
+    for key, treatment in treatments_by_pair.items():
         resolved = resolved_actions.get(treatment.action_id)
-        if resolved is None or not any(
+        if resolved is None or treatment.action_id not in ordinary_ids | split_ids:
+            raise V2FrameError("evidence has no actual insert or Split activation owner")
+        hold_end = (split_hold_ends[key] if isinstance(resolved.action, SplitAction)
+                    else resolved.end_ms + treatment.intent.readable_hold_intent_ms)
+        if not any(
             activation.board_id == treatment.intent.destination_board_id
             and activation.start_ms <= resolved.start_ms
-            and resolved.end_ms + treatment.intent.readable_hold_intent_ms <= activation.end_ms
+            and hold_end <= activation.end_ms
             for activation in layout.activations
         ):
             raise V2FrameError("evidence readable hold outlasts its destination board")
-    for treatment in treatments_by_action.values():
         obj = layout_objects[treatment.object_id]
         chain = {obj.object_id, *_ancestor_ids(obj, layout_objects)}
         if "rotate" not in treatment.allowed_transformations and any(
@@ -588,11 +697,20 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
                 or obj.opacity <= 0 or initial_state.state != "hidden"
                 or initial_state.visible):
             raise V2FrameError(f"evidence {treatment.object_id} needs an untouched hidden source")
-        resolved = resolved_actions[treatment.action_id]
-        hold_end = resolved.end_ms + treatment.intent.readable_hold_intent_ms
         for other in timeline.actions:
             if other is resolved or isinstance(other.action, (SoundAction, GroupAction)):
                 continue
+            if isinstance(other.action, CameraAction):
+                if treatment.intent.annotation_policy is not None and not isinstance(resolved.action, SplitAction):
+                    continue
+                if isinstance(resolved.action, SplitAction):
+                    policy = resolved.action.split_policy
+                    owned = {key for closure in (policy.source_basis.source_closure,
+                                                  *policy.source_basis.result_closures) for key in closure.owned_ids}
+                    owned.update(_split_logical_write_owners(policy))
+                    targets = set(other.action.target_ids)
+                    if targets and targets.issubset(owned):
+                        continue
             if (other.action.board_id == obj.board_id
                     and other.start_ms < hold_end and other.end_ms > resolved.start_ms):
                 raise V2FrameError(
@@ -708,9 +826,20 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
         visible=obj.visible, opacity=obj.opacity, reveal_fraction=1.0 if obj.visible else 0.0,
         transform=FrameTransform.from_contract(obj.transform),
     ) for obj in layout.objects)
+    bound = [obj for obj in layout_objects.values() if isinstance(obj, VisualObject)
+             and obj.registry_binding is not None]
+    if bound:
+        if registry_inputs is None:
+            registry_inputs = registry_endpoint_inputs_for_objects(layout_objects)
+        assets = _registry_endpoint_assets(registry_inputs)
+        for obj in bound:
+            if obj.variant not in assets:
+                raise V2FrameError("registry endpoint inputs lack the exact variant")
+            validate_registry_binding(obj, assets[obj.variant])
     return _PairContext(layout, timeline, hierarchy, layout_objects, initial, frames,
                         frozenset(mask_sources), frozenset(managed_connectors),
-                        frozenset(connector_endpoints), treatments_by_action)
+                        frozenset(connector_endpoints), treatments_by_action, treatments_by_pair, registry_inputs,
+                        structural_timeline)
 
 
 def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, camera_plan) -> None:
@@ -811,6 +940,7 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                 validate_group_lifetime(context.objects, timeline.actions, participants,
                                         item.start_ms, hold_end,
                                         description=f"annotation {action.action_id} needs uninterrupted construction and hold")
+                require_media_window(context.objects, [target_id], item.start_ms, hold_end)
                 for reading in lifecycle_samples(replay, item, hold_end):
                     reading_objects = reading.hierarchy.object_map(context.objects)
                     reading_frames = {frame.object_id: frame for frame in reading.objects}
@@ -832,7 +962,7 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                     validate_annotation_geometry(
                         action, layout, reading_objects,
                         {key: frame.transform for key, frame in reading_frames.items()},
-                        [viewport], hierarchy=reading.hierarchy)
+                        [viewport], hierarchy=reading.hierarchy, registry_inputs=context.registry_inputs)
             except ValueError as exc:
                 raise V2FrameError(str(exc)) from exc
             for object_id in participants:
@@ -880,6 +1010,10 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                 for reading in lifecycle_samples(replay, item, hold_end):
                     viewport = evaluate_camera(layout, camera_plan, reading.at_ms, activation.activation_id, _ease)
                     validate_evidence_reading(item, layout, context.objects, treatment, reading, viewport)
+                validate_evidence_annotation_history(item, layout, timeline, context.objects, treatment, replay,
+                    lambda at_ms, activation_id=activation.activation_id:
+                        evaluate_camera(layout, camera_plan, at_ms, activation_id, _ease),
+                    registry_inputs=context.registry_inputs)
             except ValueError as exc:
                 raise V2FrameError(str(exc)) from exc
             last_target_end[target] = item.end_ms
@@ -951,7 +1085,8 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                 raise V2FrameError("output profile cannot uniformly scale Paper & Ink design tokens")
             try:
                 connector_route(layout_objects[action.connector_id], layout_objects, sampled,
-                                style.strokes.regular_px * scale)
+                                style.strokes.regular_px * scale, registry_inputs=context.registry_inputs,
+                                media_view=media_visual_view(layout_objects, sample.at_ms))
                 validate_connection_lifetime(item, sample, context.objects, timeline.actions, timeline.duration_ms)
             except (UnsupportedConnector, UnsupportedLifecycle) as exc:
                 raise V2FrameError(str(exc)) from exc
@@ -979,7 +1114,8 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                            for activation in layout.activations):
                     raise V2FrameError(f"isolate {action.action_id} needs an active board")
                 try:
-                    isolation_context_roots(context.objects, sample.hierarchy, sampled, action)
+                    isolation_context_roots(context.objects, sample.hierarchy, sampled, action,
+                        media_view=media_visual_view(context.objects, sample.at_ms), end_ms=item.end_ms)
                 except UnsupportedIsolation as exc:
                     raise V2FrameError(str(exc)) from exc
             if isinstance(item.action, TargetAction) and item.action.verb == "count":
@@ -1029,6 +1165,7 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                              or obj.opacity <= 0 or last_target_verb.get(target) not in (None, "dim"))):
                     raise V2FrameError(f"dim {item.action.action_id} needs visible context without prior edits")
                 if (isinstance(item.action, TargetAction) and item.action.verb == "progressive_reveal"
+                        and item.action.structured_list_policy is None
                         and (initial[target].visible or initial[target].state != "hidden"
                              or target in last_target_end)):
                     raise V2FrameError(f"action {item.action.action_id} requires a previously untouched hidden list")
@@ -1039,7 +1176,7 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
 
 
 
-def _validate_consumer_history(context: _PairContext):
+def _validate_consumer_history(context: _PairContext, *, split_inputs=None):
     """One replay/camera/lifecycle proof for the caller's exact causal actions.
 
     Storage receipt callers may use a resolved-order prefix. All observers must
@@ -1047,29 +1184,58 @@ def _validate_consumer_history(context: _PairContext):
     Public capability admission remains the responsibility of the frame caller.
     """
     layout, timeline, hierarchy = context.layout, context.timeline, context.hierarchy
+    has_split = any(isinstance(row.action, SplitAction) for row in timeline.actions)
     try:
-        replay = replay_chronology(
-            context.objects, hierarchy, {frame.object_id: frame for frame in context.frames},
-            {key: item.state_version for key, item in context.initial.items()}, tuple(timeline.actions),
-            tuple((item.board_id, item.start_ms, item.end_ms) for item in layout.activations), timeline.duration_ms,
-        )
+        if has_split:
+            from atme.render.v2_split_paint import _checked_split_resources
+            from atme.render.v2_timeline_replay import (
+                ReplaySample,
+                _replay_split_chronology,
+            )
+
+            assets = _checked_split_resources(layout, split_inputs)[3]
+            initial = ReplaySample(0, tuple(sorted(context.frames, key=lambda row: row.object_id)),
+                tuple(sorted((key, row.state_version) for key, row in context.initial.items())), hierarchy)
+            replay = _replay_split_chronology(layout, initial, tuple(timeline.actions), timeline.duration_ms,
+                assets, timeline=timeline, split_inputs=split_inputs, layout_sha256=timeline.layout_sha256,
+                structural_timeline=context.structural_timeline, registry_inputs=context.registry_inputs)
+        else:
+            replay = replay_chronology(
+                context.objects, hierarchy, {frame.object_id: frame for frame in context.frames},
+                {key: item.state_version for key, item in context.initial.items()}, tuple(timeline.actions),
+                tuple((item.board_id, item.start_ms, item.end_ms) for item in layout.activations), timeline.duration_ms,
+                evidence_treatments=tuple(context.treatments_by_action.values()),
+            )
     except ReplayError as exc:
         raise V2FrameError(str(exc)) from exc
     try:
-        camera_plan = camera_segments(layout, timeline, replay)
+        validate_external_aperture_history(layout, timeline, context.objects, replay)
+        camera_plan = (camera_segments(layout, timeline, replay, split_inputs=split_inputs,
+            layout_sha256=timeline.layout_sha256, structural_timeline=context.structural_timeline) if has_split
+                       else camera_segments(layout, timeline, replay))
         _validate_pair_temporal(context, replay, camera_plan)
-    except (UnsupportedCamera, ReplayError) as exc:
+        validate_callout_history(layout, timeline, context.objects, replay, registry_inputs=context.registry_inputs)
+        validate_technical_frame_history(layout, timeline, context.objects, replay)
+    except (UnsupportedCamera, ReplayError, UnsupportedTechnicalFrameLifecycle,
+            UnsupportedExternalAperture, UnsupportedWorldGeometry) as exc:
+        raise V2FrameError(str(exc)) from exc
+    try:
+        validate_image_placement_history(timeline, context.objects, replay)
+        validate_media_relationship_history(layout, timeline, context.objects, replay)
+    except ValueError as exc:
         raise V2FrameError(str(exc)) from exc
     return replay, camera_plan
 
 
 def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
-                   layout_sha256: str, hierarchy: HierarchySnapshot):
-    context = _validate_pair_static(layout, timeline, layout_sha256, hierarchy)
-    # Preserve capability/error boundaries until full structural consumers land.
+                   layout_sha256: str, hierarchy: HierarchySnapshot, *, registry_inputs=None):
+    context = _validate_pair_static(layout, timeline, layout_sha256, hierarchy,
+                                    registry_inputs=registry_inputs)
+    # Policy-bearing Group uses the same proven chronology and consumers.
+    # Bare Group and other unsupported operators still fail before sampling.
     for resolved in timeline.actions:
         action = resolved.action
-        if isinstance(action, GroupAction) or not supports_operator(action):
+        if not supports_operator(action):
             raise UnsupportedVisualAction(
                 f"v2 action {action.action_id} uses {action.verb}, which has no frame implementation"
             )
@@ -1077,8 +1243,8 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
 
 
 def validate_resolved_return_history(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
-                                     *, layout_sha256: str) -> None:
-    """Validate compiler return receipts on write without opening public Group rendering.
+                                     *, layout_sha256: str, registry_inputs=None, split_inputs=None) -> None:
+    """Validate compiler return receipts on write through the shared frame history.
 
     Replay and lifecycle consumers are the same immutable proof used by frames.
     A receipt is proved at its captured start, never compared to the initial pose.
@@ -1091,14 +1257,50 @@ def validate_resolved_return_history(layout: ExecutableLayoutV2, timeline: Resol
     # Same-time starts follow resolved order. An action after the last return is
     # not its causal history, even if their millisecond timestamps are equal.
     causal_actions = timeline.actions[:return_indices[-1] + 1] if return_indices else timeline.actions
-    # Storage proves paired hierarchy/annotation consumers through this same
-    # captured history. Public Group frame admission remains a separate gate.
+    # Storage and public frames prove hierarchy/annotation consumers through
+    # this same captured history; storage does not advertise a capability.
     causal_timeline = timeline.model_copy(update={"actions": list(causal_actions)})
+    has_split = any(isinstance(row.action, SplitAction) for row in timeline.actions)
+    if has_split:
+        from atme.render.v2_split_paint import _checked_split_resources
+
+        resources = _checked_split_resources(layout, split_inputs)
+        registry_inputs = registry_endpoint_inputs_for_objects(
+            {obj.object_id: obj for obj in layout.objects}, frozen_files=resources[2])
     # The caller hashes the exact stored document, not a default-expanded dump.
     # All static and temporal consumer scans share this same resolved-order slice.
     context = _validate_pair_static(layout, causal_timeline, layout_sha256, hierarchy,
-                                    structural_timeline=timeline if return_indices else None)
-    _validate_consumer_history(context)
+                                    structural_timeline=timeline if return_indices else None,
+                                    registry_inputs=registry_inputs)
+    replay, _ = _validate_consumer_history(context, split_inputs=split_inputs)
+    if has_split and len(causal_actions) != len(timeline.actions):
+        full = _validate_pair_static(layout, timeline, layout_sha256, hierarchy, registry_inputs=registry_inputs)
+        replay, _ = _validate_consumer_history(full, split_inputs=split_inputs)
+    if has_split:
+        from atme.render.v2_split import CapturedSplitAction, _AttributedSplitCapture
+        from atme.render.v2_split_paint import prove_split_coverage
+
+        expected = {index: row for index, row in enumerate(timeline.actions) if isinstance(row.action, SplitAction)}
+        captures = {}
+        for checkpoint in replay.checkpoints:
+            seen = set()
+            for row in checkpoint.active:
+                if not isinstance(row, CapturedSplitAction):
+                    continue
+                owner = expected.get(row.resolved_index)
+                capture = row.split_capture
+                if (type(row) is not CapturedSplitAction or type(capture) is not _AttributedSplitCapture
+                        or owner is None or row.resolved != owner or row.resolved_index in seen
+                        or capture.action_id != owner.action.action_id
+                        or (capture.start_ms, capture.end_ms) != (owner.start_ms, owner.end_ms)
+                        or row.resolved_index in captures and captures[row.resolved_index] is not row):
+                    raise V2FrameError("Split storage requires exact nonconflicting live captures")
+                seen.add(row.resolved_index)
+                captures[row.resolved_index] = row
+        if captures.keys() != expected.keys():
+            raise V2FrameError("Split storage requires every resolved live capture")
+        for row in captures.values():
+            prove_split_coverage(row.split_capture, layout, split_inputs)
 
 
 def evaluate_frame(
@@ -1107,6 +1309,12 @@ def evaluate_frame(
     at_ms: int,
 ) -> FrameSnapshot:
     """Evaluate from immutable initial state, never from a previous frame."""
+    return _evaluate_frame_with_registry_inputs(layout_document, timeline_document, at_ms, None)
+
+
+def _evaluate_frame_with_registry_inputs(layout_document: dict, timeline_document: dict,
+                                          at_ms: int, registry_inputs) -> FrameSnapshot:
+    """Internal frozen-byte route with the same public action admission checks."""
     if not isinstance(layout_document, dict) or not isinstance(timeline_document, dict):
         raise V2FrameError("frame evaluation requires the exact stored JSON documents")
     try:
@@ -1122,7 +1330,8 @@ def evaluate_frame(
         hierarchy = HierarchySnapshot.from_objects({obj.object_id: obj for obj in layout.objects})
     except UnsupportedHierarchy as exc:
         raise V2FrameError(str(exc)) from exc
-    replay, camera_plan = _validate_pair(layout, timeline, layout_sha256, hierarchy)
+    replay, camera_plan = _validate_pair(layout, timeline, layout_sha256, hierarchy,
+                                       registry_inputs=registry_inputs)
     return _sample_validated_frame(layout, timeline, replay, camera_plan, at_ms)
 
 
@@ -1144,6 +1353,14 @@ def _sample_validated_frame(layout: ExecutableLayoutV2, timeline: ResolvedVisual
     camera = evaluate_camera(layout, camera_plan, at_ms,
                              activation.activation_id if activation else None, _ease)
     object_map = hierarchy.object_map({obj.object_id: obj for obj in layout.objects})
+    validate_character_assembly_map(object_map)
+    validate_illustration_assembly_map(object_map)
+    try:
+        external_aperture_projections(object_map, current, active_board=active_board,
+                                      state_versions=dict(sample.state_versions),
+                                      media_view=media_visual_view(object_map, at_ms))
+    except (UnsupportedExternalAperture, UnsupportedWorldGeometry) as exc:
+        raise V2FrameError(str(exc)) from exc
     ordered = tuple(
         replace(current[obj.object_id],
                 visible=current[obj.object_id].visible and obj.board_id == active_board
@@ -1159,5 +1376,10 @@ def _sample_validated_frame(layout: ExecutableLayoutV2, timeline: ResolvedVisual
             world_bounds(obj, object_map, transforms)
     except UnsupportedWorldGeometry as exc:
         raise V2FrameError(str(exc)) from exc
+    from atme.render.v2_timeline_replay import SplitReplaySample
+
+    if type(sample) is SplitReplaySample and sample.envelopes:
+        return SplitFrameSnapshot(at_ms=at_ms, active_board_id=active_board,
+            objects=ordered, camera=camera, hierarchy=hierarchy, envelopes=sample.envelopes)
     return FrameSnapshot(at_ms=at_ms, active_board_id=active_board,
                          objects=ordered, camera=camera, hierarchy=hierarchy)

@@ -120,3 +120,26 @@ def canonical_png(raw: bytes) -> CanonicalPNG:
     if len(encoded) > MAX_CANONICAL_BYTES:
         raise UnsupportedProjectPNG("canonical project PNG exceeds 16 MiB")
     return CanonicalPNG(encoded, width, height, hashlib.sha256(raw).hexdigest())
+
+
+@lru_cache(maxsize=4)
+def cropped_png(raster: CanonicalPNG, x: int, y: int, width: int, height: int) -> bytes:
+    """Discard outside pixels before native resampling; never alter the original.
+
+    Cache only four bounded crops, keyed by immutable checked source and exact
+    integer crop. No host file or second media resolver is involved.
+    """
+    if (any(type(value) is not int for value in (x, y, width, height))
+            or x < 0 or y < 0 or width <= 0 or height <= 0
+            or x + width > raster.width or y + height > raster.height):
+        raise UnsupportedProjectPNG("project image crop exceeds checked source pixels")
+    if (x, y, width, height) == (0, 0, raster.width, raster.height):
+        return raster.payload
+    with Image.open(io.BytesIO(raster.payload)) as image:
+        crop = image.crop((x, y, x + width, y + height))
+        output = io.BytesIO()
+        crop.save(output, format="PNG", optimize=False, compress_level=9)
+    encoded = output.getvalue()
+    if len(encoded) > MAX_CANONICAL_BYTES:
+        raise UnsupportedProjectPNG("cropped project PNG exceeds 16 MiB")
+    return encoded

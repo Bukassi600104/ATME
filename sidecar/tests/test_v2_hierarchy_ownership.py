@@ -3,19 +3,12 @@
 from copy import deepcopy
 
 import pytest
-from conftest import load_schema
-from jsonschema import Draft202012Validator
-from pydantic import ValidationError
-from test_v2_hierarchy_contract import receipt_documents, rehash
-from test_v2_hierarchy_snapshot import basis
-from v2_fixtures import digest, executable_layout_v2, resolved_timeline_v2
-
 from atme.render.v2_hierarchy import (
     HierarchyNode,
     HierarchySnapshot,
     changed_hierarchy_objects,
 )
-from atme.render.v2_state import UnsupportedVisualAction, V2FrameError, evaluate_frame
+from atme.render.v2_state import V2FrameError, evaluate_frame
 from atme.store.contracts_v2 import (
     ExecutableLayoutV2,
     HierarchyBasis,
@@ -24,6 +17,12 @@ from atme.store.contracts_v2 import (
     validate_plan_layout,
     validate_resolved_structure,
 )
+from conftest import load_schema
+from jsonschema import Draft202012Validator
+from pydantic import ValidationError
+from test_v2_hierarchy_contract import receipt_documents, rehash
+from test_v2_hierarchy_snapshot import basis
+from v2_fixtures import digest, executable_layout_v2, resolved_timeline_v2
 
 
 def documents():
@@ -72,9 +71,8 @@ def test_owned_empty_shell_and_initial_basis_roundtrip_preserve_member_semantic_
     assert ExecutableLayoutV2.model_validate(parsed_layout.model_dump(mode="json")) == parsed_layout
     assert ResolvedVisualTimelineV2.model_validate(resolved.model_dump(mode="json")) == resolved
     assert resolved.actions[-1].action.expected_state == "ungrouped"
-    # Neither accepting these contracts nor ownership enables unverified playback.
-    with pytest.raises(UnsupportedVisualAction, match="group"):
-        evaluate_frame(layout, timeline, 5000)
+    # Public sampling still proves the complete receipt/history before painting.
+    assert evaluate_frame(layout, timeline, 5000).at_ms == 5000
     assert (plan, layout, timeline) == original
 
 

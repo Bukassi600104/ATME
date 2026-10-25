@@ -9,7 +9,7 @@ from atme.store.contracts_v2 import Bounds
 
 SUPPORTED_HIGHLIGHT_MARKS = frozenset({
     "freehand", "line", "rectangle", "rounded_rectangle", "ellipse", "polygon",
-    "underline", "highlight",
+    "underline", "highlight", "bracket",
 })
 SUPPORTED_HIGHLIGHT_TEXT = frozenset({"text", "list"})
 

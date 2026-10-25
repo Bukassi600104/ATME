@@ -82,11 +82,12 @@ _PAINT_TOKENS = {"paper", "ink", "muted", "accent", "accent-soft"}
 _PATH_DATA = re.compile(r"^[MmLlHhVvCcSsQqTtAaZz0-9+.,\-eE\s]+$")
 
 
-def _validate_svg(path: Path, expected_view_box: tuple[int, int, int, int]) -> ET.Element:
+def _validate_svg(path: Path, expected_view_box: tuple[int, int, int, int],
+                  *, payload: bytes | None = None) -> ET.Element:
     """Parse only the static SVG subset used by pinned ATME originals."""
-    if path.stat().st_size > 256 * 1024:
+    if (path.stat().st_size if payload is None else len(payload)) > 256 * 1024:
         raise StyleBundleError(f"oversized SVG resource: {path.name}")
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8") if payload is None else payload.decode("utf-8")
     if "<!doctype" in text.casefold() or "<!entity" in text.casefold():
         raise StyleBundleError(f"DTD or entity in SVG resource: {path.name}")
     try:
@@ -182,21 +183,37 @@ def resolve_contract_bundle(style_system_version: str, asset_registry_version: s
     return style, registry, root
 
 
-def _font_css(style: PaperInkStyle, root: Path) -> str:
+def _font_css(style: PaperInkStyle, root: Path | None, *, frozen_files=None, code_bundle=None) -> str:
     rules = []
     for font in style.fonts:
-        path = _verified_file(root, font.file, font.sha256)
+        path = _verified_file(root, font.file, font.sha256) if frozen_files is None else Path(font.file)
         mime = "font/ttf" if path.suffix == ".ttf" else "font/otf"
-        payload = base64.b64encode(path.read_bytes()).decode("ascii")
+        raw = path.read_bytes() if frozen_files is None else frozen_files[font.file]
+        payload = base64.b64encode(raw).decode("ascii")
         rules.append(
             f"@font-face{{font-family:'{font.family}';font-style:normal;"
             f"font-weight:{font.weight};src:url(data:{mime};base64,{payload})}}"
         )
+    if frozen_files is not None or code_bundle is not None:
+        from atme.render.code_font_bundle import (
+            CODE_FONT_MANIFEST,
+            verify_code_font_bundle,
+        )
+        from atme.render.v2_code import code_font_css
+
+        if frozen_files is not None and CODE_FONT_MANIFEST in frozen_files:
+            checked = verify_code_font_bundle(frozen_files.__getitem__)
+            if code_bundle is not None and checked != code_bundle:
+                raise StyleBundleError("code-font CSS bundle differs from frozen bytes")
+            code_bundle = checked
+        if code_bundle is not None:
+            rules.append(code_font_css(code_bundle))
     return "".join(rules)
 
 
-def _asset_inner(path: Path, colors: dict[str, str], view_box: tuple[int, int, int, int]) -> str:
-    root = _validate_svg(path, view_box)
+def _asset_inner(path: Path, colors: dict[str, str], view_box: tuple[int, int, int, int],
+                 *, payload: bytes | None = None) -> str:
+    root = _validate_svg(path, view_box, payload=payload)
 
     def emit(element: ET.Element) -> str:
         tag = element.tag.removeprefix(f"{{{_SVG_NS}}}")
@@ -213,12 +230,51 @@ def _asset_inner(path: Path, colors: dict[str, str], view_box: tuple[int, int, i
 
 def verified_asset_svg(asset_id: str):
     """Return a pinned original illustration for v2 composition, rechecking its bytes."""
-    style, registry, root = load_bundle()
-    asset = next((item for item in registry.assets if item.id == asset_id), None)
-    if asset is None:
-        raise StyleBundleError(f"unknown Paper & Ink asset: {asset_id}")
+    from atme.render.v2_registry import (
+        UnsupportedRegistryPlacement,
+        _checked_registry_entry,
+        checked_registry_art,
+    )
+
+    style, _, root = load_bundle()
+    registry_payload = _verified_file(root, "asset-registry.json", EXPECTED_REGISTRY_SHA256).read_bytes()
+    try:
+        asset = _checked_registry_entry(asset_id, registry_payload)
+    except UnsupportedRegistryPlacement as exc:
+        raise StyleBundleError(str(exc)) from exc
     path = _verified_file(root, asset.file, asset.sha256)
-    return asset, _asset_inner(path, style.colors, asset.view_box)
+    try:
+        asset, payload = checked_registry_art(asset_id, registry_payload, path.read_bytes())
+    except UnsupportedRegistryPlacement as exc:
+        raise StyleBundleError(str(exc)) from exc
+    return asset, _asset_inner(path, style.colors, asset.view_box, payload=payload)
+
+
+def registry_endpoint_inputs_for_objects(objects: dict, *, frozen_files=None, require_metadata=False):
+    """Acquire pinned bytes once at a consumer boundary, never in endpoint math."""
+    from atme.render.v2_registry import (
+        _checked_registry_entry,
+        registry_endpoint_inputs,
+    )
+    from atme.store.contracts_v2 import SemanticStandardObjectSpec, VisualObject
+
+    variants = sorted({obj.registry_binding.asset_id for obj in objects.values()
+        if isinstance(obj, (VisualObject, SemanticStandardObjectSpec)) and obj.registry_binding is not None})
+    if not variants and not require_metadata:
+        return None
+    if frozen_files is not None:
+        try:
+            return registry_endpoint_inputs(frozen_files["asset-registry.json"],
+                {key: frozen_files[f"assets/{key}.svg"] for key in variants})
+        except KeyError as exc:
+            raise StyleBundleError("frozen registry endpoint byte evidence is missing") from exc
+    _, _, root = load_bundle()
+    registry_payload = _verified_file(root, "asset-registry.json", EXPECTED_REGISTRY_SHA256).read_bytes()
+    artworks = {}
+    for key in variants:
+        entry = _checked_registry_entry(key, registry_payload)
+        artworks[key] = _verified_file(root, entry.file, entry.sha256).read_bytes()
+    return registry_endpoint_inputs(registry_payload, artworks)
 
 
 def asset_matrix_svg(profile: str = "landscape-16:9") -> str:

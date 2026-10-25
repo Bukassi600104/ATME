@@ -247,7 +247,7 @@ def test_generator_is_idempotent():
                REPO_ROOT / "schemas" / "paper-ink-assets-v2.schema.json"]
     before = {path: digest(path) for path in tracked}
     result = subprocess.run(
-        [str(REPO_ROOT / "sidecar" / ".venv" / "Scripts" / "python.exe"),
+        [sys.executable,
          str(REPO_ROOT / "sidecar" / "tools" / "generate_paper_ink_v2.py")],
         cwd=REPO_ROOT, capture_output=True, text=True, check=False,
     )

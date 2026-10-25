@@ -247,7 +247,9 @@ def migrate_visual_bundle_v1(
         "boards": boards, "objects": executable_objects, "activations": activations,
     }
     ExecutableLayoutV2.model_validate(layout_v2)
-    validate_plan_layout(plan_v2, layout_v2)
+    # Compatibility validation is authorized only by this explicit migration
+    # producer, never inferred from a missing payload on a normal new write.
+    validate_plan_layout(plan_v2, layout_v2, require_code_payloads=False)
     output_hashes = {"visual_plan_v2": _digest(plan_v2), "executable_layout_v2": _digest(layout_v2)}
     report = {
         "contract_version": "2.0.0", "migration_id": migration_id, "adapter_version": ADAPTER_VERSION,

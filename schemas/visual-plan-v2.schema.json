@@ -21,6 +21,25 @@
       "title": "AbsoluteTrigger",
       "type": "object"
     },
+    "Anchor": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor_id": {
+          "minLength": 1,
+          "title": "Anchor Id",
+          "type": "string"
+        },
+        "point": {
+          "$ref": "#/$defs/Point"
+        }
+      },
+      "required": [
+        "anchor_id",
+        "point"
+      ],
+      "title": "Anchor",
+      "type": "object"
+    },
     "AnnotationPhase": {
       "additionalProperties": false,
       "properties": {
@@ -211,6 +230,17 @@
           ],
           "default": null,
           "title": "Duration Ms"
+        },
+        "media_stream": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MediaStreamPin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "provenance": {
           "$ref": "#/$defs/Provenance"
@@ -626,6 +656,46 @@
       "title": "Bounds",
       "type": "object"
     },
+    "CalloutBinding": {
+      "additionalProperties": false,
+      "description": "Exact authored pointer endpoints; no source or destination inference.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "leader_connector_id": {
+          "minLength": 1,
+          "title": "Leader Connector Id",
+          "type": "string"
+        },
+        "callout_anchor_id": {
+          "minLength": 1,
+          "title": "Callout Anchor Id",
+          "type": "string"
+        },
+        "target_object_id": {
+          "minLength": 1,
+          "title": "Target Object Id",
+          "type": "string"
+        },
+        "target_anchor_id": {
+          "minLength": 1,
+          "title": "Target Anchor Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "leader_connector_id",
+        "callout_anchor_id",
+        "target_object_id",
+        "target_anchor_id"
+      ],
+      "title": "CalloutBinding",
+      "type": "object"
+    },
     "CameraAction": {
       "additionalProperties": false,
       "properties": {
@@ -855,6 +925,1368 @@
       "title": "CameraIntent",
       "type": "object"
     },
+    "CharacterAnchorBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "semantic_name": {
+          "enum": [
+            "head",
+            "left_hand",
+            "right_hand"
+          ],
+          "title": "Semantic Name",
+          "type": "string"
+        },
+        "object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Object Id",
+          "type": "string"
+        },
+        "anchor_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Anchor Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_name",
+        "object_id",
+        "anchor_id"
+      ],
+      "title": "CharacterAnchorBinding",
+      "type": "object"
+    },
+    "CharacterAssemblyBinding": {
+      "additionalProperties": false,
+      "description": "An author's explicit layered character claim, not a generated body/rig.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "pose_id": {
+          "enum": [
+            "neutral",
+            "point_right",
+            "open_hands"
+          ],
+          "title": "Pose Id",
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/CharacterRoleBinding"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "properties": {
+                "role": {
+                  "const": "head"
+                }
+              }
+            },
+            {
+              "properties": {
+                "role": {
+                  "const": "torso"
+                }
+              }
+            },
+            {
+              "properties": {
+                "role": {
+                  "const": "left_arm"
+                }
+              }
+            },
+            {
+              "properties": {
+                "role": {
+                  "const": "right_arm"
+                }
+              }
+            }
+          ],
+          "title": "Roles",
+          "type": "array"
+        },
+        "semantic_anchors": {
+          "items": {
+            "$ref": "#/$defs/CharacterAnchorBinding"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "properties": {
+                "semantic_name": {
+                  "const": "head"
+                }
+              }
+            },
+            {
+              "properties": {
+                "semantic_name": {
+                  "const": "left_hand"
+                }
+              }
+            },
+            {
+              "properties": {
+                "semantic_name": {
+                  "const": "right_hand"
+                }
+              }
+            }
+          ],
+          "title": "Semantic Anchors",
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "pose_id",
+        "roles",
+        "semantic_anchors"
+      ],
+      "title": "CharacterAssemblyBinding",
+      "type": "object"
+    },
+    "CharacterRoleBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "head",
+            "torso",
+            "left_arm",
+            "right_arm"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Object Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "object_id"
+      ],
+      "title": "CharacterRoleBinding",
+      "type": "object"
+    },
+    "ChartAxis": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
+        "domain": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Domain",
+          "type": "array"
+        },
+        "scale": {
+          "enum": [
+            "linear",
+            "log"
+          ],
+          "title": "Scale",
+          "type": "string"
+        },
+        "ticks": {
+          "items": {
+            "$ref": "#/$defs/ChartTick"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Ticks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "label",
+        "unit",
+        "domain",
+        "scale",
+        "ticks"
+      ],
+      "title": "ChartAxis",
+      "type": "object"
+    },
+    "ChartBar": {
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "number"
+        },
+        "width_units": {
+          "const": "x_axis",
+          "title": "Width Units",
+          "type": "string"
+        },
+        "baseline": {
+          "title": "Baseline",
+          "type": "number"
+        }
+      },
+      "required": [
+        "width",
+        "width_units",
+        "baseline"
+      ],
+      "title": "ChartBar",
+      "type": "object"
+    },
+    "ChartConstruction": {
+      "additionalProperties": false,
+      "properties": {
+        "series_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Series Id",
+          "type": "string"
+        },
+        "point_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Point Id",
+          "type": "string"
+        },
+        "start_fraction": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Start Fraction",
+          "type": "number"
+        },
+        "end_fraction": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "End Fraction",
+          "type": "number"
+        }
+      },
+      "required": [
+        "series_id",
+        "point_id",
+        "start_fraction",
+        "end_fraction"
+      ],
+      "title": "ChartConstruction",
+      "type": "object"
+    },
+    "ChartHighlight": {
+      "additionalProperties": false,
+      "properties": {
+        "series_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Series Id",
+          "type": "string"
+        },
+        "point_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Point Id",
+          "type": "string"
+        },
+        "color": {
+          "title": "Color",
+          "type": "string"
+        }
+      },
+      "required": [
+        "series_id",
+        "point_id",
+        "color"
+      ],
+      "title": "ChartHighlight",
+      "type": "object"
+    },
+    "ChartPayload": {
+      "additionalProperties": false,
+      "description": "Exact external data and display decisions, not an inferred chart recipe.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "bars",
+            "line"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "x_axis": {
+          "$ref": "#/$defs/ChartAxis"
+        },
+        "y_axis": {
+          "$ref": "#/$defs/ChartAxis"
+        },
+        "series": {
+          "items": {
+            "$ref": "#/$defs/ChartSeries"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Series",
+          "type": "array"
+        },
+        "bar": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChartBar"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "highlights": {
+          "items": {
+            "$ref": "#/$defs/ChartHighlight"
+          },
+          "maxItems": 4096,
+          "title": "Highlights",
+          "type": "array"
+        },
+        "construction": {
+          "items": {
+            "$ref": "#/$defs/ChartConstruction"
+          },
+          "maxItems": 131072,
+          "minItems": 1,
+          "title": "Construction",
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "title",
+        "x_axis",
+        "y_axis",
+        "series",
+        "bar",
+        "highlights",
+        "construction"
+      ],
+      "title": "ChartPayload",
+      "type": "object"
+    },
+    "ChartPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "point_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Point Id",
+          "type": "string"
+        },
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "point_id",
+        "x",
+        "y",
+        "label"
+      ],
+      "title": "ChartPoint",
+      "type": "object"
+    },
+    "ChartSeries": {
+      "additionalProperties": false,
+      "properties": {
+        "series_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Series Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "color": {
+          "title": "Color",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "$ref": "#/$defs/ChartPoint"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "title": "Points",
+          "type": "array"
+        }
+      },
+      "required": [
+        "series_id",
+        "label",
+        "color",
+        "points"
+      ],
+      "title": "ChartSeries",
+      "type": "object"
+    },
+    "ChartTick": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "label"
+      ],
+      "title": "ChartTick",
+      "type": "object"
+    },
+    "ClipContainer": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "child_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Child Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "const": "clip",
+          "title": "Object Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "child_ids",
+        "object_type"
+      ],
+      "title": "ClipContainer",
+      "type": "object"
+    },
+    "CodeLine": {
+      "additionalProperties": false,
+      "properties": {
+        "line_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Line Id",
+          "type": "string"
+        },
+        "spans": {
+          "items": {
+            "$ref": "#/$defs/CodeSpan"
+          },
+          "title": "Spans",
+          "type": "array"
+        }
+      },
+      "required": [
+        "line_id",
+        "spans"
+      ],
+      "title": "CodeLine",
+      "type": "object"
+    },
+    "CodePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "font_system_id": {
+          "const": "atme-code-font-v1",
+          "title": "Font System Id",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "plain",
+            "tokens"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "tab_size": {
+          "enum": [
+            2,
+            4,
+            8
+          ],
+          "title": "Tab Size",
+          "type": "integer"
+        },
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/CodeLine"
+          },
+          "minItems": 1,
+          "title": "Lines",
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "font_system_id",
+        "mode",
+        "tab_size",
+        "lines"
+      ],
+      "title": "CodePayload",
+      "type": "object"
+    },
+    "CodeSpan": {
+      "additionalProperties": false,
+      "description": "Authored text and role; ATME never tokenizes or rewrites this content.",
+      "properties": {
+        "span_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Span Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "plain",
+            "keyword",
+            "identifier",
+            "literal",
+            "comment",
+            "operator",
+            "punctuation"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "span_id",
+        "role",
+        "text"
+      ],
+      "title": "CodeSpan",
+      "type": "object"
+    },
+    "CompositionBinding": {
+      "additionalProperties": false,
+      "description": "Initial receipt; actual complete-layout verification remains mandatory.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "instance": {
+          "$ref": "#/$defs/CompositionInstanceSpec"
+        },
+        "members": {
+          "items": {
+            "$ref": "#/$defs/CompositionExpansionMember"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Members",
+          "type": "array"
+        },
+        "expansion_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Expansion Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "instance",
+        "members",
+        "expansion_sha256"
+      ],
+      "title": "CompositionBinding",
+      "type": "object"
+    },
+    "CompositionBooleanValue": {
+      "additionalProperties": false,
+      "properties": {
+        "value_type": {
+          "const": "boolean",
+          "title": "Value Type",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "value_type",
+        "value"
+      ],
+      "title": "CompositionBooleanValue",
+      "type": "object"
+    },
+    "CompositionCoverageMapping": {
+      "additionalProperties": false,
+      "properties": {
+        "local_coverage_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Local Coverage Id",
+          "type": "string"
+        },
+        "coverage_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Coverage Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "local_coverage_id",
+        "coverage_id"
+      ],
+      "title": "CompositionCoverageMapping",
+      "type": "object"
+    },
+    "CompositionDefinition": {
+      "additionalProperties": false,
+      "description": "Closed authored template, not an executable scene object or runtime rig.\n\nBoard/beat/coverage IDs are definition-local context. Later explicit binding\nmust map that context and every local object ID before ordinary graph paint.\nArrays remain authored content; sibling paint order is still z/ID, not array\norder. Definitions contain no nested template references or external clips.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "definition_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Definition Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "root_local_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Root Local Id",
+          "type": "string"
+        },
+        "template_board_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Template Board Id",
+          "type": "string"
+        },
+        "template_beat_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Template Beat Id",
+          "type": "string"
+        },
+        "template_coverage_ids": {
+          "items": {
+            "minLength": 1,
+            "not": {
+              "pattern": "\\s"
+            },
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "title": "Template Coverage Ids",
+          "type": "array"
+        },
+        "objects": {
+          "allOf": [
+            {
+              "items": {
+                "not": {
+                  "required": [
+                    "composition_binding"
+                  ]
+                }
+              }
+            }
+          ],
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "application": "#/$defs/VisualObject",
+                "arrow": "#/$defs/ConnectorObject",
+                "bracket": "#/$defs/MarkObject",
+                "browser": "#/$defs/VisualObject",
+                "callout": "#/$defs/TextObject",
+                "character": "#/$defs/VisualObject",
+                "chart": "#/$defs/VisualObject",
+                "clip": "#/$defs/ClipContainer",
+                "code": "#/$defs/TextObject",
+                "comparison": "#/$defs/VisualObject",
+                "composition": "#/$defs/VisualObject",
+                "database": "#/$defs/VisualObject",
+                "device": "#/$defs/VisualObject",
+                "document": "#/$defs/VisualObject",
+                "ellipse": "#/$defs/MarkObject",
+                "evidence": "#/$defs/VisualObject",
+                "folder": "#/$defs/VisualObject",
+                "freehand": "#/$defs/MarkObject",
+                "group": "#/$defs/GroupContainer",
+                "highlight": "#/$defs/MarkObject",
+                "icon": "#/$defs/VisualObject",
+                "image": "#/$defs/VisualObject",
+                "instance": "#/$defs/VisualObject",
+                "line": "#/$defs/MarkObject",
+                "list": "#/$defs/TextObject",
+                "mask": "#/$defs/MaskContainer",
+                "network": "#/$defs/ConnectorObject",
+                "pictogram": "#/$defs/VisualObject",
+                "polygon": "#/$defs/MarkObject",
+                "presenter": "#/$defs/VisualObject",
+                "rectangle": "#/$defs/MarkObject",
+                "rounded_rectangle": "#/$defs/MarkObject",
+                "screen_recording": "#/$defs/VisualObject",
+                "server": "#/$defs/VisualObject",
+                "terminal": "#/$defs/VisualObject",
+                "text": "#/$defs/TextObject",
+                "underline": "#/$defs/MarkObject",
+                "video": "#/$defs/VisualObject"
+              },
+              "propertyName": "object_type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MarkObject"
+              },
+              {
+                "$ref": "#/$defs/ConnectorObject"
+              },
+              {
+                "$ref": "#/$defs/TextObject"
+              },
+              {
+                "$ref": "#/$defs/VisualObject"
+              },
+              {
+                "$ref": "#/$defs/GroupContainer"
+              },
+              {
+                "$ref": "#/$defs/ClipContainer"
+              },
+              {
+                "$ref": "#/$defs/MaskContainer"
+              }
+            ]
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Objects",
+          "type": "array"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/CompositionParameterSpec"
+          },
+          "maxItems": 4096,
+          "title": "Parameters",
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "definition_id",
+        "revision",
+        "root_local_id",
+        "template_board_id",
+        "template_beat_id",
+        "template_coverage_ids",
+        "objects",
+        "parameters"
+      ],
+      "title": "CompositionDefinition",
+      "type": "object"
+    },
+    "CompositionExpansionMember": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Object Id",
+          "type": "string"
+        },
+        "initial_object_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Initial Object Sha256",
+          "type": "string"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "not": {
+                "pattern": "\\s"
+              },
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent Id"
+        },
+        "sibling_ordinal": {
+          "minimum": 0,
+          "title": "Sibling Ordinal",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "object_id",
+        "initial_object_sha256",
+        "parent_id",
+        "sibling_ordinal"
+      ],
+      "title": "CompositionExpansionMember",
+      "type": "object"
+    },
+    "CompositionInstanceSpec": {
+      "additionalProperties": false,
+      "description": "Explicit authoring input, NOT an executable binding or admission receipt.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "composition",
+            "instance"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "definition": {
+          "$ref": "#/$defs/CompositionDefinition"
+        },
+        "definition_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Definition Sha256",
+          "type": "string"
+        },
+        "root_object_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Root Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "root_parent_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "not": {
+                "pattern": "\\s"
+              },
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Root Parent Id"
+        },
+        "root_z_index": {
+          "title": "Root Z Index",
+          "type": "integer"
+        },
+        "coverage_map": {
+          "items": {
+            "$ref": "#/$defs/CompositionCoverageMapping"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "title": "Coverage Map",
+          "type": "array"
+        },
+        "object_map": {
+          "items": {
+            "$ref": "#/$defs/CompositionObjectMapping"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Object Map",
+          "type": "array"
+        },
+        "parameter_values": {
+          "items": {
+            "$ref": "#/$defs/CompositionParameterValue"
+          },
+          "maxItems": 4096,
+          "title": "Parameter Values",
+          "type": "array"
+        },
+        "overrides": {
+          "items": {
+            "$ref": "#/$defs/CompositionOverride"
+          },
+          "maxItems": 4096,
+          "title": "Overrides",
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "definition",
+        "definition_sha256",
+        "root_object_id",
+        "board_id",
+        "beat_id",
+        "root_parent_id",
+        "root_z_index",
+        "coverage_map",
+        "object_map",
+        "parameter_values",
+        "overrides"
+      ],
+      "title": "CompositionInstanceSpec",
+      "type": "object"
+    },
+    "CompositionNumberValue": {
+      "additionalProperties": false,
+      "properties": {
+        "value_type": {
+          "const": "number",
+          "title": "Value Type",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value_type",
+        "value"
+      ],
+      "title": "CompositionNumberValue",
+      "type": "object"
+    },
+    "CompositionObjectMapping": {
+      "additionalProperties": false,
+      "properties": {
+        "local_object_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Local Object Id",
+          "type": "string"
+        },
+        "object_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Object Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "local_object_id",
+        "object_id"
+      ],
+      "title": "CompositionObjectMapping",
+      "type": "object"
+    },
+    "CompositionOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/CompositionParameterTarget"
+        },
+        "value": {
+          "discriminator": {
+            "mapping": {
+              "boolean": "#/$defs/CompositionBooleanValue",
+              "number": "#/$defs/CompositionNumberValue",
+              "string": "#/$defs/CompositionStringValue"
+            },
+            "propertyName": "value_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CompositionStringValue"
+            },
+            {
+              "$ref": "#/$defs/CompositionNumberValue"
+            },
+            {
+              "$ref": "#/$defs/CompositionBooleanValue"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "target",
+        "value"
+      ],
+      "title": "CompositionOverride",
+      "type": "object"
+    },
+    "CompositionParameterSpec": {
+      "additionalProperties": false,
+      "description": "All parameters are required at binding; no implicit defaults or expressions.",
+      "properties": {
+        "parameter_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Parameter Id",
+          "type": "string"
+        },
+        "value_type": {
+          "enum": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "title": "Value Type",
+          "type": "string"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/CompositionParameterTarget"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "title": "Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "parameter_id",
+        "value_type",
+        "targets"
+      ],
+      "title": "CompositionParameterSpec",
+      "type": "object"
+    },
+    "CompositionParameterTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Object Id",
+          "type": "string"
+        },
+        "field": {
+          "enum": [
+            "text",
+            "style.stroke",
+            "style.fill",
+            "style.text",
+            "geometry.bounds.x",
+            "geometry.bounds.y",
+            "geometry.bounds.width",
+            "geometry.bounds.height",
+            "transform.position.x",
+            "transform.position.y",
+            "transform.scale_x",
+            "transform.scale_y",
+            "transform.rotation_degrees",
+            "opacity",
+            "visible"
+          ],
+          "title": "Field",
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_id",
+        "field"
+      ],
+      "title": "CompositionParameterTarget",
+      "type": "object"
+    },
+    "CompositionParameterValue": {
+      "additionalProperties": false,
+      "properties": {
+        "parameter_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Parameter Id",
+          "type": "string"
+        },
+        "value": {
+          "discriminator": {
+            "mapping": {
+              "boolean": "#/$defs/CompositionBooleanValue",
+              "number": "#/$defs/CompositionNumberValue",
+              "string": "#/$defs/CompositionStringValue"
+            },
+            "propertyName": "value_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CompositionStringValue"
+            },
+            {
+              "$ref": "#/$defs/CompositionNumberValue"
+            },
+            {
+              "$ref": "#/$defs/CompositionBooleanValue"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "parameter_id",
+        "value"
+      ],
+      "title": "CompositionParameterValue",
+      "type": "object"
+    },
+    "CompositionStringValue": {
+      "additionalProperties": false,
+      "properties": {
+        "value_type": {
+          "const": "string",
+          "title": "Value Type",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value_type",
+        "value"
+      ],
+      "title": "CompositionStringValue",
+      "type": "object"
+    },
     "ConnectionAction": {
       "additionalProperties": false,
       "properties": {
@@ -1005,6 +2437,386 @@
         "destination_anchor_id"
       ],
       "title": "ConnectionAction",
+      "type": "object"
+    },
+    "ConnectorBinding": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "pointer"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_point": {
+                "type": "object"
+              },
+              "source_object_id": {
+                "type": "null"
+              },
+              "source_anchor_id": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "source_point"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "semantic_connector"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "source_point"
+              ]
+            },
+            "properties": {
+              "source_object_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "source_anchor_id": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_object_id",
+              "source_anchor_id"
+            ]
+          }
+        }
+      ],
+      "description": "Semantic authority projected exactly onto one executable relationship.",
+      "properties": {
+        "source_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Object Id"
+        },
+        "source_anchor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Anchor Id"
+        },
+        "destination_object_id": {
+          "minLength": 1,
+          "title": "Destination Object Id",
+          "type": "string"
+        },
+        "destination_anchor_id": {
+          "minLength": 1,
+          "title": "Destination Anchor Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "pointer",
+            "semantic_connector"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "routing": {
+          "enum": [
+            "straight",
+            "elbow",
+            "curve"
+          ],
+          "title": "Routing",
+          "type": "string"
+        },
+        "allow_self_loop": {
+          "const": false,
+          "default": false,
+          "title": "Allow Self Loop",
+          "type": "boolean"
+        },
+        "source_point": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PointerSourcePoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "destination_object_id",
+        "destination_anchor_id",
+        "role",
+        "routing"
+      ],
+      "title": "ConnectorBinding",
+      "type": "object"
+    },
+    "ConnectorObject": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "source_point"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "const": "arrow"
+              },
+              "role": {
+                "const": "pointer"
+              },
+              "source_point": {
+                "type": "object"
+              },
+              "source_object_id": {
+                "type": "null"
+              },
+              "source_anchor_id": {
+                "type": "null"
+              },
+              "allow_self_loop": {
+                "const": false
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "enum": [
+            "arrow",
+            "network"
+          ],
+          "title": "Object Type",
+          "type": "string"
+        },
+        "source_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Object Id"
+        },
+        "source_anchor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Anchor Id"
+        },
+        "destination_object_id": {
+          "title": "Destination Object Id",
+          "type": "string"
+        },
+        "destination_anchor_id": {
+          "title": "Destination Anchor Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "pointer",
+            "semantic_connector"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "routing": {
+          "enum": [
+            "straight",
+            "elbow",
+            "curve"
+          ],
+          "title": "Routing",
+          "type": "string"
+        },
+        "allow_self_loop": {
+          "default": false,
+          "title": "Allow Self Loop",
+          "type": "boolean"
+        },
+        "source_point": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PointerSourcePoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "object_type",
+        "destination_object_id",
+        "destination_anchor_id",
+        "role",
+        "routing"
+      ],
+      "title": "ConnectorObject",
       "type": "object"
     },
     "ContinuityPlan": {
@@ -1550,6 +3362,18 @@
           "default": null,
           "title": "Annotation Omission Reason"
         },
+        "annotation_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnnotationPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "type": "object"
+        },
         "readable_hold_intent_ms": {
           "exclusiveMinimum": 0,
           "title": "Readable Hold Intent Ms",
@@ -1686,6 +3510,39 @@
       "title": "FallbackRecord",
       "type": "object"
     },
+    "Geometry": {
+      "additionalProperties": false,
+      "properties": {
+        "bounds": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "points": {
+          "items": {
+            "$ref": "#/$defs/Point"
+          },
+          "title": "Points",
+          "type": "array"
+        },
+        "corner_radius": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corner Radius"
+        }
+      },
+      "required": [
+        "bounds"
+      ],
+      "title": "Geometry",
+      "type": "object"
+    },
     "GroupAction": {
       "additionalProperties": false,
       "properties": {
@@ -1779,8 +3636,7 @@
         "verb": {
           "enum": [
             "group",
-            "ungroup",
-            "split"
+            "ungroup"
           ],
           "title": "Verb",
           "type": "string"
@@ -1830,6 +3686,193 @@
         "target_ids"
       ],
       "title": "GroupAction",
+      "type": "object"
+    },
+    "GroupContainer": {
+      "additionalProperties": false,
+      "not": {
+        "properties": {
+          "character_assembly": {
+            "type": "object"
+          },
+          "illustration_assembly": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "character_assembly",
+          "illustration_assembly"
+        ]
+      },
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "child_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Child Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "const": "group",
+          "title": "Object Type",
+          "type": "string"
+        },
+        "character_assembly": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CharacterAssemblyBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "illustration_assembly": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IllustrationAssemblyBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "composition_binding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompositionBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "child_ids",
+        "object_type"
+      ],
+      "title": "GroupContainer",
       "type": "object"
     },
     "HierarchyBasis": {
@@ -1950,6 +3993,817 @@
         "preserve_world_transform"
       ],
       "title": "HierarchyTransitionPolicy",
+      "type": "object"
+    },
+    "IllustrationAnchorBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "semantic_name": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Semantic Name",
+          "type": "string"
+        },
+        "role_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Role Id",
+          "type": "string"
+        },
+        "object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Object Id",
+          "type": "string"
+        },
+        "anchor_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Anchor Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_name",
+        "role_id",
+        "object_id",
+        "anchor_id"
+      ],
+      "title": "IllustrationAnchorBinding",
+      "type": "object"
+    },
+    "IllustrationAssemblyBinding": {
+      "additionalProperties": false,
+      "description": "Per-plan authored content identity, not a registry asset or state machine.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "family": {
+          "enum": [
+            "icon",
+            "pictogram",
+            "device",
+            "document",
+            "terminal"
+          ],
+          "title": "Family",
+          "type": "string"
+        },
+        "content_state_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Content State Id",
+          "type": "string"
+        },
+        "roles": {
+          "contains": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "artwork",
+                  "content"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          "items": {
+            "$ref": "#/$defs/IllustrationRoleBinding"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "title": "Roles",
+          "type": "array"
+        },
+        "semantic_anchors": {
+          "items": {
+            "$ref": "#/$defs/IllustrationAnchorBinding"
+          },
+          "maxItems": 4096,
+          "title": "Semantic Anchors",
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "family",
+        "content_state_id",
+        "roles",
+        "semantic_anchors"
+      ],
+      "title": "IllustrationAssemblyBinding",
+      "type": "object"
+    },
+    "IllustrationRoleBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "role_id": {
+          "minLength": 1,
+          "not": {
+            "pattern": "\\s"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "title": "Role Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "artwork",
+            "content",
+            "label",
+            "state"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Object Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role_id",
+        "kind",
+        "object_id"
+      ],
+      "title": "IllustrationRoleBinding",
+      "type": "object"
+    },
+    "ImageFocalPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "ImageFocalPoint",
+      "type": "object"
+    },
+    "ImagePixelCrop": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "ImagePixelCrop",
+      "type": "object"
+    },
+    "ImagePlacement": {
+      "additionalProperties": false,
+      "description": "Authored placement of checked supporting pixels, never evidence authority.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "minimum": 1,
+          "title": "Source Revision",
+          "type": "integer"
+        },
+        "source_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Sha256",
+          "type": "string"
+        },
+        "source_width": {
+          "exclusiveMinimum": 0,
+          "title": "Source Width",
+          "type": "integer"
+        },
+        "source_height": {
+          "exclusiveMinimum": 0,
+          "title": "Source Height",
+          "type": "integer"
+        },
+        "crop": {
+          "$ref": "#/$defs/ImagePixelCrop"
+        },
+        "fit": {
+          "enum": [
+            "contain",
+            "cover"
+          ],
+          "title": "Fit",
+          "type": "string"
+        },
+        "focal_point": {
+          "$ref": "#/$defs/ImageFocalPoint"
+        },
+        "allowed_transformations": {
+          "items": {
+            "enum": [
+              "scale",
+              "crop",
+              "rotate",
+              "mask"
+            ],
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Allowed Transformations",
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "version",
+        "source_revision",
+        "source_sha256",
+        "source_width",
+        "source_height",
+        "crop",
+        "fit",
+        "focal_point",
+        "allowed_transformations"
+      ],
+      "title": "ImagePlacement",
+      "type": "object"
+    },
+    "MarkObject": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "enum": [
+            "freehand",
+            "line",
+            "rectangle",
+            "rounded_rectangle",
+            "ellipse",
+            "polygon",
+            "bracket",
+            "underline",
+            "highlight"
+          ],
+          "title": "Object Type",
+          "type": "string"
+        },
+        "path_data": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path Data"
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "object_type"
+      ],
+      "title": "MarkObject",
+      "type": "object"
+    },
+    "MaskContainer": {
+      "additionalProperties": false,
+      "description": "Static alpha mask; source is a dedicated sibling, not painted content.",
+      "oneOf": [
+        {
+          "properties": {
+            "mask_mode": {
+              "type": "null"
+            },
+            "mask_source_object_id": {
+              "type": "null"
+            },
+            "mask_coordinate_space": {
+              "type": "null"
+            },
+            "invert": {
+              "type": "null"
+            },
+            "feather_px": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "mask_mode": {
+              "const": "alpha"
+            },
+            "mask_source_object_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "mask_coordinate_space": {
+              "const": "parent_local"
+            },
+            "invert": {
+              "const": false
+            },
+            "feather_px": {
+              "const": 0
+            }
+          },
+          "required": [
+            "mask_mode",
+            "mask_source_object_id",
+            "mask_coordinate_space",
+            "invert",
+            "feather_px"
+          ]
+        }
+      ],
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "child_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Child Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "const": "mask",
+          "title": "Object Type",
+          "type": "string"
+        },
+        "mask_mode": {
+          "anyOf": [
+            {
+              "const": "alpha",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mask Mode"
+        },
+        "mask_source_object_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mask Source Object Id"
+        },
+        "mask_coordinate_space": {
+          "anyOf": [
+            {
+              "const": "parent_local",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mask Coordinate Space"
+        },
+        "invert": {
+          "anyOf": [
+            {
+              "const": false,
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Invert"
+        },
+        "feather_px": {
+          "anyOf": [
+            {
+              "const": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Feather Px"
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "child_ids",
+        "object_type"
+      ],
+      "title": "MaskContainer",
+      "type": "object"
+    },
+    "MediaPlayback": {
+      "additionalProperties": false,
+      "description": "One-to-one absolute playback of a checked half-open source interval.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "placement": {
+          "$ref": "#/$defs/ImagePlacement"
+        },
+        "source_stream": {
+          "$ref": "#/$defs/MediaStreamPin"
+        },
+        "source_duration_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Source Duration Ms",
+          "type": "integer"
+        },
+        "source_in_ms": {
+          "minimum": 0,
+          "title": "Source In Ms",
+          "type": "integer"
+        },
+        "source_out_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Source Out Ms",
+          "type": "integer"
+        },
+        "timeline_start_ms": {
+          "minimum": 0,
+          "title": "Timeline Start Ms",
+          "type": "integer"
+        },
+        "frame_selection": {
+          "const": "last_pts_at_or_before",
+          "title": "Frame Selection",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "placement",
+        "source_stream",
+        "source_duration_ms",
+        "source_in_ms",
+        "source_out_ms",
+        "timeline_start_ms",
+        "frame_selection"
+      ],
+      "title": "MediaPlayback",
+      "type": "object"
+    },
+    "MediaStreamPin": {
+      "additionalProperties": false,
+      "description": "Identity of a checked presentation inventory, not a container/FPS guess.\n\nRaw decoded PTS/durations are sorted in strict presentation order. The\ninventory's first PTS is the signed origin and its final PTS+duration is\nthe exclusive end. The decoder must attest these pins against actual bytes.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "stream_index": {
+          "minimum": 0,
+          "title": "Stream Index",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "time_base_numerator": {
+          "exclusiveMinimum": 0,
+          "title": "Time Base Numerator",
+          "type": "integer"
+        },
+        "time_base_denominator": {
+          "exclusiveMinimum": 0,
+          "title": "Time Base Denominator",
+          "type": "integer"
+        },
+        "first_pts": {
+          "title": "First Pts",
+          "type": "integer"
+        },
+        "end_pts": {
+          "title": "End Pts",
+          "type": "integer"
+        },
+        "frame_count": {
+          "exclusiveMinimum": 0,
+          "title": "Frame Count",
+          "type": "integer"
+        },
+        "timestamps_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Timestamps Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "stream_index",
+        "width",
+        "height",
+        "time_base_numerator",
+        "time_base_denominator",
+        "first_pts",
+        "end_pts",
+        "frame_count",
+        "timestamps_sha256"
+      ],
+      "title": "MediaStreamPin",
       "type": "object"
     },
     "MorphPolicy": {
@@ -2161,6 +5015,30 @@
       "title": "Point",
       "type": "object"
     },
+    "PointerSourcePoint": {
+      "additionalProperties": false,
+      "description": "An authored parent-local source; never inferred from a target anchor.",
+      "properties": {
+        "x": {
+          "maximum": 1000000,
+          "minimum": -1000000,
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "maximum": 1000000,
+          "minimum": -1000000,
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "PointerSourcePoint",
+      "type": "object"
+    },
     "PriorActionTrigger": {
       "additionalProperties": false,
       "properties": {
@@ -2259,6 +5137,61 @@
         "originality_status"
       ],
       "title": "Provenance",
+      "type": "object"
+    },
+    "RegistryAnchorMapping": {
+      "additionalProperties": false,
+      "properties": {
+        "placed_anchor_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Placed Anchor Id",
+          "type": "string"
+        },
+        "registry_anchor_name": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Registry Anchor Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "placed_anchor_id",
+        "registry_anchor_name"
+      ],
+      "title": "RegistryAnchorMapping",
+      "type": "object"
+    },
+    "RegistryBinding": {
+      "additionalProperties": false,
+      "description": "Exact authored anchor names, not inferred art parts or fitted geometry.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "asset_id": {
+          "pattern": "^[a-z0-9-]+$",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "anchor_mappings": {
+          "items": {
+            "$ref": "#/$defs/RegistryAnchorMapping"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "title": "Anchor Mappings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "asset_id",
+        "anchor_mappings"
+      ],
+      "title": "RegistryBinding",
       "type": "object"
     },
     "ReplaceAction": {
@@ -2559,6 +5492,24 @@
           ],
           "default": null,
           "title": "Feather Px"
+        },
+        "child_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 4096,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Child Ids",
+          "uniqueItems": true
         }
       },
       "required": [
@@ -2576,6 +5527,750 @@
     },
     "SemanticStandardObjectSpec": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "child_ids": {
+                "type": "array"
+              }
+            },
+            "required": [
+              "child_ids"
+            ]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "properties": {
+                  "object_type": {
+                    "enum": [
+                      "group",
+                      "clip"
+                    ]
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "object_type": {
+                    "enum": [
+                      "composition",
+                      "instance"
+                    ]
+                  },
+                  "composition_binding": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "composition_binding"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "composition_binding": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "composition_binding"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "enum": [
+                  "composition",
+                  "instance"
+                ]
+              },
+              "child_ids": {
+                "type": "array"
+              }
+            },
+            "required": [
+              "child_ids"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "structured_list": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "structured_list"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "const": "list"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "registry_binding": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "registry_binding"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "enum": [
+                  "character",
+                  "chart",
+                  "device",
+                  "document",
+                  "icon",
+                  "pictogram",
+                  "terminal"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "technical_frame"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "enum": [
+                  "application",
+                  "browser",
+                  "comparison",
+                  "database",
+                  "folder",
+                  "server"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              },
+              "object_type": {
+                "const": "browser"
+              }
+            },
+            "required": [
+              "technical_frame",
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "technical_frame": {
+                "properties": {
+                  "display_state": {
+                    "enum": [
+                      "ready",
+                      "loading",
+                      "error"
+                    ]
+                  },
+                  "roles": {
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "address"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "content"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              },
+              "object_type": {
+                "const": "application"
+              }
+            },
+            "required": [
+              "technical_frame",
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "technical_frame": {
+                "properties": {
+                  "display_state": {
+                    "enum": [
+                      "ready",
+                      "busy",
+                      "error"
+                    ]
+                  },
+                  "roles": {
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "navigation"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "content"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              },
+              "object_type": {
+                "const": "server"
+              }
+            },
+            "required": [
+              "technical_frame",
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "technical_frame": {
+                "properties": {
+                  "display_state": {
+                    "enum": [
+                      "idle",
+                      "active",
+                      "offline"
+                    ]
+                  },
+                  "roles": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "content"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              },
+              "object_type": {
+                "const": "database"
+              }
+            },
+            "required": [
+              "technical_frame",
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "technical_frame": {
+                "properties": {
+                  "display_state": {
+                    "enum": [
+                      "idle",
+                      "active",
+                      "offline"
+                    ]
+                  },
+                  "roles": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "content"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              },
+              "object_type": {
+                "const": "folder"
+              }
+            },
+            "required": [
+              "technical_frame",
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "technical_frame": {
+                "properties": {
+                  "display_state": {
+                    "enum": [
+                      "closed",
+                      "open"
+                    ]
+                  },
+                  "roles": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "content"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              },
+              "object_type": {
+                "const": "comparison"
+              }
+            },
+            "required": [
+              "technical_frame",
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "technical_frame": {
+                "properties": {
+                  "display_state": {
+                    "enum": [
+                      "balanced",
+                      "contrast"
+                    ]
+                  },
+                  "roles": {
+                    "maxItems": 4,
+                    "minItems": 4,
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "left_title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "left_content"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "right_title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "right_content"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "character_assembly": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "character_assembly"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "const": "group"
+              }
+            },
+            "required": [
+              "child_ids"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "illustration_assembly": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "illustration_assembly"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "const": "group"
+              },
+              "child_ids": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 4096,
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "child_ids"
+            ]
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "character_assembly": {
+                "type": "object"
+              },
+              "illustration_assembly": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "character_assembly",
+              "illustration_assembly"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "chart_payload": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "chart_payload"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "const": "chart"
+              },
+              "asset_id": {
+                "type": "null"
+              },
+              "variant": {
+                "type": "null"
+              },
+              "registry_binding": {
+                "type": "null"
+              },
+              "technical_frame": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "image_placement": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "image_placement"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "const": "image"
+              },
+              "asset_id": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "asset_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "media_playback": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "media_playback"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "enum": [
+                  "presenter",
+                  "screen_recording",
+                  "video"
+                ]
+              },
+              "asset_id": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "asset_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "object_type": {
+                "enum": [
+                  "presenter",
+                  "screen_recording",
+                  "video"
+                ]
+              }
+            },
+            "required": [
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "asset_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "media_playback": {
+                "type": "object"
+              },
+              "variant": {
+                "type": "null"
+              },
+              "registry_binding": {
+                "type": "null"
+              },
+              "technical_frame": {
+                "type": "null"
+              },
+              "chart_payload": {
+                "type": "null"
+              },
+              "image_placement": {
+                "type": "null"
+              },
+              "composition_binding": {
+                "type": "null"
+              },
+              "character_assembly": {
+                "type": "null"
+              },
+              "illustration_assembly": {
+                "type": "null"
+              },
+              "structured_list": {
+                "type": "null"
+              },
+              "code_payload": {
+                "type": "null"
+              },
+              "callout_binding": {
+                "type": "null"
+              },
+              "child_ids": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "asset_id",
+              "media_playback"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "connector_binding"
+            ]
+          },
+          "then": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "object_type": {
+                      "const": "network"
+                    }
+                  },
+                  "required": [
+                    "object_type"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "connector_binding": {
+                      "properties": {
+                        "role": {
+                          "const": "semantic_connector"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ],
+            "properties": {
+              "object_type": {
+                "enum": [
+                  "arrow",
+                  "network"
+                ]
+              },
+              "connector_binding": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      ],
       "properties": {
         "object_id": {
           "title": "Object Id",
@@ -2656,10 +6351,177 @@
             "group",
             "clip",
             "composition",
-            "instance"
+            "instance",
+            "video",
+            "presenter",
+            "screen_recording"
           ],
           "title": "Object Type",
           "type": "string"
+        },
+        "code_payload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CodePayload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "callout_binding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CalloutBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "structured_list": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StructuredListPayload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "registry_binding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RegistryBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "technical_frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TechnicalFrameBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "character_assembly": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CharacterAssemblyBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "illustration_assembly": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IllustrationAssemblyBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "chart_payload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChartPayload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "composition_binding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompositionBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "image_placement": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ImagePlacement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "media_playback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MediaPlayback"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "connector_binding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectorBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "child_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 4096,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Child Ids",
+          "uniqueItems": true
         }
       },
       "required": [
@@ -2857,8 +6719,1002 @@
       "title": "SoundIntent",
       "type": "object"
     },
+    "SplitAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "source_instruction_id": {
+          "minLength": 1,
+          "title": "Source Instruction Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "semantic_reason": {
+          "minLength": 1,
+          "title": "Semantic Reason",
+          "type": "string"
+        },
+        "trigger": {
+          "discriminator": {
+            "mapping": {
+              "absolute": "#/$defs/AbsoluteTrigger",
+              "beat_start": "#/$defs/BeatStartTrigger",
+              "phrase": "#/$defs/PhraseTrigger",
+              "prior_action": "#/$defs/PriorActionTrigger",
+              "word": "#/$defs/WordTrigger"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BeatStartTrigger"
+            },
+            {
+              "$ref": "#/$defs/WordTrigger"
+            },
+            {
+              "$ref": "#/$defs/PhraseTrigger"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteTrigger"
+            },
+            {
+              "$ref": "#/$defs/PriorActionTrigger"
+            }
+          ],
+          "title": "Trigger"
+        },
+        "easing": {
+          "default": "ease_out",
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out",
+            "step"
+          ],
+          "title": "Easing",
+          "type": "string"
+        },
+        "expected_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State"
+        },
+        "post_state": {
+          "minLength": 1,
+          "title": "Post State",
+          "type": "string"
+        },
+        "fallback": {
+          "$ref": "#/$defs/FallbackPolicy"
+        },
+        "coverage_id": {
+          "minLength": 1,
+          "title": "Coverage Id",
+          "type": "string"
+        },
+        "verb": {
+          "const": "split",
+          "title": "Verb",
+          "type": "string"
+        },
+        "target_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Target Ids",
+          "type": "array"
+        },
+        "container_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Container Id"
+        },
+        "hierarchy_policy": {
+          "default": null,
+          "title": "Hierarchy Policy",
+          "type": "null"
+        },
+        "split_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SplitPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "action_id",
+        "source_instruction_id",
+        "board_id",
+        "semantic_reason",
+        "trigger",
+        "post_state",
+        "fallback",
+        "coverage_id",
+        "verb",
+        "target_ids"
+      ],
+      "title": "SplitAction",
+      "type": "object"
+    },
+    "SplitAssetPin": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "resource_uri": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Resource Uri",
+          "type": "string"
+        },
+        "checksum_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Checksum Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_id",
+        "revision",
+        "resource_uri",
+        "checksum_sha256"
+      ],
+      "title": "SplitAssetPin",
+      "type": "object"
+    },
+    "SplitBasis": {
+      "additionalProperties": false,
+      "properties": {
+        "source_closure": {
+          "$ref": "#/$defs/SplitClosure"
+        },
+        "result_closures": {
+          "items": {
+            "$ref": "#/$defs/SplitClosure"
+          },
+          "maxItems": 256,
+          "minItems": 2,
+          "title": "Result Closures",
+          "type": "array"
+        },
+        "placements": {
+          "items": {
+            "$ref": "#/$defs/SplitPlacement"
+          },
+          "maxItems": 4096,
+          "minItems": 3,
+          "title": "Placements",
+          "type": "array"
+        },
+        "read_dependencies": {
+          "items": {
+            "$ref": "#/$defs/SplitReadDependency"
+          },
+          "maxItems": 4096,
+          "title": "Read Dependencies",
+          "type": "array"
+        },
+        "asset_pins": {
+          "items": {
+            "$ref": "#/$defs/SplitAssetPin"
+          },
+          "maxItems": 4096,
+          "title": "Asset Pins",
+          "type": "array"
+        },
+        "style_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Style Sha256",
+          "type": "string"
+        },
+        "registry_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Registry Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_closure",
+        "result_closures",
+        "placements",
+        "read_dependencies",
+        "asset_pins",
+        "style_sha256",
+        "registry_sha256"
+      ],
+      "title": "SplitBasis",
+      "type": "object"
+    },
+    "SplitClosure": {
+      "additionalProperties": false,
+      "properties": {
+        "root_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Root Id",
+          "type": "string"
+        },
+        "owned_ids": {
+          "items": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "title": "Owned Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "root_id",
+        "owned_ids"
+      ],
+      "title": "SplitClosure",
+      "type": "object"
+    },
+    "SplitConstruction": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "reveal",
+            "draw",
+            "write",
+            "enter"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "phase": {
+          "$ref": "#/$defs/SplitPhase"
+        },
+        "enter_destination": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Transform"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "mode",
+        "phase"
+      ],
+      "title": "SplitConstruction",
+      "type": "object"
+    },
+    "SplitCorrespondence": {
+      "additionalProperties": false,
+      "properties": {
+        "correspondence_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Correspondence Id",
+          "type": "string"
+        },
+        "source_object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Source Object Id",
+          "type": "string"
+        },
+        "source_content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Content Sha256",
+          "type": "string"
+        },
+        "result_object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Result Object Id",
+          "type": "string"
+        },
+        "result_content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Result Content Sha256",
+          "type": "string"
+        },
+        "relationship": {
+          "const": "authored_assertion",
+          "title": "Relationship",
+          "type": "string"
+        },
+        "statement": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Statement",
+          "type": "string"
+        },
+        "source_region": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Bounds"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "correspondence_id",
+        "source_object_id",
+        "source_content_sha256",
+        "result_object_id",
+        "result_content_sha256",
+        "relationship",
+        "statement"
+      ],
+      "title": "SplitCorrespondence",
+      "type": "object"
+    },
+    "SplitEvidenceActivation": {
+      "additionalProperties": false,
+      "description": "Authored causal authority only; attestation needs the actual source context.",
+      "properties": {
+        "result_object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Result Object Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "causal_action_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Causal Action Id",
+          "type": "string"
+        },
+        "intent": {
+          "$ref": "#/$defs/EvidenceIntent"
+        },
+        "asset_pin": {
+          "$ref": "#/$defs/SplitAssetPin"
+        },
+        "permission_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Permission Sha256",
+          "type": "string"
+        },
+        "allowed_transformations": {
+          "items": {
+            "enum": [
+              "crop",
+              "scale",
+              "rotate",
+              "mask",
+              "annotate",
+              "color_treatment"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Allowed Transformations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "result_object_id",
+        "beat_id",
+        "causal_action_id",
+        "intent",
+        "asset_pin",
+        "permission_sha256",
+        "allowed_transformations"
+      ],
+      "title": "SplitEvidenceActivation",
+      "type": "object"
+    },
+    "SplitMovement": {
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "$ref": "#/$defs/SplitPhase"
+        },
+        "from_transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "destination": {
+          "$ref": "#/$defs/Transform"
+        }
+      },
+      "required": [
+        "phase",
+        "from_transform",
+        "destination"
+      ],
+      "title": "SplitMovement",
+      "type": "object"
+    },
+    "SplitPhase": {
+      "additionalProperties": false,
+      "properties": {
+        "start_tick": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Start Tick",
+          "type": "integer"
+        },
+        "end_tick": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "End Tick",
+          "type": "integer"
+        },
+        "easing": {
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out"
+          ],
+          "title": "Easing",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_tick",
+        "end_tick",
+        "easing"
+      ],
+      "title": "SplitPhase",
+      "type": "object"
+    },
+    "SplitPlacement": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Object Id",
+          "type": "string"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent Id"
+        },
+        "sibling_ordinal": {
+          "minimum": 0,
+          "title": "Sibling Ordinal",
+          "type": "integer"
+        },
+        "local_content_bounds": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "local_transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "world_matrix": {
+          "maxItems": 6,
+          "minItems": 6,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "World Matrix",
+          "type": "array"
+        },
+        "world_corners": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/Point"
+            },
+            {
+              "$ref": "#/$defs/Point"
+            },
+            {
+              "$ref": "#/$defs/Point"
+            },
+            {
+              "$ref": "#/$defs/Point"
+            }
+          ],
+          "title": "World Corners",
+          "type": "array"
+        },
+        "world_bounds": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "state": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "State",
+          "type": "string"
+        },
+        "local_visibility": {
+          "title": "Local Visibility",
+          "type": "boolean"
+        },
+        "effective_visibility": {
+          "title": "Effective Visibility",
+          "type": "boolean"
+        },
+        "reveal": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Reveal",
+          "type": "number"
+        },
+        "local_opacity": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Local Opacity",
+          "type": "number"
+        },
+        "state_version": {
+          "minimum": 1,
+          "title": "State Version",
+          "type": "integer"
+        },
+        "content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_id",
+        "parent_id",
+        "sibling_ordinal",
+        "local_content_bounds",
+        "local_transform",
+        "world_matrix",
+        "world_corners",
+        "world_bounds",
+        "state",
+        "local_visibility",
+        "effective_visibility",
+        "reveal",
+        "local_opacity",
+        "state_version",
+        "content_sha256"
+      ],
+      "title": "SplitPlacement",
+      "type": "object"
+    },
+    "SplitPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "source_object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Source Object Id",
+          "type": "string"
+        },
+        "parent_policy": {
+          "enum": [
+            "common_parent",
+            "authored_distinct_parents"
+          ],
+          "title": "Parent Policy",
+          "type": "string"
+        },
+        "source_exit": {
+          "$ref": "#/$defs/SplitPhase"
+        },
+        "results": {
+          "items": {
+            "$ref": "#/$defs/SplitResult"
+          },
+          "maxItems": 256,
+          "minItems": 2,
+          "title": "Results",
+          "type": "array"
+        },
+        "correspondences": {
+          "items": {
+            "$ref": "#/$defs/SplitCorrespondence"
+          },
+          "maxItems": 256,
+          "minItems": 2,
+          "title": "Correspondences",
+          "type": "array"
+        },
+        "source_basis": {
+          "$ref": "#/$defs/SplitBasis"
+        },
+        "source_basis_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Basis Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_object_id",
+        "parent_policy",
+        "source_exit",
+        "results",
+        "correspondences",
+        "source_basis",
+        "source_basis_sha256"
+      ],
+      "title": "SplitPolicy",
+      "type": "object"
+    },
+    "SplitReadDependency": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "ancestor",
+            "aperture",
+            "mask_source",
+            "connector_anchor",
+            "annotation_anchor"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "object_ids": {
+          "items": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "title": "Object Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "object_ids"
+      ],
+      "title": "SplitReadDependency",
+      "type": "object"
+    },
+    "SplitResult": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Object Id",
+          "type": "string"
+        },
+        "correspondence_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Correspondence Id",
+          "type": "string"
+        },
+        "construction": {
+          "$ref": "#/$defs/SplitConstruction"
+        },
+        "movement": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SplitMovement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "destination": {
+          "$ref": "#/$defs/Transform"
+        },
+        "post_state": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Post State",
+          "type": "string"
+        },
+        "evidence_activation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SplitEvidenceActivation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "type": "object"
+        }
+      },
+      "required": [
+        "object_id",
+        "correspondence_id",
+        "construction",
+        "destination",
+        "post_state"
+      ],
+      "title": "SplitResult",
+      "type": "object"
+    },
+    "StructuredListPayload": {
+      "additionalProperties": false,
+      "description": "Authored heading/group/order binding; each item is a real scene object.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "container_group_id": {
+          "minLength": 1,
+          "title": "Container Group Id",
+          "type": "string"
+        },
+        "item_object_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Item Object Ids",
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "version",
+        "container_group_id",
+        "item_object_ids"
+      ],
+      "title": "StructuredListPayload",
+      "type": "object"
+    },
+    "StructuredListPhase": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "weight": {
+          "maximum": 10000,
+          "minimum": 1,
+          "title": "Weight",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "object_id",
+        "weight"
+      ],
+      "title": "StructuredListPhase",
+      "type": "object"
+    },
+    "StructuredListPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "list_object_id": {
+          "minLength": 1,
+          "title": "List Object Id",
+          "type": "string"
+        },
+        "container_group_id": {
+          "minLength": 1,
+          "title": "Container Group Id",
+          "type": "string"
+        },
+        "item_object_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Item Object Ids",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "phases": {
+          "items": {
+            "$ref": "#/$defs/StructuredListPhase"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Phases",
+          "type": "array"
+        },
+        "expected_item_state_versions": {
+          "additionalProperties": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "title": "Expected Item State Versions",
+          "type": "object"
+        }
+      },
+      "required": [
+        "version",
+        "list_object_id",
+        "container_group_id",
+        "item_object_ids",
+        "phases",
+        "expected_item_state_versions"
+      ],
+      "title": "StructuredListPolicy",
+      "type": "object"
+    },
+    "StyleRefs": {
+      "additionalProperties": false,
+      "properties": {
+        "stroke": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stroke"
+        },
+        "fill": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fill"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "effect": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effect"
+        }
+      },
+      "title": "StyleRefs",
+      "type": "object"
+    },
     "TargetAction": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "structured_list_policy": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "structured_list_policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "verb": {
+                "const": "progressive_reveal"
+              },
+              "easing": {
+                "const": "linear"
+              },
+              "expected_state": {
+                "const": "hidden"
+              },
+              "post_state": {
+                "const": "visible"
+              },
+              "annotation": {
+                "type": "null"
+              },
+              "annotation_policy": {
+                "type": "null"
+              },
+              "count_policy": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "easing",
+              "expected_state"
+            ]
+          }
+        }
+      ],
       "properties": {
         "action_id": {
           "minLength": 1,
@@ -3006,6 +7862,17 @@
             }
           ],
           "default": null
+        },
+        "structured_list_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StructuredListPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -3021,6 +7888,331 @@
         "target_ids"
       ],
       "title": "TargetAction",
+      "type": "object"
+    },
+    "TechnicalAnchorMapping": {
+      "additionalProperties": false,
+      "properties": {
+        "placed_anchor_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Placed Anchor Id",
+          "type": "string"
+        },
+        "native_anchor_name": {
+          "enum": [
+            "top",
+            "right",
+            "bottom",
+            "left"
+          ],
+          "title": "Native Anchor Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "placed_anchor_id",
+        "native_anchor_name"
+      ],
+      "title": "TechnicalAnchorMapping",
+      "type": "object"
+    },
+    "TechnicalFrameBinding": {
+      "additionalProperties": false,
+      "description": "Authored content roles and chrome state; never a lifecycle-state channel.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "container_group_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Container Group Id",
+          "type": "string"
+        },
+        "display_state": {
+          "enum": [
+            "ready",
+            "loading",
+            "error",
+            "busy",
+            "idle",
+            "active",
+            "offline",
+            "closed",
+            "open",
+            "balanced",
+            "contrast"
+          ],
+          "title": "Display State",
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/TechnicalRoleBinding"
+          },
+          "maxItems": 4,
+          "minItems": 2,
+          "title": "Roles",
+          "type": "array"
+        },
+        "anchor_mappings": {
+          "items": {
+            "$ref": "#/$defs/TechnicalAnchorMapping"
+          },
+          "maxItems": 4,
+          "title": "Anchor Mappings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "container_group_id",
+        "display_state",
+        "roles",
+        "anchor_mappings"
+      ],
+      "title": "TechnicalFrameBinding",
+      "type": "object"
+    },
+    "TechnicalRoleBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "title",
+            "address",
+            "navigation",
+            "content",
+            "left_title",
+            "left_content",
+            "right_title",
+            "right_content"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Object Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "object_id"
+      ],
+      "title": "TechnicalRoleBinding",
+      "type": "object"
+    },
+    "TextObject": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "structured_list": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "structured_list"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "const": "list"
+              },
+              "items": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "enum": [
+            "text",
+            "list",
+            "callout",
+            "code"
+          ],
+          "title": "Object Type",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "code_payload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CodePayload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "callout_binding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CalloutBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "structured_list": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StructuredListPayload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "object_type",
+        "text"
+      ],
+      "title": "TextObject",
       "type": "object"
     },
     "Transform": {
@@ -3205,6 +8397,767 @@
       "title": "TransformAction",
       "type": "object"
     },
+    "VisualObject": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "registry_binding": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "registry_binding"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "enum": [
+                  "character",
+                  "chart",
+                  "device",
+                  "document",
+                  "icon",
+                  "pictogram",
+                  "terminal"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "technical_frame"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "enum": [
+                  "application",
+                  "browser",
+                  "comparison",
+                  "database",
+                  "folder",
+                  "server"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              },
+              "object_type": {
+                "const": "browser"
+              }
+            },
+            "required": [
+              "technical_frame",
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "technical_frame": {
+                "properties": {
+                  "display_state": {
+                    "enum": [
+                      "ready",
+                      "loading",
+                      "error"
+                    ]
+                  },
+                  "roles": {
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "address"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "content"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              },
+              "object_type": {
+                "const": "application"
+              }
+            },
+            "required": [
+              "technical_frame",
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "technical_frame": {
+                "properties": {
+                  "display_state": {
+                    "enum": [
+                      "ready",
+                      "busy",
+                      "error"
+                    ]
+                  },
+                  "roles": {
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "navigation"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "content"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              },
+              "object_type": {
+                "const": "server"
+              }
+            },
+            "required": [
+              "technical_frame",
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "technical_frame": {
+                "properties": {
+                  "display_state": {
+                    "enum": [
+                      "idle",
+                      "active",
+                      "offline"
+                    ]
+                  },
+                  "roles": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "content"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              },
+              "object_type": {
+                "const": "database"
+              }
+            },
+            "required": [
+              "technical_frame",
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "technical_frame": {
+                "properties": {
+                  "display_state": {
+                    "enum": [
+                      "idle",
+                      "active",
+                      "offline"
+                    ]
+                  },
+                  "roles": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "content"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              },
+              "object_type": {
+                "const": "folder"
+              }
+            },
+            "required": [
+              "technical_frame",
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "technical_frame": {
+                "properties": {
+                  "display_state": {
+                    "enum": [
+                      "closed",
+                      "open"
+                    ]
+                  },
+                  "roles": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "content"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "technical_frame": {
+                "type": "object"
+              },
+              "object_type": {
+                "const": "comparison"
+              }
+            },
+            "required": [
+              "technical_frame",
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "technical_frame": {
+                "properties": {
+                  "display_state": {
+                    "enum": [
+                      "balanced",
+                      "contrast"
+                    ]
+                  },
+                  "roles": {
+                    "maxItems": 4,
+                    "minItems": 4,
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "left_title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "left_content"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "right_title"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "role": {
+                            "const": "right_content"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "chart_payload": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "chart_payload"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "const": "chart"
+              },
+              "asset_id": {
+                "type": "null"
+              },
+              "variant": {
+                "type": "null"
+              },
+              "registry_binding": {
+                "type": "null"
+              },
+              "technical_frame": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "image_placement": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "image_placement"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "const": "image"
+              },
+              "asset_id": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "asset_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "media_playback": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "media_playback"
+            ]
+          },
+          "then": {
+            "properties": {
+              "object_type": {
+                "enum": [
+                  "presenter",
+                  "screen_recording",
+                  "video"
+                ]
+              },
+              "asset_id": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "asset_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "object_type": {
+                "enum": [
+                  "presenter",
+                  "screen_recording",
+                  "video"
+                ]
+              }
+            },
+            "required": [
+              "object_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "asset_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "media_playback": {
+                "type": "object"
+              },
+              "variant": {
+                "type": "null"
+              },
+              "registry_binding": {
+                "type": "null"
+              },
+              "technical_frame": {
+                "type": "null"
+              },
+              "chart_payload": {
+                "type": "null"
+              },
+              "image_placement": {
+                "type": "null"
+              },
+              "composition_binding": {
+                "type": "null"
+              },
+              "character_assembly": {
+                "type": "null"
+              },
+              "illustration_assembly": {
+                "type": "null"
+              },
+              "structured_list": {
+                "type": "null"
+              },
+              "code_payload": {
+                "type": "null"
+              },
+              "callout_binding": {
+                "type": "null"
+              },
+              "child_ids": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "asset_id",
+              "media_playback"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "semantic_role": {
+          "minLength": 1,
+          "title": "Semantic Role",
+          "type": "string"
+        },
+        "z_index": {
+          "title": "Z Index",
+          "type": "integer"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleRefs"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/Anchor"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "clip_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Id"
+        },
+        "initial_state": {
+          "minLength": 1,
+          "title": "Initial State",
+          "type": "string"
+        },
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "coverage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Coverage Ids",
+          "type": "array"
+        },
+        "object_type": {
+          "enum": [
+            "icon",
+            "pictogram",
+            "character",
+            "image",
+            "evidence",
+            "chart",
+            "comparison",
+            "browser",
+            "application",
+            "terminal",
+            "document",
+            "device",
+            "server",
+            "database",
+            "folder",
+            "composition",
+            "instance",
+            "video",
+            "presenter",
+            "screen_recording"
+          ],
+          "title": "Object Type",
+          "type": "string"
+        },
+        "variant": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Variant"
+        },
+        "registry_binding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RegistryBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "technical_frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TechnicalFrameBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "chart_payload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChartPayload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "image_placement": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ImagePlacement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "media_playback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MediaPlayback"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "object_id",
+        "board_id",
+        "beat_id",
+        "semantic_role",
+        "z_index",
+        "geometry",
+        "transform",
+        "style",
+        "initial_state",
+        "description",
+        "coverage_ids",
+        "object_type"
+      ],
+      "title": "VisualObject",
+      "type": "object"
+    },
     "WordTrigger": {
       "additionalProperties": false,
       "properties": {
@@ -3324,12 +9277,15 @@
             "network": "#/$defs/SemanticStandardObjectSpec",
             "pictogram": "#/$defs/SemanticStandardObjectSpec",
             "polygon": "#/$defs/SemanticStandardObjectSpec",
+            "presenter": "#/$defs/SemanticStandardObjectSpec",
             "rectangle": "#/$defs/SemanticStandardObjectSpec",
             "rounded_rectangle": "#/$defs/SemanticStandardObjectSpec",
+            "screen_recording": "#/$defs/SemanticStandardObjectSpec",
             "server": "#/$defs/SemanticStandardObjectSpec",
             "terminal": "#/$defs/SemanticStandardObjectSpec",
             "text": "#/$defs/SemanticStandardObjectSpec",
-            "underline": "#/$defs/SemanticStandardObjectSpec"
+            "underline": "#/$defs/SemanticStandardObjectSpec",
+            "video": "#/$defs/SemanticStandardObjectSpec"
           },
           "propertyName": "object_type"
         },
@@ -3388,7 +9344,7 @@
             "rotate": "#/$defs/TransformAction",
             "scale": "#/$defs/TransformAction",
             "sound_cue": "#/$defs/SoundAction",
-            "split": "#/$defs/GroupAction",
+            "split": "#/$defs/SplitAction",
             "ungroup": "#/$defs/GroupAction",
             "write": "#/$defs/TargetAction"
           },
@@ -3409,6 +9365,9 @@
           },
           {
             "$ref": "#/$defs/GroupAction"
+          },
+          {
+            "$ref": "#/$defs/SplitAction"
           },
           {
             "$ref": "#/$defs/EvidenceAction"

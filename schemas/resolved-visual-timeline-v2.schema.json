@@ -927,6 +927,18 @@
           "default": null,
           "title": "Annotation Omission Reason"
         },
+        "annotation_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnnotationPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "type": "object"
+        },
         "readable_hold_intent_ms": {
           "exclusiveMinimum": 0,
           "title": "Readable Hold Intent Ms",
@@ -1238,8 +1250,7 @@
         "verb": {
           "enum": [
             "group",
-            "ungroup",
-            "split"
+            "ungroup"
           ],
           "title": "Verb",
           "type": "string"
@@ -1409,6 +1420,74 @@
         "preserve_world_transform"
       ],
       "title": "HierarchyTransitionPolicy",
+      "type": "object"
+    },
+    "MediaStreamPin": {
+      "additionalProperties": false,
+      "description": "Identity of a checked presentation inventory, not a container/FPS guess.\n\nRaw decoded PTS/durations are sorted in strict presentation order. The\ninventory's first PTS is the signed origin and its final PTS+duration is\nthe exclusive end. The decoder must attest these pins against actual bytes.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "stream_index": {
+          "minimum": 0,
+          "title": "Stream Index",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "time_base_numerator": {
+          "exclusiveMinimum": 0,
+          "title": "Time Base Numerator",
+          "type": "integer"
+        },
+        "time_base_denominator": {
+          "exclusiveMinimum": 0,
+          "title": "Time Base Denominator",
+          "type": "integer"
+        },
+        "first_pts": {
+          "title": "First Pts",
+          "type": "integer"
+        },
+        "end_pts": {
+          "title": "End Pts",
+          "type": "integer"
+        },
+        "frame_count": {
+          "exclusiveMinimum": 0,
+          "title": "Frame Count",
+          "type": "integer"
+        },
+        "timestamps_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Timestamps Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "stream_index",
+        "width",
+        "height",
+        "time_base_numerator",
+        "time_base_denominator",
+        "first_pts",
+        "end_pts",
+        "frame_count",
+        "timestamps_sha256"
+      ],
+      "title": "MediaStreamPin",
       "type": "object"
     },
     "MorphPolicy": {
@@ -1874,7 +1953,7 @@
               "rotate": "#/$defs/TransformAction",
               "scale": "#/$defs/TransformAction",
               "sound_cue": "#/$defs/SoundAction",
-              "split": "#/$defs/GroupAction",
+              "split": "#/$defs/SplitAction",
               "ungroup": "#/$defs/GroupAction",
               "write": "#/$defs/TargetAction"
             },
@@ -1895,6 +1974,9 @@
             },
             {
               "$ref": "#/$defs/GroupAction"
+            },
+            {
+              "$ref": "#/$defs/SplitAction"
             },
             {
               "$ref": "#/$defs/EvidenceAction"
@@ -1931,6 +2013,35 @@
             }
           ],
           "default": null
+        },
+        "split_completion_receipt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SplitCompletionReceipt"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "split_evidence_windows": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ResolvedSplitEvidenceWindow"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Split Evidence Windows",
+          "type": "array"
         }
       },
       "required": [
@@ -2030,6 +2141,30 @@
           "default": null,
           "title": "Height"
         },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "media_stream": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MediaStreamPin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "orientation": {
           "anyOf": [
             {
@@ -2096,6 +2231,53 @@
         "start_ms"
       ],
       "title": "ResolvedBeatAnchor",
+      "type": "object"
+    },
+    "ResolvedSplitEvidenceWindow": {
+      "additionalProperties": false,
+      "description": "Resolved syntax; the timeline rederives phase times and real treatment SHA.",
+      "properties": {
+        "result_object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Result Object Id",
+          "type": "string"
+        },
+        "treatment_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Treatment Sha256",
+          "type": "string"
+        },
+        "construction_complete_ms": {
+          "minimum": 0,
+          "title": "Construction Complete Ms",
+          "type": "integer"
+        },
+        "movement_complete_ms": {
+          "minimum": 0,
+          "title": "Movement Complete Ms",
+          "type": "integer"
+        },
+        "readable_hold_start_ms": {
+          "minimum": 0,
+          "title": "Readable Hold Start Ms",
+          "type": "integer"
+        },
+        "readable_hold_end_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Readable Hold End Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "result_object_id",
+        "treatment_sha256",
+        "construction_complete_ms",
+        "movement_complete_ms",
+        "readable_hold_start_ms",
+        "readable_hold_end_ms"
+      ],
+      "title": "ResolvedSplitEvidenceWindow",
       "type": "object"
     },
     "ResolvedTrigger": {
@@ -2363,8 +2545,999 @@
       "title": "SoundAction",
       "type": "object"
     },
+    "SplitAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "minLength": 1,
+          "title": "Action Id",
+          "type": "string"
+        },
+        "source_instruction_id": {
+          "minLength": 1,
+          "title": "Source Instruction Id",
+          "type": "string"
+        },
+        "board_id": {
+          "minLength": 1,
+          "title": "Board Id",
+          "type": "string"
+        },
+        "semantic_reason": {
+          "minLength": 1,
+          "title": "Semantic Reason",
+          "type": "string"
+        },
+        "trigger": {
+          "discriminator": {
+            "mapping": {
+              "absolute": "#/$defs/AbsoluteTrigger",
+              "beat_start": "#/$defs/BeatStartTrigger",
+              "phrase": "#/$defs/PhraseTrigger",
+              "prior_action": "#/$defs/PriorActionTrigger",
+              "word": "#/$defs/WordTrigger"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BeatStartTrigger"
+            },
+            {
+              "$ref": "#/$defs/WordTrigger"
+            },
+            {
+              "$ref": "#/$defs/PhraseTrigger"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteTrigger"
+            },
+            {
+              "$ref": "#/$defs/PriorActionTrigger"
+            }
+          ],
+          "title": "Trigger"
+        },
+        "easing": {
+          "default": "ease_out",
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out",
+            "step"
+          ],
+          "title": "Easing",
+          "type": "string"
+        },
+        "expected_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State"
+        },
+        "post_state": {
+          "minLength": 1,
+          "title": "Post State",
+          "type": "string"
+        },
+        "fallback": {
+          "$ref": "#/$defs/FallbackPolicy"
+        },
+        "coverage_id": {
+          "minLength": 1,
+          "title": "Coverage Id",
+          "type": "string"
+        },
+        "verb": {
+          "const": "split",
+          "title": "Verb",
+          "type": "string"
+        },
+        "target_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Target Ids",
+          "type": "array"
+        },
+        "container_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Container Id"
+        },
+        "hierarchy_policy": {
+          "default": null,
+          "title": "Hierarchy Policy",
+          "type": "null"
+        },
+        "split_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SplitPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "action_id",
+        "source_instruction_id",
+        "board_id",
+        "semantic_reason",
+        "trigger",
+        "post_state",
+        "fallback",
+        "coverage_id",
+        "verb",
+        "target_ids"
+      ],
+      "title": "SplitAction",
+      "type": "object"
+    },
+    "SplitAssetPin": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "resource_uri": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Resource Uri",
+          "type": "string"
+        },
+        "checksum_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Checksum Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_id",
+        "revision",
+        "resource_uri",
+        "checksum_sha256"
+      ],
+      "title": "SplitAssetPin",
+      "type": "object"
+    },
+    "SplitBasis": {
+      "additionalProperties": false,
+      "properties": {
+        "source_closure": {
+          "$ref": "#/$defs/SplitClosure"
+        },
+        "result_closures": {
+          "items": {
+            "$ref": "#/$defs/SplitClosure"
+          },
+          "maxItems": 256,
+          "minItems": 2,
+          "title": "Result Closures",
+          "type": "array"
+        },
+        "placements": {
+          "items": {
+            "$ref": "#/$defs/SplitPlacement"
+          },
+          "maxItems": 4096,
+          "minItems": 3,
+          "title": "Placements",
+          "type": "array"
+        },
+        "read_dependencies": {
+          "items": {
+            "$ref": "#/$defs/SplitReadDependency"
+          },
+          "maxItems": 4096,
+          "title": "Read Dependencies",
+          "type": "array"
+        },
+        "asset_pins": {
+          "items": {
+            "$ref": "#/$defs/SplitAssetPin"
+          },
+          "maxItems": 4096,
+          "title": "Asset Pins",
+          "type": "array"
+        },
+        "style_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Style Sha256",
+          "type": "string"
+        },
+        "registry_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Registry Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_closure",
+        "result_closures",
+        "placements",
+        "read_dependencies",
+        "asset_pins",
+        "style_sha256",
+        "registry_sha256"
+      ],
+      "title": "SplitBasis",
+      "type": "object"
+    },
+    "SplitClosure": {
+      "additionalProperties": false,
+      "properties": {
+        "root_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Root Id",
+          "type": "string"
+        },
+        "owned_ids": {
+          "items": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "title": "Owned Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "root_id",
+        "owned_ids"
+      ],
+      "title": "SplitClosure",
+      "type": "object"
+    },
+    "SplitCompletionReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "source_basis_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Basis Sha256",
+          "type": "string"
+        },
+        "policy_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Policy Sha256",
+          "type": "string"
+        },
+        "placements": {
+          "items": {
+            "$ref": "#/$defs/SplitPlacement"
+          },
+          "maxItems": 4096,
+          "minItems": 3,
+          "title": "Placements",
+          "type": "array"
+        },
+        "read_dependencies": {
+          "items": {
+            "$ref": "#/$defs/SplitReadDependency"
+          },
+          "maxItems": 4096,
+          "title": "Read Dependencies",
+          "type": "array"
+        },
+        "asset_pins": {
+          "items": {
+            "$ref": "#/$defs/SplitAssetPin"
+          },
+          "maxItems": 4096,
+          "title": "Asset Pins",
+          "type": "array"
+        },
+        "style_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Style Sha256",
+          "type": "string"
+        },
+        "registry_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Registry Sha256",
+          "type": "string"
+        },
+        "completion_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Completion Sha256",
+          "type": "string"
+        },
+        "evidence_windows": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ResolvedSplitEvidenceWindow"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Windows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_basis_sha256",
+        "policy_sha256",
+        "placements",
+        "read_dependencies",
+        "asset_pins",
+        "style_sha256",
+        "registry_sha256",
+        "completion_sha256"
+      ],
+      "title": "SplitCompletionReceipt",
+      "type": "object"
+    },
+    "SplitConstruction": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "reveal",
+            "draw",
+            "write",
+            "enter"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "phase": {
+          "$ref": "#/$defs/SplitPhase"
+        },
+        "enter_destination": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Transform"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "mode",
+        "phase"
+      ],
+      "title": "SplitConstruction",
+      "type": "object"
+    },
+    "SplitCorrespondence": {
+      "additionalProperties": false,
+      "properties": {
+        "correspondence_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Correspondence Id",
+          "type": "string"
+        },
+        "source_object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Source Object Id",
+          "type": "string"
+        },
+        "source_content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Content Sha256",
+          "type": "string"
+        },
+        "result_object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Result Object Id",
+          "type": "string"
+        },
+        "result_content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Result Content Sha256",
+          "type": "string"
+        },
+        "relationship": {
+          "const": "authored_assertion",
+          "title": "Relationship",
+          "type": "string"
+        },
+        "statement": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Statement",
+          "type": "string"
+        },
+        "source_region": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Bounds"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "correspondence_id",
+        "source_object_id",
+        "source_content_sha256",
+        "result_object_id",
+        "result_content_sha256",
+        "relationship",
+        "statement"
+      ],
+      "title": "SplitCorrespondence",
+      "type": "object"
+    },
+    "SplitEvidenceActivation": {
+      "additionalProperties": false,
+      "description": "Authored causal authority only; attestation needs the actual source context.",
+      "properties": {
+        "result_object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Result Object Id",
+          "type": "string"
+        },
+        "beat_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "causal_action_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Causal Action Id",
+          "type": "string"
+        },
+        "intent": {
+          "$ref": "#/$defs/EvidenceIntent"
+        },
+        "asset_pin": {
+          "$ref": "#/$defs/SplitAssetPin"
+        },
+        "permission_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Permission Sha256",
+          "type": "string"
+        },
+        "allowed_transformations": {
+          "items": {
+            "enum": [
+              "crop",
+              "scale",
+              "rotate",
+              "mask",
+              "annotate",
+              "color_treatment"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Allowed Transformations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "result_object_id",
+        "beat_id",
+        "causal_action_id",
+        "intent",
+        "asset_pin",
+        "permission_sha256",
+        "allowed_transformations"
+      ],
+      "title": "SplitEvidenceActivation",
+      "type": "object"
+    },
+    "SplitMovement": {
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "$ref": "#/$defs/SplitPhase"
+        },
+        "from_transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "destination": {
+          "$ref": "#/$defs/Transform"
+        }
+      },
+      "required": [
+        "phase",
+        "from_transform",
+        "destination"
+      ],
+      "title": "SplitMovement",
+      "type": "object"
+    },
+    "SplitPhase": {
+      "additionalProperties": false,
+      "properties": {
+        "start_tick": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Start Tick",
+          "type": "integer"
+        },
+        "end_tick": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "End Tick",
+          "type": "integer"
+        },
+        "easing": {
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out"
+          ],
+          "title": "Easing",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_tick",
+        "end_tick",
+        "easing"
+      ],
+      "title": "SplitPhase",
+      "type": "object"
+    },
+    "SplitPlacement": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Object Id",
+          "type": "string"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent Id"
+        },
+        "sibling_ordinal": {
+          "minimum": 0,
+          "title": "Sibling Ordinal",
+          "type": "integer"
+        },
+        "local_content_bounds": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "local_transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "world_matrix": {
+          "maxItems": 6,
+          "minItems": 6,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "World Matrix",
+          "type": "array"
+        },
+        "world_corners": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/Point"
+            },
+            {
+              "$ref": "#/$defs/Point"
+            },
+            {
+              "$ref": "#/$defs/Point"
+            },
+            {
+              "$ref": "#/$defs/Point"
+            }
+          ],
+          "title": "World Corners",
+          "type": "array"
+        },
+        "world_bounds": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "state": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "State",
+          "type": "string"
+        },
+        "local_visibility": {
+          "title": "Local Visibility",
+          "type": "boolean"
+        },
+        "effective_visibility": {
+          "title": "Effective Visibility",
+          "type": "boolean"
+        },
+        "reveal": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Reveal",
+          "type": "number"
+        },
+        "local_opacity": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Local Opacity",
+          "type": "number"
+        },
+        "state_version": {
+          "minimum": 1,
+          "title": "State Version",
+          "type": "integer"
+        },
+        "content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_id",
+        "parent_id",
+        "sibling_ordinal",
+        "local_content_bounds",
+        "local_transform",
+        "world_matrix",
+        "world_corners",
+        "world_bounds",
+        "state",
+        "local_visibility",
+        "effective_visibility",
+        "reveal",
+        "local_opacity",
+        "state_version",
+        "content_sha256"
+      ],
+      "title": "SplitPlacement",
+      "type": "object"
+    },
+    "SplitPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "source_object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Source Object Id",
+          "type": "string"
+        },
+        "parent_policy": {
+          "enum": [
+            "common_parent",
+            "authored_distinct_parents"
+          ],
+          "title": "Parent Policy",
+          "type": "string"
+        },
+        "source_exit": {
+          "$ref": "#/$defs/SplitPhase"
+        },
+        "results": {
+          "items": {
+            "$ref": "#/$defs/SplitResult"
+          },
+          "maxItems": 256,
+          "minItems": 2,
+          "title": "Results",
+          "type": "array"
+        },
+        "correspondences": {
+          "items": {
+            "$ref": "#/$defs/SplitCorrespondence"
+          },
+          "maxItems": 256,
+          "minItems": 2,
+          "title": "Correspondences",
+          "type": "array"
+        },
+        "source_basis": {
+          "$ref": "#/$defs/SplitBasis"
+        },
+        "source_basis_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Basis Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_object_id",
+        "parent_policy",
+        "source_exit",
+        "results",
+        "correspondences",
+        "source_basis",
+        "source_basis_sha256"
+      ],
+      "title": "SplitPolicy",
+      "type": "object"
+    },
+    "SplitReadDependency": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "ancestor",
+            "aperture",
+            "mask_source",
+            "connector_anchor",
+            "annotation_anchor"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "object_ids": {
+          "items": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "title": "Object Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "object_ids"
+      ],
+      "title": "SplitReadDependency",
+      "type": "object"
+    },
+    "SplitResult": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Object Id",
+          "type": "string"
+        },
+        "correspondence_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Correspondence Id",
+          "type": "string"
+        },
+        "construction": {
+          "$ref": "#/$defs/SplitConstruction"
+        },
+        "movement": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SplitMovement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "destination": {
+          "$ref": "#/$defs/Transform"
+        },
+        "post_state": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Post State",
+          "type": "string"
+        },
+        "evidence_activation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SplitEvidenceActivation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "type": "object"
+        }
+      },
+      "required": [
+        "object_id",
+        "correspondence_id",
+        "construction",
+        "destination",
+        "post_state"
+      ],
+      "title": "SplitResult",
+      "type": "object"
+    },
+    "StructuredListPhase": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "weight": {
+          "maximum": 10000,
+          "minimum": 1,
+          "title": "Weight",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "object_id",
+        "weight"
+      ],
+      "title": "StructuredListPhase",
+      "type": "object"
+    },
+    "StructuredListPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "list_object_id": {
+          "minLength": 1,
+          "title": "List Object Id",
+          "type": "string"
+        },
+        "container_group_id": {
+          "minLength": 1,
+          "title": "Container Group Id",
+          "type": "string"
+        },
+        "item_object_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Item Object Ids",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "phases": {
+          "items": {
+            "$ref": "#/$defs/StructuredListPhase"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Phases",
+          "type": "array"
+        },
+        "expected_item_state_versions": {
+          "additionalProperties": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "title": "Expected Item State Versions",
+          "type": "object"
+        }
+      },
+      "required": [
+        "version",
+        "list_object_id",
+        "container_group_id",
+        "item_object_ids",
+        "phases",
+        "expected_item_state_versions"
+      ],
+      "title": "StructuredListPolicy",
+      "type": "object"
+    },
     "TargetAction": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "structured_list_policy": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "structured_list_policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "verb": {
+                "const": "progressive_reveal"
+              },
+              "easing": {
+                "const": "linear"
+              },
+              "expected_state": {
+                "const": "hidden"
+              },
+              "post_state": {
+                "const": "visible"
+              },
+              "annotation": {
+                "type": "null"
+              },
+              "annotation_policy": {
+                "type": "null"
+              },
+              "count_policy": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "easing",
+              "expected_state"
+            ]
+          }
+        }
+      ],
       "properties": {
         "action_id": {
           "minLength": 1,
@@ -2506,6 +3679,17 @@
           "anyOf": [
             {
               "$ref": "#/$defs/CountPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "structured_list_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StructuredListPolicy"
             },
             {
               "type": "null"

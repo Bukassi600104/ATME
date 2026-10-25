@@ -3,6 +3,9 @@
 from copy import deepcopy
 
 import pytest
+from atme.project_service import ProjectError, _resolved_compilation_fingerprint
+from atme.render import v2_state
+from atme.store.contracts_v2 import ExecutableLayoutV2, ResolvedVisualTimelineV2
 from test_v2_annotation_action import append_target
 from test_v2_annotation_contract import grouped_annotation_documents
 from test_v2_evidence_lifecycle import grouped_evidence_documents
@@ -10,10 +13,6 @@ from test_v2_group_return_project import stored_group_return_basis
 from test_v2_resolved_project import stored_v2_basis
 from test_v2_return_hierarchy import return_receipt_documents
 from v2_fixtures import digest
-
-from atme.project_service import ProjectError, _resolved_compilation_fingerprint
-from atme.render import v2_state
-from atme.store.contracts_v2 import ExecutableLayoutV2, ResolvedVisualTimelineV2
 
 
 def validate_history(layout, timeline):
@@ -33,7 +32,7 @@ def test_history_validator_cannot_drop_annotation_ancestor_hold_guard(start):
     assert (layout, timeline) == original
 
 
-def test_no_return_history_runs_real_evidence_lifecycle_without_public_group(tmp_path, monkeypatch):
+def test_no_return_history_and_public_frames_run_real_evidence_lifecycle(tmp_path, monkeypatch):
     layout, timeline = grouped_evidence_documents(tmp_path)
     observed = []
     original = v2_state.validate_evidence_reading
@@ -45,8 +44,7 @@ def test_no_return_history_runs_real_evidence_lifecycle_without_public_group(tmp
     monkeypatch.setattr(v2_state, "validate_evidence_reading", observe)
     validate_history(layout, timeline)
     assert 5499 in observed and 5500 in observed
-    with pytest.raises(v2_state.UnsupportedVisualAction, match="no frame implementation"):
-        v2_state.evaluate_frame(layout, timeline, 5500)
+    assert v2_state.evaluate_frame(layout, timeline, 5500).at_ms == 5500
 
 
 def test_receipt_history_runs_temporal_consumers_only_through_last_return(monkeypatch):
