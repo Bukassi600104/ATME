@@ -14,9 +14,10 @@ Historical packaged executables, build intermediates, generated Tauri schemas, s
 
 The repository's maintainer-only draft release **ATME development recovery — 2026-10-25**, tag `atme-history-backup-2026-10-25`, stores:
 
-- `atme-history-2026-10-25.bundle`: complete history reachable from the saved local refs and worktree heads at capture, including original commit IDs and the historical binary.
+- `atme-history-2026-10-25.bundle.part01` through `.part11` and `bundle-parts.json`: ordered binary parts reconstructing the complete history reachable from saved refs and worktree heads, including original commit IDs and the historical binary. The unchanged bundle was split after full-file uploads failed with DNS and HTTP 408 errors.
 - `backup-manifest.json`: captured refs, source identities and publication-file inventory.
 - `restore-verification.json`: independent local restore/ref/object verification.
+- `github-readback-verification.json`: authenticated download, reconstruction and Git verification of the stored parts.
 - `atme-task10-checkpoint-2026-10-25.zip`: 451 selected task checkpoint/evidence files, with a per-file checksum manifest.
 - `SHA256SUMS.txt` and `RECOVERY.md`: archive checksums and restore instructions.
 
@@ -32,6 +33,22 @@ Use authenticated GitHub CLI and a new empty recovery location. Download the dra
 
 ```powershell
 gh release download atme-history-backup-2026-10-25 --repo Bukassi600104/ATME --dir .\atme-recovery
+@'
+from pathlib import Path
+import hashlib, json
+p = Path("atme-recovery")
+m = json.loads((p / "bundle-parts.json").read_text())
+out = p / m["bundle_name"]
+with out.open("xb") as f:
+    for part in m["ordered_parts"]:
+        data = (p / part["name"]).read_bytes()
+        assert len(data) == part["bytes"]
+        assert hashlib.sha256(data).hexdigest() == part["sha256"]
+        f.write(data)
+assert out.stat().st_size == m["bundle_bytes"]
+with out.open("rb") as f:
+    assert hashlib.file_digest(f, "sha256").hexdigest() == m["bundle_sha256"]
+'@ | py -3.12 -
 Get-FileHash .\atme-recovery\atme-history-2026-10-25.bundle -Algorithm SHA256
 git clone --mirror .\atme-recovery\atme-history-2026-10-25.bundle .\atme-recovered.git
 git -C .\atme-recovered.git fsck --full --no-reflogs
