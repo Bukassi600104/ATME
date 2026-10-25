@@ -1,0 +1,347 @@
+{
+  "contract_version": "2.0.0",
+  "timeline_id": "timeline-rich",
+  "project_id": 1,
+  "project_revision": 5,
+  "plan_id": "plan-rich",
+  "plan_revision": 4,
+  "plan_sha256": "ed4654c09da37233741e2e136e1dbd7d755381298b7d0cbdef77181d25700eb5",
+  "layout_id": "layout-rich",
+  "layout_revision": 5,
+  "layout_sha256": "0a1649e9116170669eb02bc7b5a6389e4cca42419ed02f202c7726568a9e4fc1",
+  "cleaned_timeline_revision": 2,
+  "cleaned_timeline_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "output_profile": {
+    "profile_id": "LONG_FORM_16_9",
+    "width": 1280,
+    "height": 720,
+    "fps": 30
+  },
+  "style_system_version": "atme-style-v2",
+  "asset_registry_version": "atme-assets-v2",
+  "duration_ms": 10000,
+  "compilation_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "resolved_assets": [
+    {
+      "asset_id": "asset-evidence",
+      "revision": 1,
+      "managed_ref": "assets/evidence.png",
+      "checksum_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "provenance_verified": true,
+      "kind": "evidence",
+      "media_type": "image/png",
+      "byte_length": 1000,
+      "width": 900,
+      "height": 500,
+      "orientation": "upright",
+      "allowed_transformations": [
+        "crop",
+        "scale",
+        "annotate",
+        "color_treatment"
+      ]
+    }
+  ],
+  "evidence_treatments": [
+    {
+      "beat_id": "beat-002",
+      "object_id": "object-evidence",
+      "action_id": "action-3",
+      "asset_revision": 1,
+      "asset_checksum_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "asset_managed_ref": "assets/evidence.png",
+      "asset_width": 900,
+      "asset_height": 500,
+      "asset_provenance": {
+        "category": "external_evidence",
+        "source_uri": "https://example.com/source",
+        "checksum_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "license_status": "licensed",
+        "fabrication_prohibited": true,
+        "originality_status": "reference_only"
+      },
+      "allowed_transformations": [
+        "crop",
+        "scale",
+        "annotate",
+        "color_treatment"
+      ],
+      "intent": {
+        "claim_id": "claim-1",
+        "claim": "The source confirms the mechanism",
+        "evidence_asset_id": "asset-evidence",
+        "crop": {
+          "x": 0,
+          "y": 0,
+          "width": 900,
+          "height": 500
+        },
+        "focus_region": {
+          "x": 100,
+          "y": 100,
+          "width": 500,
+          "height": 200
+        },
+        "mask_object_id": null,
+        "darkening": 0.2,
+        "source_label": "Example Source",
+        "annotation": "Key mechanism",
+        "annotation_target_id": "object-evidence",
+        "annotation_omission_reason": null,
+        "readable_hold_intent_ms": 2500,
+        "destination_board_id": "board-main",
+        "destination_state": "evidence_visible",
+        "provenance_verified": true,
+        "checksum_verified": true
+      }
+    }
+  ],
+  "initial_object_states": [
+    {
+      "object_id": "object-system",
+      "state": "hidden",
+      "state_version": 1,
+      "visible": false
+    },
+    {
+      "object_id": "object-label",
+      "state": "hidden",
+      "state_version": 1,
+      "visible": false
+    },
+    {
+      "object_id": "object-evidence",
+      "state": "hidden",
+      "state_version": 1,
+      "visible": false
+    }
+  ],
+  "beat_anchors": [
+    {
+      "beat_id": "beat-001",
+      "start_ms": 0
+    },
+    {
+      "beat_id": "beat-002",
+      "start_ms": 4000
+    }
+  ],
+  "actions": [
+    {
+      "action": {
+        "action_id": "action-1",
+        "source_instruction_id": "instruction-1",
+        "board_id": "board-main",
+        "semantic_reason": "Explain the narrated concept",
+        "trigger": {
+          "kind": "phrase",
+          "phrase": "system begins",
+          "occurrence": 1,
+          "offset_ms": 0,
+          "minimum_confidence": 0.75
+        },
+        "easing": "ease_out",
+        "expected_state": "hidden",
+        "post_state": "visible",
+        "fallback": {
+          "fallback_id": "fallback-1",
+          "on_failure": "block"
+        },
+        "coverage_id": "coverage-1",
+        "verb": "draw",
+        "target_ids": [
+          "object-system"
+        ],
+        "annotation": null
+      },
+      "start_ms": 0,
+      "end_ms": 900,
+      "resolved_trigger": {
+        "source": {
+          "kind": "phrase",
+          "phrase": "system begins",
+          "occurrence": 1,
+          "offset_ms": 0,
+          "minimum_confidence": 0.75
+        },
+        "alignment_anchor_ms": 0,
+        "matched_text": "system begins",
+        "matched_occurrence": 1,
+        "resolved_at_ms": 0,
+        "confidence": 0.98,
+        "exact": true
+      }
+    },
+    {
+      "action": {
+        "action_id": "action-2",
+        "source_instruction_id": "instruction-2",
+        "board_id": "board-main",
+        "semantic_reason": "Explain the narrated concept",
+        "trigger": {
+          "kind": "phrase",
+          "phrase": "system begins",
+          "occurrence": 1,
+          "offset_ms": 0,
+          "minimum_confidence": 0.75
+        },
+        "easing": "ease_out",
+        "expected_state": "hidden",
+        "post_state": "visible",
+        "fallback": {
+          "fallback_id": "fallback-2",
+          "on_failure": "block"
+        },
+        "coverage_id": "coverage-2",
+        "verb": "write",
+        "target_ids": [
+          "object-label"
+        ],
+        "annotation": null
+      },
+      "start_ms": 2000,
+      "end_ms": 2900,
+      "resolved_trigger": {
+        "source": {
+          "kind": "phrase",
+          "phrase": "system begins",
+          "occurrence": 1,
+          "offset_ms": 0,
+          "minimum_confidence": 0.75
+        },
+        "alignment_anchor_ms": 2000,
+        "matched_text": "system begins",
+        "matched_occurrence": 1,
+        "resolved_at_ms": 2000,
+        "confidence": 0.98,
+        "exact": true
+      }
+    },
+    {
+      "action": {
+        "action_id": "action-3",
+        "source_instruction_id": "instruction-3",
+        "board_id": "board-main",
+        "semantic_reason": "Explain the narrated concept",
+        "trigger": {
+          "kind": "phrase",
+          "phrase": "system begins",
+          "occurrence": 1,
+          "offset_ms": 0,
+          "minimum_confidence": 0.75
+        },
+        "easing": "ease_out",
+        "expected_state": "hidden",
+        "post_state": "evidence_visible",
+        "fallback": {
+          "fallback_id": "fallback-3",
+          "on_failure": "block"
+        },
+        "coverage_id": "coverage-3",
+        "verb": "insert_evidence",
+        "evidence_asset_id": "asset-evidence",
+        "destination_board_id": "board-main",
+        "target_object_id": "object-evidence",
+        "destination_state": "evidence_visible",
+        "source_board_id": null,
+        "source_activation_id": null,
+        "prior_destination_activation_id": null,
+        "destination_activation_id": null,
+        "expected_object_states": null,
+        "expected_object_state_versions": null
+      },
+      "start_ms": 4000,
+      "end_ms": 4900,
+      "resolved_trigger": {
+        "source": {
+          "kind": "phrase",
+          "phrase": "system begins",
+          "occurrence": 1,
+          "offset_ms": 0,
+          "minimum_confidence": 0.75
+        },
+        "alignment_anchor_ms": 4000,
+        "matched_text": "system begins",
+        "matched_occurrence": 1,
+        "resolved_at_ms": 4000,
+        "confidence": 0.98,
+        "exact": true
+      }
+    }
+  ],
+  "coverage": [
+    {
+      "coverage_id": "coverage-1",
+      "instruction_id": "instruction-1",
+      "status": "executed",
+      "action_ids": [
+        "action-1"
+      ],
+      "fallback_id": null
+    },
+    {
+      "coverage_id": "coverage-2",
+      "instruction_id": "instruction-2",
+      "status": "executed",
+      "action_ids": [
+        "action-2"
+      ],
+      "fallback_id": null
+    },
+    {
+      "coverage_id": "coverage-3",
+      "instruction_id": "instruction-3",
+      "status": "executed",
+      "action_ids": [
+        "action-3"
+      ],
+      "fallback_id": null
+    }
+  ],
+  "fallbacks": [
+    {
+      "fallback_id": "fallback-1",
+      "affected_ids": [
+        "instruction-1"
+      ],
+      "reason_code": "asset_or_timing_failure",
+      "degradation_class": "none",
+      "substitute": "No substitute; preserve meaning and block",
+      "recoverable": true,
+      "production_blocking": true,
+      "user_exception_required": false,
+      "status": "unused"
+    },
+    {
+      "fallback_id": "fallback-2",
+      "affected_ids": [
+        "instruction-2"
+      ],
+      "reason_code": "asset_or_timing_failure",
+      "degradation_class": "none",
+      "substitute": "No substitute; preserve meaning and block",
+      "recoverable": true,
+      "production_blocking": true,
+      "user_exception_required": false,
+      "status": "unused"
+    },
+    {
+      "fallback_id": "fallback-3",
+      "affected_ids": [
+        "instruction-3"
+      ],
+      "reason_code": "asset_or_timing_failure",
+      "degradation_class": "none",
+      "substitute": "No substitute; preserve meaning and block",
+      "recoverable": true,
+      "production_blocking": true,
+      "user_exception_required": false,
+      "status": "unused"
+    }
+  ],
+  "validation": {
+    "status": "pass",
+    "production_ready": true,
+    "issues": []
+  }
+}

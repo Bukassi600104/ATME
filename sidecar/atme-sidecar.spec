@@ -33,7 +33,8 @@ a = Analysis(
     pathex=["src"],
     binaries=[(find_ffmpeg(), "ffmpeg")],
     datas=[(str(ROOT / "schemas"), "schemas"),
-           (str(ROOT / "prompts"), "prompts")],
+           (str(ROOT / "prompts"), "prompts"),
+           (str(ROOT / "production-assets"), "production-assets")],
     hiddenimports=[
         "uvicorn.logging",
         "uvicorn.loops",
@@ -47,6 +48,8 @@ a = Analysis(
         "uvicorn.lifespan.on",
         "kokoro_onnx",
         "resvg_py",
+        "atme.render.style_bundle",
+        "atme.render.style_contracts",
     ],
     hookspath=[],
     runtime_hooks=[],

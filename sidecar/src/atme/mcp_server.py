@@ -32,6 +32,8 @@ from atme.store.db import JobStore
 Id = Annotated[int, Field(strict=True, ge=1)]
 Revision = Annotated[int, Field(strict=True, ge=0)]
 Kind = Literal["brief", "script", "storyboard", "layout"]
+SchemaKind = Literal["brief", "script", "storyboard", "layout", "resolved_timeline", "migration_report"]
+SchemaVersion = Literal["1", "2.0.0"]
 MAX_RESOURCE_BYTES = 128 * 1024 * 1024
 
 
@@ -95,9 +97,9 @@ def create_mcp(service: ProjectService, activity: McpActivity | None = None):
                       tool="atme.get_capabilities")
 
     @server.tool(name="atme.get_schema", annotations=read)
-    def get_schema(kind: Kind) -> CallToolResult:
-        """Read the runtime schema before authoring an artifact."""
-        return invoke(service.schema, kind, tool="atme.get_schema")
+    def get_schema(kind: SchemaKind, version: SchemaVersion = "1") -> CallToolResult:
+        """Read one explicit contract version; v2 authoring does not imply v2 render support."""
+        return invoke(service.schema, kind, version, tool="atme.get_schema")
 
     @server.tool(name="atme.list_projects", annotations=read)
     def list_projects(limit: Annotated[int, Field(strict=True, ge=1, le=100)] = 50,
@@ -143,6 +145,12 @@ def create_mcp(service: ProjectService, activity: McpActivity | None = None):
         return invoke(service.write, project_id, kind, document, expected_revision,
                       tool="atme.write_artifact", project_id=project_id)
 
+    @server.tool(name="atme.migrate_visual_contracts_v1", annotations=write)
+    def migrate_visual_contracts_v1(project_id: Id, expected_revision: Revision) -> CallToolResult:
+        """Create immutable v2 plan/layout revisions; retain all v1 history and migration evidence."""
+        return invoke(service.migrate_visual_contracts_v1, project_id, expected_revision,
+                      tool="atme.migrate_visual_contracts_v1", project_id=project_id)
+
     @server.tool(name="atme.approve_script", annotations=write)
     def approve_script(project_id: Id, script_revision: Revision, expected_revision: Revision,
                        approved: Annotated[bool, Field(strict=True)]) -> CallToolResult:
@@ -163,12 +171,12 @@ def create_mcp(service: ProjectService, activity: McpActivity | None = None):
 
     @server.tool(name="atme.list_project_assets", annotations=read)
     def list_project_assets(project_id: Id) -> CallToolResult:
-        """List immutable supporting assets without confusing them with narrative authority."""
+        """List project-owned supporting/evidence assets and their distinct managed refs."""
         return invoke(service.list_assets, project_id, tool="atme.list_project_assets", project_id=project_id)
 
     @server.resource("atme://projects/{project_id}/assets/{asset_id}",
                      name="ATME project asset", mime_type="application/octet-stream",
-                     description="Integrity-checked supporting project asset.")
+                     description="Integrity-checked project asset; role and provenance are listed separately.")
     def project_asset_resource(project_id: int, asset_id: str) -> bytes:
         try:
             path, _ = service.asset(project_id, asset_id, MAX_RESOURCE_BYTES)

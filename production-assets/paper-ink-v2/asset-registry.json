@@ -1,0 +1,629 @@
+{
+  "contract": "atme.paper-ink-assets",
+  "version": "2.0.0",
+  "registry_id": "atme-assets-v2",
+  "style_version": "2.0.0",
+  "style_system_id": "atme-style-v2",
+  "assets": [
+    {
+      "id": "person-presenter",
+      "family": "people",
+      "file": "assets/person-presenter.svg",
+      "sha256": "3c62f65bfa8a49fde24487b833180ab261d8a11cf5ef140b4a2a04f41709d29a",
+      "view_box": [
+        0,
+        0,
+        240,
+        240
+      ],
+      "keywords": [
+        "speaker",
+        "teacher",
+        "human"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "head": [
+          0.5,
+          0.25
+        ],
+        "left_hand": [
+          0.29,
+          0.78
+        ],
+        "right_hand": [
+          0.71,
+          0.78
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "person-collaborators",
+      "family": "people",
+      "file": "assets/person-collaborators.svg",
+      "sha256": "8821865df2fe372a4c240640d908a28755262b1766ff0a9cfb4c186d8f54d356",
+      "view_box": [
+        0,
+        0,
+        300,
+        220
+      ],
+      "keywords": [
+        "team",
+        "people",
+        "collaboration"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "left_person": [
+          0.3,
+          0.48
+        ],
+        "right_person": [
+          0.7,
+          0.48
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "gesture-point",
+      "family": "gestures",
+      "file": "assets/gesture-point.svg",
+      "sha256": "83acecc09c77daa25d47dbbcba8b63cce0bc86f1d96868d74fe9074882c0278a",
+      "view_box": [
+        0,
+        0,
+        260,
+        160
+      ],
+      "keywords": [
+        "point",
+        "direction",
+        "attention"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "wrist": [
+          0.2,
+          0.72
+        ],
+        "finger_tip": [
+          0.86,
+          0.47
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "gesture-emphasis",
+      "family": "gestures",
+      "file": "assets/gesture-emphasis.svg",
+      "sha256": "a61eb996a6746dac5eeb320865a5bfb887fa85ff2830fc54751ed267d6f4ce26",
+      "view_box": [
+        0,
+        0,
+        220,
+        220
+      ],
+      "keywords": [
+        "hand",
+        "emphasis",
+        "explain"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "wrist": [
+          0.47,
+          0.84
+        ],
+        "palm": [
+          0.55,
+          0.45
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "device-laptop",
+      "family": "devices",
+      "file": "assets/device-laptop.svg",
+      "sha256": "87b3dd4a050a65e554cbad4f5b50b667e84e504657b118bdeb513985dc453900",
+      "view_box": [
+        0,
+        0,
+        300,
+        210
+      ],
+      "keywords": [
+        "computer",
+        "code",
+        "screen"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "screen": [
+          0.5,
+          0.41
+        ],
+        "keyboard": [
+          0.5,
+          0.84
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "device-phone",
+      "family": "devices",
+      "file": "assets/device-phone.svg",
+      "sha256": "4465cb97880f61579ba8de9023a423f670af129431d7301e55769e1f9e1ccd85",
+      "view_box": [
+        0,
+        0,
+        150,
+        260
+      ],
+      "keywords": [
+        "phone",
+        "mobile",
+        "success"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "screen": [
+          0.5,
+          0.48
+        ],
+        "speaker": [
+          0.5,
+          0.1
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "document-stack",
+      "family": "documents",
+      "file": "assets/document-stack.svg",
+      "sha256": "ce696d02b093ec57fc6d2a8e106c63e52efe2504ce82bd53d5e1c0644cf00830",
+      "view_box": [
+        0,
+        0,
+        260,
+        230
+      ],
+      "keywords": [
+        "documents",
+        "pages",
+        "record"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "title": [
+          0.4,
+          0.45
+        ],
+        "last_line": [
+          0.4,
+          0.8
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "document-checklist",
+      "family": "documents",
+      "file": "assets/document-checklist.svg",
+      "sha256": "bffd5dee8785d8397e42b5a37c0b4e6ff8168245ba1bbc833a4708d486d58b16",
+      "view_box": [
+        0,
+        0,
+        220,
+        260
+      ],
+      "keywords": [
+        "checklist",
+        "approval",
+        "tasks"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "first_task": [
+          0.5,
+          0.28
+        ],
+        "last_task": [
+          0.5,
+          0.74
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "network-nodes",
+      "family": "networks",
+      "file": "assets/network-nodes.svg",
+      "sha256": "af46e9aa7710dbdc96624f7cb0e78093daf60c9ed89609bb1175f1e0f1d448f0",
+      "view_box": [
+        0,
+        0,
+        280,
+        230
+      ],
+      "keywords": [
+        "network",
+        "nodes",
+        "distributed"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "hub": [
+          0.5,
+          0.47
+        ],
+        "leaf_left": [
+          0.2,
+          0.24
+        ],
+        "leaf_right": [
+          0.8,
+          0.24
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "network-pipeline",
+      "family": "networks",
+      "file": "assets/network-pipeline.svg",
+      "sha256": "ce0f94e0fb60f263db785fa31fd70d27a5fb916329dbd6a02da5f883d133d118",
+      "view_box": [
+        0,
+        0,
+        320,
+        180
+      ],
+      "keywords": [
+        "pipeline",
+        "flow",
+        "stages"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "input": [
+          0.16,
+          0.5
+        ],
+        "transform": [
+          0.5,
+          0.5
+        ],
+        "output": [
+          0.84,
+          0.5
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "chart-bars",
+      "family": "charts",
+      "file": "assets/chart-bars.svg",
+      "sha256": "9195730ed51a103de81372aded4fc749c263e47c8f5a90d37996cc57c41978f3",
+      "view_box": [
+        0,
+        0,
+        280,
+        220
+      ],
+      "keywords": [
+        "chart",
+        "bars",
+        "comparison"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "baseline": [
+          0.52,
+          0.86
+        ],
+        "peak": [
+          0.78,
+          0.22
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "chart-trend",
+      "family": "charts",
+      "file": "assets/chart-trend.svg",
+      "sha256": "598d08280f35504cd61033131d786298bbebceaab9eb5b77decc9dba81ec4117",
+      "view_box": [
+        0,
+        0,
+        280,
+        220
+      ],
+      "keywords": [
+        "chart",
+        "trend",
+        "growth"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "start": [
+          0.17,
+          0.71
+        ],
+        "end": [
+          0.8,
+          0.22
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "frame-code",
+      "family": "technical-frames",
+      "file": "assets/frame-code.svg",
+      "sha256": "2ab7eaf18609a75234f5252b35fa2cd4c03da9ebf07a8aa724aa999b686e4648",
+      "view_box": [
+        0,
+        0,
+        320,
+        220
+      ],
+      "keywords": [
+        "code",
+        "editor",
+        "syntax"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "content": [
+          0.5,
+          0.58
+        ],
+        "toolbar": [
+          0.5,
+          0.16
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "frame-terminal",
+      "family": "technical-frames",
+      "file": "assets/frame-terminal.svg",
+      "sha256": "3926eadbdb474dfb2279a69568e289ed60f8c38c03a1c7dbde49774c4c576315",
+      "view_box": [
+        0,
+        0,
+        320,
+        220
+      ],
+      "keywords": [
+        "terminal",
+        "command",
+        "output"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "prompt": [
+          0.22,
+          0.5
+        ],
+        "output": [
+          0.45,
+          0.73
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "metaphor-lightbulb",
+      "family": "abstract-metaphors",
+      "file": "assets/metaphor-lightbulb.svg",
+      "sha256": "59ad85580521c59be84b67f14e4cbb2b2756baa6bb2df56144ebcec8ae64e216",
+      "view_box": [
+        0,
+        0,
+        220,
+        260
+      ],
+      "keywords": [
+        "idea",
+        "insight",
+        "solution"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "idea": [
+          0.5,
+          0.42
+        ],
+        "base": [
+          0.5,
+          0.82
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    },
+    {
+      "id": "metaphor-bridge",
+      "family": "abstract-metaphors",
+      "file": "assets/metaphor-bridge.svg",
+      "sha256": "06e787eff153a59b2d235d887cb3a06bf57274abfc14d68828018a8dbb9e7215",
+      "view_box": [
+        0,
+        0,
+        320,
+        220
+      ],
+      "keywords": [
+        "bridge",
+        "connection",
+        "transition"
+      ],
+      "anchors": {
+        "center": [
+          0.5,
+          0.5
+        ],
+        "source": [
+          0.16,
+          0.64
+        ],
+        "destination": [
+          0.84,
+          0.64
+        ]
+      },
+      "provenance": {
+        "origin": "ATME-original",
+        "author": "ATME project",
+        "created_for": "ATME Paper & Ink v2",
+        "derivative_of_reference_art": false,
+        "license": "ATME-project"
+      }
+    }
+  ]
+}

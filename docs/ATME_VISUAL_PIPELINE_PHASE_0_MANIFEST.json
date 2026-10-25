@@ -1,0 +1,117 @@
+{
+  "manifest_version": 1,
+  "captured_on": "2026-09-20",
+  "git": {
+    "branch": "master",
+    "commit": "0b454a34c1f7fb4258df352bc387369a21a38a10",
+    "preexisting_tracked_changes": 33,
+    "preexisting_untracked_entries_before_phase_documents": 344,
+    "note": "Tracked changes were generated packaging/build outputs. Existing untracked media, logs, test outputs and diagnostics were preserved."
+  },
+  "baseline_authority": {
+    "behavioral_application": "installed ATME desktop",
+    "implementation_source": "the recorded Git commit plus explicitly listed working-tree changes",
+    "release_candidate": "not designated during Phase 0",
+    "reason": "The installed desktop executable differs from the current release executable and must not be treated as the same build."
+  },
+  "executables": {
+    "installed_desktop": {
+      "path": "C:/Users/USER/AppData/Local/ATME/atme-app.exe",
+      "sha256": "C0FBA75920BB1B03C49BCF5E674F2050A00319FD9624DA28756F97ADE980EEF2"
+    },
+    "current_release_desktop": {
+      "path": "app/src-tauri/target/release/atme-app.exe",
+      "sha256": "D35AD9FCE422FEA2333DFDB0A1C9B4FBC70B077ACDFB9238D3BDD7F2A10AE102"
+    },
+    "installed_sidecar": {
+      "path": "C:/Users/USER/AppData/Local/ATME/atme-sidecar.exe",
+      "sha256": "F9D2647ACF82F4A3B1288AAA0C7DF381C6FB2B48C245D06DF4CF3AD9CCFF368E"
+    },
+    "current_packaged_sidecar": {
+      "path": "sidecar-dist/atme-sidecar/atme-sidecar.exe",
+      "sha256": "F9D2647ACF82F4A3B1288AAA0C7DF381C6FB2B48C245D06DF4CF3AD9CCFF368E"
+    },
+    "current_installer": {
+      "path": "app/src-tauri/target/release/bundle/nsis/ATME_0.1.2_x64-setup.exe",
+      "sha256": "F90F44787C817EA46BBAA64BCEC8AAFFAC4AB7D9FE6A8074F83F9E4E6DEEC929"
+    }
+  },
+  "live_contract_hashes": {
+    "schemas/visual-plan.schema.json": "AED0EB384DE180A6AF463294400C821268D6011D0093E49B0BEC8429F2F2BE3B",
+    "schemas/excalidraw-layout.schema.json": "C49CFFEBC272142301F12D03B22BF5A9C74418035F11952542CF23F4238009C2",
+    "schemas/source-timeline.schema.json": "E96660425B834B25F22F4B2AD14AA962EEEA099A4269C903E90E845B926E0200",
+    "schemas/cue-timeline.schema.json": "94BE0D580C33415164D0B78B9D6E9BFA4A27D30E9CAE0A90C32EC6A1B1261AFB",
+    "schemas/script-scenes.schema.json": "0124A024636ED3AFF5C588FD973F1AA34B4D0B5F7A9E2B778BF066517D2AF65A",
+    "schemas/reference-video-analysis.schema.json": "7FB220AE4963756C1584353488D1BB004F75B01E55CC6EC25D34C71E6701DF86"
+  },
+  "runtime_authority_hashes": {
+    "sidecar/src/atme/narrative_source.py": "E2D25A323F03F46EBE28C664F4BA56CBA5547ED46EEA4FD78ADFEE49348AD0FC",
+    "sidecar/src/atme/project_service.py": "40B9F2C01A362DE23FB18EB326160D72C1924B09E768533673BD4EBC1A68F68C",
+    "sidecar/src/atme/source_timeline.py": "827F3CA64FC8E67AE7EADA966F4DC3F42B814517F78D45B3E17845C36C808EF6",
+    "sidecar/src/atme/board_compiler.py": "232FD1C044DE527A42CC7DC5599C993D47E23C625F8A4C4A96591F5F04492F2B",
+    "sidecar/src/atme/external_inputs.py": "D0094897FB20E722997668AC74F747A0DDF47D998D1E152CABC34D8927FBEB6C",
+    "sidecar/src/atme/project_runner.py": "3205DFB0184A28FD8FB2A0820B9040DE651F8183B538F3F40D7A4624FD3FAB41",
+    "sidecar/src/atme/mcp_server.py": "99F92DAECF204898607E311DCCA61FC104922A7444EBED3F1CF3DF0811C0B913",
+    "sidecar/src/atme/mcp_activity.py": "DF7B153DD6E30C3CFB675C2831FC6E201DC039C0266FE7DBDD3B071131F7C9A6",
+    "sidecar/src/atme/render/animator.py": "B86235983F34830D19736D4BD68B594D639A74003B6129BE4E354E8002A0B27D",
+    "sidecar/src/atme/render/camera.py": "F0B50ECDCED7922C409305D1F2F340BA567E98EC5A3FB0DAFBCEDCF5CC1AFAA4",
+    "sidecar/src/atme/render/visibility.py": "F23B56506B0C6FF2A993C535D00B62AE072ED4A344415262E99F776357182C58"
+  },
+  "studio_authority_hashes": {
+    "app/src/studio.ts": "6EE86D7767F0BF430C13BAA6B2422D153B54A6D0709978CD9967C6E4562C546A",
+    "app/src/studio.css": "388468B90BEA58709F324E22BD195C6CCD9B82350B8B7F99FCA79DDE8F77D527",
+    "app/src-tauri/src/main.rs": "65F5D0507054B87F6CD621A0E2A5B4E69056DF0C246C4A425F05018F79F484D3",
+    "app/src-tauri/tauri.conf.json": "42EB83D05EEA898EABC0FA40B42C82DBD03805AEEFF1089A0413F5B3C506DE2D"
+  },
+  "installed_project_logical_snapshot": {
+    "database_path": "C:/Users/USER/AppData/Local/ATME/jobs/jobs.db",
+    "captured_in_single_read_transaction": true,
+    "project_tables_sha256": "eafe7d81aeab683896aaeb880a3e7f359420c188be011bf9d972566eb47db1df",
+    "source_media_sha256": "37a24c69a1b1ff6b77eb8e559927f3a4601047aa46eac6fe40b7f25335465d4f",
+    "mcp_sessions_at_capture": 34,
+    "open_mcp_sessions_at_capture": 34,
+    "note": "MCP activity is intentionally excluded from the project-content digest. The live database was not copied or modified."
+  },
+  "known_defective_output": {
+    "path": "ATME-What-Is-ATME-Caleb-Style.mp4",
+    "sha256": "4706962D0714C81F405B6681DC85F5F87217DF76B0329A2DF769EDC1497CD25E",
+    "dimensions": [720, 1280],
+    "fps": 30,
+    "duration_seconds": 21.658,
+    "bytes": 823151,
+    "phase_0_human_score": 10,
+    "maximum_score": 20,
+    "note": "Baseline score records sparse boxes/text, weak visual development, no evidence cycle, no rich illustration, and no demonstrated board return. It is a failure baseline, not an accepted golden production."
+  },
+  "test_baseline": {
+    "python_collected": 267,
+    "python_full_suite_exit": 0,
+    "frontend_build_exit": 0,
+    "rust_check_exit": 0,
+    "packaged_sidecar_smoke_exit": 0,
+    "packaged_mcp_stdio_tests": 2,
+    "packaged_mcp_stdio_exit": 0,
+    "packaged_provider_configuration_status": 410,
+    "packaged_internal_topic_generation_status": 410
+  },
+  "renderer_performance": {
+    "legacy_720p30_cold_fps": 22.7,
+    "legacy_720p30_warm_fps": 26.0,
+    "stateful_board_600x400_fps": 66.3,
+    "evidence_600x400_fps": 106.0,
+    "portrait_stateful_720x1280_fps": 21.5,
+    "note": "These are v1 compatibility landmarks, not v2 dense-scene promises."
+  },
+  "research": {
+    "forensic_manifest": "C:/Users/USER/Documents/Codex/2026-09-02/chrome-tabs-the-user-has-the/outputs/atme-v2-forensic-study/SHA256SUMS.json",
+    "forensic_manifest_records_verified": 29,
+    "archived_blueprint": {
+      "path": "docs/research/caleb_writes_code_reverse_engineering_blueprint.pdf",
+      "sha256": "DD807F8C639BCD4AD88B15B4C441137E4B24B51866E93C23A21B13B1E9AAD485"
+    },
+    "high_bandwidth_packet_sha256": "5643476A13DED2071DF8433C969DA1A9A6CAB3D8BD75201F92D6DE52F53C6057",
+    "jalapeno_packet_sha256": "926E13B41A4257785515F5ECB1DE2B7B167C0ABCF85A0F7F6291A36335740108",
+    "agent_harness_packet_sha256": "63B2522528F0E66960F86A1C9790D2484B722F76BE61528327C1B786C242A441",
+    "supplied_checksum_files_match": true
+  }
+}

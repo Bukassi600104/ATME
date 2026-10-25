@@ -1,0 +1,81 @@
+{
+  "scope": "source-only private compositor; network forbidden",
+  "frames": [
+    {
+      "mapping": "canonical_outline",
+      "at_ms": 6000,
+      "sha256": "5db1d1bac306ed019b3369126f6de89f73bd251be5168580b81cd2c2b00f4921"
+    },
+    {
+      "mapping": "canonical_outline",
+      "at_ms": 6250,
+      "sha256": "16264a1b2aed9b0cb459bff5dc6be911a9a14cdd9b99dd0d332cb9e34c43783f"
+    },
+    {
+      "mapping": "canonical_outline",
+      "at_ms": 6500,
+      "sha256": "5fdb30239b85cfaaf2e291062778ad1aa433df0c36603f02c4c01239b0be8f19"
+    },
+    {
+      "mapping": "canonical_outline",
+      "at_ms": 6750,
+      "sha256": "3fab055f2fcecaade5415d57413a8c2eb3c6b8e3f7a835d3431bd9f7b681d8bc"
+    },
+    {
+      "mapping": "canonical_outline",
+      "at_ms": 7000,
+      "sha256": "eb79b2aca0bf7e6a3ca1ad16b3fb6758a04f43d3468f863e2f72124d70a8081a"
+    },
+    {
+      "mapping": "ordered_vertices",
+      "at_ms": 6000,
+      "sha256": "5a171a935943b9aefa4c01b6069b38d27a146471fba3a97e5c3b52cec6de3755"
+    },
+    {
+      "mapping": "ordered_vertices",
+      "at_ms": 6250,
+      "sha256": "df28dfd7932c534b8cf17be8b5070143d301ee2d63da9b39938c92e2504afea8"
+    },
+    {
+      "mapping": "ordered_vertices",
+      "at_ms": 6500,
+      "sha256": "803d38d7b29c3304e5f3deafe5d508f53d7a3d0b409b548a3a249bdea6104e84"
+    },
+    {
+      "mapping": "ordered_vertices",
+      "at_ms": 6750,
+      "sha256": "f53f7e706c5c14c5cba32ae826808e8eacb4ad375974843b4bef838e1a22953c"
+    },
+    {
+      "mapping": "ordered_vertices",
+      "at_ms": 7000,
+      "sha256": "a9eb81fb27889ab818301c49dc61a5bb9240fc119e70a434af1c4a739eb3c43d"
+    },
+    {
+      "mapping": "matching_path_commands",
+      "at_ms": 6000,
+      "sha256": "d914988e628e3af553ffe2c060e3ac475ea00edf8596a4d55f738f9de8907d07"
+    },
+    {
+      "mapping": "matching_path_commands",
+      "at_ms": 6250,
+      "sha256": "838d832abfc5695e3b6edbe847c3596e1d0cdc2936932b00e7cf03fa45ef87f2"
+    },
+    {
+      "mapping": "matching_path_commands",
+      "at_ms": 6500,
+      "sha256": "57ca98c042d00c1e7da6c83479b67be31ac021991f52566335e15e96a70728e2"
+    },
+    {
+      "mapping": "matching_path_commands",
+      "at_ms": 6750,
+      "sha256": "568382397f1b1ce459f103a3d91a57629947ad8a80946151211d1890197a2999"
+    },
+    {
+      "mapping": "matching_path_commands",
+      "at_ms": 7000,
+      "sha256": "0015e33bd393b55c81badea03840690f58c740af80459bb57a52ac1dcf88c9c2"
+    }
+  ],
+  "contact_sheet_sha256": "6f156b3e518c3fd205db1a37d83d831c2399630d86e99661f6ac02dc9ccfa4d8"
+}

@@ -53,8 +53,8 @@ def register_projects(app, store, auth):
         return live.wait(max(0, after))
 
     @app.get("/projects/schemas/{kind}", dependencies=[Depends(auth)])
-    def schema(kind: str):
-        return call(service.schema, kind)
+    def schema(kind: str, version: str = "1"):
+        return call(service.schema, kind, version)
 
     @app.get("/projects", dependencies=[Depends(auth)])
     def list_projects():
@@ -77,6 +77,11 @@ def register_projects(app, store, auth):
     async def archive_project(project_id: int, request: Request):
         value = await body(request, ("expected_revision", "confirmed"))
         return call(service.archive, project_id, value["expected_revision"], value["confirmed"])
+
+    @app.post("/projects/{project_id}/migrate-visual-contracts-v1", dependencies=[Depends(auth)])
+    async def migrate_visual_contracts_v1(project_id: int, request: Request):
+        value = await body(request, ("expected_revision",))
+        return call(service.migrate_visual_contracts_v1, project_id, value["expected_revision"])
 
     @app.put("/projects/{project_id}/profile", dependencies=[Depends(auth)])
     async def set_profile(project_id: int, request: Request):
@@ -207,6 +212,59 @@ def register_projects(app, store, auth):
             return call(service.attach_asset_file, project_id, staged, x_filename, expected_revision)
         finally:
             staged.unlink(missing_ok=True)
+
+    @app.post("/projects/{project_id}/evidence-assets", dependencies=[Depends(auth)])
+    async def attach_evidence(project_id: int, expected_revision: int, request: Request,
+                              x_filename: str = Header(default="evidence.png"),
+                              x_evidence_provenance: str = Header(),
+                              x_evidence_transformations: str = Header()):
+        """Raw PNG upload with explicit provenance and treatment declarations."""
+        from atme.render.v2_raster import MAX_SOURCE_BYTES
+        try:
+            provenance = json.loads(x_evidence_provenance)
+            transformations = json.loads(x_evidence_transformations)
+        except (ValueError, UnicodeError) as exc:
+            raise HTTPException(400, {"code": "invalid_evidence",
+                                      "message": "Evidence declaration must be JSON"}) from exc
+        if not isinstance(provenance, dict) or not isinstance(transformations, list):
+            raise HTTPException(400, {"code": "invalid_evidence",
+                                      "message": "Evidence declaration is incomplete"})
+        length = request.headers.get("content-length")
+        if length:
+            try:
+                if int(length) > MAX_SOURCE_BYTES:
+                    raise HTTPException(413, {"code": "too_large", "message": "Evidence exceeds 8 MiB"})
+            except ValueError as exc:
+                raise HTTPException(400, {"code": "invalid_request",
+                                          "message": "Invalid content-length"}) from exc
+        parent = service.store.db_path.resolve().parent
+        asset_root = parent / "project-assets"
+        incoming = asset_root / ".incoming"
+        if (asset_root.is_symlink() or asset_root.is_junction()
+                or incoming.is_symlink() or incoming.is_junction()
+                or (asset_root.exists() and asset_root.resolve() != asset_root)
+                or (incoming.exists() and incoming.resolve() != incoming)):
+            raise HTTPException(500, {"code": "storage_error", "message": "Invalid evidence storage"})
+        incoming.mkdir(parents=True, exist_ok=True)
+        if incoming.resolve() != incoming:
+            raise HTTPException(500, {"code": "storage_error", "message": "Invalid evidence storage"})
+        staged = incoming / (uuid4().hex + ".part")
+        received = 0
+        try:
+            with staged.open("xb") as output:
+                async for chunk in request.stream():
+                    received += len(chunk)
+                    if received > MAX_SOURCE_BYTES:
+                        raise HTTPException(413, {"code": "too_large", "message": "Evidence exceeds 8 MiB"})
+                    output.write(chunk)
+            return call(service.attach_evidence_file, project_id, staged, x_filename,
+                        expected_revision, provenance, transformations)
+        finally:
+            if (not asset_root.is_symlink() and not asset_root.is_junction()
+                    and not incoming.is_symlink() and not incoming.is_junction()
+                    and asset_root.resolve() == asset_root
+                    and incoming.resolve() == incoming):
+                staged.unlink(missing_ok=True)
 
     @app.get("/projects/{project_id}/narrative-source", dependencies=[Depends(auth)])
     def narrative_source(project_id: int):

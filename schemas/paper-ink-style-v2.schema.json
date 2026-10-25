@@ -1,0 +1,543 @@
+{
+  "$defs": {
+    "Accessibility": {
+      "additionalProperties": false,
+      "properties": {
+        "minimum_text_contrast": {
+          "maximum": 21,
+          "minimum": 4.5,
+          "title": "Minimum Text Contrast",
+          "type": "number"
+        },
+        "minimum_large_text_contrast": {
+          "maximum": 21,
+          "minimum": 3.0,
+          "title": "Minimum Large Text Contrast",
+          "type": "number"
+        }
+      },
+      "required": [
+        "minimum_text_contrast",
+        "minimum_large_text_contrast"
+      ],
+      "title": "Accessibility",
+      "type": "object"
+    },
+    "AspectProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "enum": [
+            1080,
+            1920
+          ],
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "enum": [
+            1080,
+            1920
+          ],
+          "title": "Height",
+          "type": "integer"
+        },
+        "safe_area": {
+          "$ref": "#/$defs/SafeArea"
+        },
+        "columns": {
+          "enum": [
+            4,
+            12
+          ],
+          "title": "Columns",
+          "type": "integer"
+        },
+        "column_gap_px": {
+          "maximum": 48,
+          "minimum": 12,
+          "title": "Column Gap Px",
+          "type": "integer"
+        },
+        "density": {
+          "$ref": "#/$defs/DensityRules"
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "safe_area",
+        "columns",
+        "column_gap_px",
+        "density"
+      ],
+      "title": "AspectProfile",
+      "type": "object"
+    },
+    "CaptionTokens": {
+      "additionalProperties": false,
+      "properties": {
+        "max_lines": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Max Lines",
+          "type": "integer"
+        },
+        "max_characters_per_line": {
+          "maximum": 64,
+          "minimum": 20,
+          "title": "Max Characters Per Line",
+          "type": "integer"
+        },
+        "bottom_safe_offset_px": {
+          "maximum": 240,
+          "minimum": 24,
+          "title": "Bottom Safe Offset Px",
+          "type": "integer"
+        },
+        "background_color_token": {
+          "title": "Background Color Token",
+          "type": "string"
+        },
+        "foreground_color_token": {
+          "title": "Foreground Color Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "max_lines",
+        "max_characters_per_line",
+        "bottom_safe_offset_px",
+        "background_color_token",
+        "foreground_color_token"
+      ],
+      "title": "CaptionTokens",
+      "type": "object"
+    },
+    "DensityRules": {
+      "additionalProperties": false,
+      "properties": {
+        "max_primary_objects": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Primary Objects",
+          "type": "integer"
+        },
+        "max_context_objects": {
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Max Context Objects",
+          "type": "integer"
+        },
+        "min_object_gap_px": {
+          "maximum": 96,
+          "minimum": 8,
+          "title": "Min Object Gap Px",
+          "type": "integer"
+        },
+        "min_read_hold_ms": {
+          "maximum": 8000,
+          "minimum": 500,
+          "title": "Min Read Hold Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_primary_objects",
+        "max_context_objects",
+        "min_object_gap_px",
+        "min_read_hold_ms"
+      ],
+      "title": "DensityRules",
+      "type": "object"
+    },
+    "EvidenceTokens": {
+      "additionalProperties": false,
+      "properties": {
+        "mask_color_token": {
+          "title": "Mask Color Token",
+          "type": "string"
+        },
+        "mask_opacity": {
+          "maximum": 0.9,
+          "minimum": 0.0,
+          "title": "Mask Opacity",
+          "type": "number"
+        },
+        "highlight_color_token": {
+          "title": "Highlight Color Token",
+          "type": "string"
+        },
+        "source_label_color_token": {
+          "title": "Source Label Color Token",
+          "type": "string"
+        },
+        "min_read_hold_ms": {
+          "maximum": 10000,
+          "minimum": 1000,
+          "title": "Min Read Hold Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mask_color_token",
+        "mask_opacity",
+        "highlight_color_token",
+        "source_label_color_token",
+        "min_read_hold_ms"
+      ],
+      "title": "EvidenceTokens",
+      "type": "object"
+    },
+    "FontResource": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "family": {
+          "title": "Family",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "display",
+            "body"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "weight": {
+          "enum": [
+            400,
+            700
+          ],
+          "title": "Weight",
+          "type": "integer"
+        },
+        "file": {
+          "pattern": "^fonts/[A-Za-z0-9_.-]+\\.(?:otf|ttf)$",
+          "title": "File",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "license": {
+          "const": "OFL-1.1",
+          "title": "License",
+          "type": "string"
+        },
+        "license_file": {
+          "pattern": "^fonts/OFL-[A-Za-z0-9_.-]+\\.txt$",
+          "title": "License File",
+          "type": "string"
+        },
+        "license_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "License Sha256",
+          "type": "string"
+        },
+        "source_url": {
+          "pattern": "^https://raw\\.githubusercontent\\.com/.+/[0-9a-f]{40}/.+$",
+          "title": "Source Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "family",
+        "role",
+        "weight",
+        "file",
+        "sha256",
+        "license",
+        "license_file",
+        "license_sha256",
+        "source_url"
+      ],
+      "title": "FontResource",
+      "type": "object"
+    },
+    "MotionTokens": {
+      "additionalProperties": false,
+      "properties": {
+        "draw_min_ms": {
+          "maximum": 1000,
+          "minimum": 100,
+          "title": "Draw Min Ms",
+          "type": "integer"
+        },
+        "draw_max_ms": {
+          "maximum": 2000,
+          "minimum": 300,
+          "title": "Draw Max Ms",
+          "type": "integer"
+        },
+        "transition_ms": {
+          "maximum": 1500,
+          "minimum": 100,
+          "title": "Transition Ms",
+          "type": "integer"
+        },
+        "emphasis_ms": {
+          "maximum": 2500,
+          "minimum": 200,
+          "title": "Emphasis Ms",
+          "type": "integer"
+        },
+        "reduced_motion_uses_reveal": {
+          "title": "Reduced Motion Uses Reveal",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "draw_min_ms",
+        "draw_max_ms",
+        "transition_ms",
+        "emphasis_ms",
+        "reduced_motion_uses_reveal"
+      ],
+      "title": "MotionTokens",
+      "type": "object"
+    },
+    "SafeArea": {
+      "additionalProperties": false,
+      "properties": {
+        "top_px": {
+          "minimum": 0,
+          "title": "Top Px",
+          "type": "integer"
+        },
+        "right_px": {
+          "minimum": 0,
+          "title": "Right Px",
+          "type": "integer"
+        },
+        "bottom_px": {
+          "minimum": 0,
+          "title": "Bottom Px",
+          "type": "integer"
+        },
+        "left_px": {
+          "minimum": 0,
+          "title": "Left Px",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "top_px",
+        "right_px",
+        "bottom_px",
+        "left_px"
+      ],
+      "title": "SafeArea",
+      "type": "object"
+    },
+    "StrokeTokens": {
+      "additionalProperties": false,
+      "properties": {
+        "fine_px": {
+          "maximum": 4.0,
+          "minimum": 1.0,
+          "title": "Fine Px",
+          "type": "number"
+        },
+        "regular_px": {
+          "maximum": 8.0,
+          "minimum": 2.0,
+          "title": "Regular Px",
+          "type": "number"
+        },
+        "emphasis_px": {
+          "maximum": 12.0,
+          "minimum": 3.0,
+          "title": "Emphasis Px",
+          "type": "number"
+        },
+        "corner_radius_px": {
+          "maximum": 48,
+          "minimum": 2,
+          "title": "Corner Radius Px",
+          "type": "integer"
+        },
+        "roughness_px": {
+          "maximum": 5.0,
+          "minimum": 0.0,
+          "title": "Roughness Px",
+          "type": "number"
+        }
+      },
+      "required": [
+        "fine_px",
+        "regular_px",
+        "emphasis_px",
+        "corner_radius_px",
+        "roughness_px"
+      ],
+      "title": "StrokeTokens",
+      "type": "object"
+    },
+    "Typography": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/TypographyRole"
+        },
+        "label": {
+          "$ref": "#/$defs/TypographyRole"
+        },
+        "body": {
+          "$ref": "#/$defs/TypographyRole"
+        },
+        "caption": {
+          "$ref": "#/$defs/TypographyRole"
+        }
+      },
+      "required": [
+        "title",
+        "label",
+        "body",
+        "caption"
+      ],
+      "title": "Typography",
+      "type": "object"
+    },
+    "TypographyRole": {
+      "additionalProperties": false,
+      "properties": {
+        "font_id": {
+          "title": "Font Id",
+          "type": "string"
+        },
+        "size_px": {
+          "maximum": 96,
+          "minimum": 18,
+          "title": "Size Px",
+          "type": "integer"
+        },
+        "line_height": {
+          "maximum": 1.8,
+          "minimum": 1.0,
+          "title": "Line Height",
+          "type": "number"
+        },
+        "max_characters_per_line": {
+          "maximum": 72,
+          "minimum": 18,
+          "title": "Max Characters Per Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "font_id",
+        "size_px",
+        "line_height",
+        "max_characters_per_line"
+      ],
+      "title": "TypographyRole",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract": {
+      "const": "atme.paper-ink-style",
+      "title": "Contract",
+      "type": "string"
+    },
+    "version": {
+      "const": "2.0.0",
+      "title": "Version",
+      "type": "string"
+    },
+    "system_id": {
+      "const": "atme-style-v2",
+      "title": "System Id",
+      "type": "string"
+    },
+    "identity": {
+      "const": "ATME Paper & Ink",
+      "title": "Identity",
+      "type": "string"
+    },
+    "colors": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Colors",
+      "type": "object"
+    },
+    "fonts": {
+      "items": {
+        "$ref": "#/$defs/FontResource"
+      },
+      "maxItems": 8,
+      "minItems": 4,
+      "title": "Fonts",
+      "type": "array"
+    },
+    "typography": {
+      "$ref": "#/$defs/Typography"
+    },
+    "spacing_px": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Spacing Px",
+      "type": "object"
+    },
+    "strokes": {
+      "$ref": "#/$defs/StrokeTokens"
+    },
+    "aspects": {
+      "additionalProperties": {
+        "$ref": "#/$defs/AspectProfile"
+      },
+      "propertyNames": {
+        "enum": [
+          "landscape-16:9",
+          "portrait-9:16"
+        ]
+      },
+      "title": "Aspects",
+      "type": "object"
+    },
+    "motion": {
+      "$ref": "#/$defs/MotionTokens"
+    },
+    "captions": {
+      "$ref": "#/$defs/CaptionTokens"
+    },
+    "evidence": {
+      "$ref": "#/$defs/EvidenceTokens"
+    },
+    "accessibility": {
+      "$ref": "#/$defs/Accessibility"
+    }
+  },
+  "required": [
+    "contract",
+    "version",
+    "system_id",
+    "identity",
+    "colors",
+    "fonts",
+    "typography",
+    "spacing_px",
+    "strokes",
+    "aspects",
+    "motion",
+    "captions",
+    "evidence",
+    "accessibility"
+  ],
+  "title": "PaperInkStyle",
+  "type": "object"
+}

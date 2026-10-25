@@ -1,0 +1,131 @@
+{
+  "$defs": {
+    "MigrationChange": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "value",
+        "reason"
+      ],
+      "title": "MigrationChange",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "2.0.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "migration_id": {
+      "title": "Migration Id",
+      "type": "string"
+    },
+    "adapter_version": {
+      "const": "v1-to-v2.1",
+      "title": "Adapter Version",
+      "type": "string"
+    },
+    "source_contracts": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Source Contracts",
+      "type": "object"
+    },
+    "source_revisions": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Source Revisions",
+      "type": "object"
+    },
+    "source_sha256": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Source Sha256",
+      "type": "object"
+    },
+    "output_sha256": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Output Sha256",
+      "type": "object"
+    },
+    "inserted_defaults": {
+      "items": {
+        "$ref": "#/$defs/MigrationChange"
+      },
+      "title": "Inserted Defaults",
+      "type": "array"
+    },
+    "inferred_values": {
+      "items": {
+        "$ref": "#/$defs/MigrationChange"
+      },
+      "title": "Inferred Values",
+      "type": "array"
+    },
+    "unsupported_semantics": {
+      "items": {
+        "$ref": "#/$defs/MigrationChange"
+      },
+      "title": "Unsupported Semantics",
+      "type": "array"
+    },
+    "degraded_fields": {
+      "items": {
+        "$ref": "#/$defs/MigrationChange"
+      },
+      "title": "Degraded Fields",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "lossless": {
+      "title": "Lossless",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "contract_version",
+    "migration_id",
+    "adapter_version",
+    "source_contracts",
+    "source_revisions",
+    "source_sha256",
+    "output_sha256",
+    "inserted_defaults",
+    "inferred_values",
+    "unsupported_semantics",
+    "degraded_fields",
+    "warnings",
+    "lossless"
+  ],
+  "title": "MigrationReportV2",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atme.local/schemas/v2/migration-report-v2.schema.json"
+}

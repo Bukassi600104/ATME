@@ -6,7 +6,6 @@ import json
 import os
 import socket
 import subprocess
-import sys
 import time
 import urllib.error
 import urllib.request
@@ -38,12 +37,14 @@ def main() -> int:
     env["ATME_DATA_DIR"] = str(DATA_DIR)
     env["ATME_MODEL_DIR"] = str(DATA_DIR / "models")
 
-    out_fh = open(OUT_LOG, "w", encoding="utf-8")
+    # The handle intentionally stays open for the child process lifetime and
+    # is closed in the unconditional cleanup below.
+    out_fh = OUT_LOG.open("w", encoding="utf-8")
     proc = subprocess.Popen([str(EXE), "--port", str(port), "--token", "smoke-token"],
                             stdout=out_fh, stderr=subprocess.STDOUT, env=env)
     print("spawned pid", proc.pid)
 
-    base = "http://127.0.0.1:%d" % port
+    base = f"http://127.0.0.1:{port}"
     ok = True
     try:
         hbody = None
@@ -53,31 +54,49 @@ def main() -> int:
                 with urllib.request.urlopen(base + "/healthz", timeout=3) as r:
                     hbody = json.loads(r.read())
                     break
-            except Exception:
+            except Exception:  # noqa: BLE001 - bounded readiness polling
                 time.sleep(0.4)
         if not hbody:
             raise RuntimeError("healthz never came up")
         ok = ok and hbody.get("status") == "ok"
         print("healthz:", hbody)
 
-        req = urllib.request.Request(
-            base + "/settings/providers",
-            headers={"Authorization": "Bearer smoke-token"},
-        )
+        auth = {"Authorization": "Bearer smoke-token"}
+        req = urllib.request.Request(base + "/settings/providers", headers=auth)
         with urllib.request.urlopen(req, timeout=5) as r:
             providers = json.loads(r.read())
-        roles = providers.get("roles", {})
-        expected_models = {
-            "researcher": "openrouter/perplexity/sonar-pro",
-            "reasoner": "openrouter/openai/gpt-5.6-terra",
-            "writer": "openrouter/openai/gpt-5.6-terra",
-            "layouter": "openrouter/openai/gpt-5.6-luna",
+        zero_key = providers == {
+            "configured": False, "roles": {}, "mode": "external", "api_keys_required": False,
         }
-        models = {role: roles.get(role, {}).get("model") for role in expected_models}
-        defaults_ok = models == expected_models and roles.get("researcher", {}).get("web_grounded") is True
-        print("provider defaults:", models)
-        print("researcher web grounded:", roles.get("researcher", {}).get("web_grounded"))
-        ok = ok and defaults_ok
+        print("external-AI mode:", providers)
+        ok = ok and zero_key
+
+        # Provider writes and internal topic generation must remain retired in
+        # the packaged binary. These checks catch accidental reachability of
+        # migration-era provider code without making a network/model call.
+        req = urllib.request.Request(
+            base + "/settings/providers", method="PUT", data=b"{}",
+            headers={**auth, "Content-Type": "application/json"},
+        )
+        try:
+            urllib.request.urlopen(req, timeout=5)
+            provider_write_code = 200
+        except urllib.error.HTTPError as e:
+            provider_write_code = e.code
+        print("provider configuration write:", provider_write_code)
+        ok = ok and provider_write_code == 410
+
+        req = urllib.request.Request(
+            base + "/jobs", method="POST", data=b"{}",
+            headers={**auth, "Content-Type": "application/json"},
+        )
+        try:
+            urllib.request.urlopen(req, timeout=5)
+            internal_job_code = 200
+        except urllib.error.HTTPError as e:
+            internal_job_code = e.code
+        print("internal topic-generation job:", internal_job_code)
+        ok = ok and internal_job_code == 410
 
         # auth: unauthenticated POST must be 401
         req = urllib.request.Request(base + "/jobs", method="POST",
@@ -93,7 +112,7 @@ def main() -> int:
 
         # graceful shutdown
         req = urllib.request.Request(base + "/shutdown", method="POST",
-                                     headers={"Authorization": "Bearer smoke-token"})
+                                     headers=auth)
         with urllib.request.urlopen(req, timeout=5) as r:
             print("shutdown accepted:", r.status)
     finally:
