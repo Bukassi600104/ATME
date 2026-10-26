@@ -80,7 +80,8 @@ def validate_split_lifecycle(capture: SplitCapture, replay: ChronologicalReplay,
     initial = replay.checkpoints[0]
     paired = _validate_pair_static(layout, timeline,
         layout_sha256 if layout_sha256 is not None else _split_packet_digest(layout.model_dump(mode="json")),
-        initial.hierarchy, structural_timeline=structural_timeline, registry_inputs=registry_inputs)
+        initial.hierarchy, structural_timeline=structural_timeline, registry_inputs=registry_inputs,
+        split_inputs=split_inputs)
     if {key: row.state_version for key, row in paired.initial.items()} != dict(initial.state_versions):
         raise UnsupportedLifecycle("Split lifecycle timeline differs from actual initial versions")
     recorded = {row.resolved_index: row for checkpoint in replay.checkpoints for row in checkpoint.active}

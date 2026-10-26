@@ -58,6 +58,8 @@ VISUAL_STATE_CASES = [
 APERTURE_KINDS = ("group", "clip", "mask")
 REGISTRY_ROLES = (("source", "reveal"), ("part-1", "reveal"), ("part-1", "enter"),
                   ("part-2", "reveal"), ("part-2", "enter"))
+HISTORY_CASES = ("common-group", "distinct-group", "common-clip", "distinct-clip", "nested-clips",
+                 "count-group", "group-count", "morph", "descendants")
 
 
 def split_benchmark():
@@ -1296,3 +1298,225 @@ def test_split_connector_cli_routes_only_the_authored_diagnostic_matrix(tmp_path
         monkeypatch.setattr(benchmark, entry, wrong_family)
     assert benchmark.main(["--output-dir", str(tmp_path), "--diagnostic-family", "connector"]) == 0
     assert calls == expected
+
+
+@pytest.mark.parametrize("portrait", [False, True])
+@pytest.mark.parametrize("kind", HISTORY_CASES)
+@pytest.mark.parametrize("reverse_objects", [False, True])
+def test_split_history_offline_native_parents_prior_actions_and_return(tmp_path, portrait, kind, reverse_objects):
+    benchmark = split_benchmark()
+    assert hasattr(benchmark, "history_case"), "Task10 authored history cross-matrix proof is missing"
+    if kind in {"count-group", "group-count", "descendants"}:
+        from atme.render.style_bundle import load_bundle
+
+        _, _, bundle = load_bundle()
+        font = bundle / "fonts/AtkinsonHyperlegible-Regular.otf"
+        assert font.is_file(), "Expected native oracle requires the pinned Atkinson regular font"
+    record = benchmark.history_case(tmp_path, portrait, kind, reverse_objects=reverse_objects)
+    assert (record["family"], record["kind"], record["reverse_objects"]) == ("history", kind, reverse_objects)
+    assert record["profile"] == ("SHORT_FORM_9_16" if portrait else "LONG_FORM_16_9")
+    assert record["network_forbidden"] and record["immutable_input_keys_unchanged"]
+    start, end = record["action_start_ms"], record["action_end_ms"]
+    assert end - start == 40
+    frames = record["frames"]
+    first, last = frames[str(start)], frames[str(end)]
+    tree = ET.fromstring(Path(last["svg_path"]).read_text(encoding="utf-8"))
+    ids = [row.attrib["data-object-id"] for row in tree.iter() if "data-object-id" in row.attrib]
+    assert "source" not in ids and ids.count("part-1") == ids.count("part-2") == 1
+    for key in ("source", "part-1", "part-2"):
+        assert frames[str(end - 1)]["state_versions"][key] == first["state_versions"][key]
+        assert last["state_versions"][key] == first["state_versions"][key] + 1
+    colors = json.loads(record["style_json"])["colors"]
+    ink = tuple(bytes.fromhex(colors["ink"].lstrip("#")))
+    paper = (250, 248, 241)
+    if kind in HISTORY_CASES[:5]:
+        assert record["chronology_action_ids"] == ["earlier-reveal", "split-1"]
+        assert frames["0"]["state_versions"]["earlier"] == 1
+        assert frames["100"]["state_versions"]["earlier"] == first["state_versions"]["earlier"] == 2
+        assert last["state_versions"]["earlier"] == 2
+        assert first["state_sha256"]["earlier"] == last["state_sha256"]["earlier"]
+        with Image.open(last["png_path"]) as image:
+            rgb = image.convert("RGB")
+            assert rgb.getpixel((110, 80)) == ink
+            assert rgb.getpixel((10, 20)) == (ink if kind.startswith("distinct") else paper)
+            if kind == "nested-clips":
+                assert rgb.getpixel((145, 80)) == paper
+                assert first["state_sha256"]["outer-stage"] == last["state_sha256"]["outer-stage"]
+                assert last["state_versions"]["outer-stage"] == 1
+    else:
+        assert record["chronology_action_ids"][-1] == "return-1"
+        assert frames["1999"]["state_versions"] == frames["3000"]["state_versions"]
+        assert frames["1999"]["state_sha256"] == frames["3000"]["state_sha256"]
+        assert frames["1999"]["png_sha256"] == frames["3000"]["png_sha256"]
+        with Image.open(frames["2500"]["png_path"]) as image:
+            assert image.convert("RGB").getextrema() == ((250, 250), (248, 248), (241, 241))
+        if kind in {"count-group", "group-count"}:
+            assert record["chronology_action_ids"][:2] == (
+                ["peer", "ungroup-after-count"] if kind == "count-group" else ["ungroup-after-count", "peer"])
+            assert last["state_versions"] == {"source": 4, "shell": 2, "part-1": 3, "part-2": 3}
+            assert "10 widgets" in Path(first["svg_path"]).read_text(encoding="utf-8")
+            width, height = (720, 1280) if portrait else (1280, 720)
+            literal = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">'
+                f'<rect width="{width}" height="{height}" fill="#FAF8F1"/>'
+                '<g transform="matrix(2 0 0 3 90 30)"><text x="10" y="31.3333" fill="#172033" '
+                'font-family="Atkinson Hyperlegible" font-weight="400" font-size="21.3333" '
+                'xml:space="preserve"><tspan x="10" dy="0">10 widgets</tspan></text></g></svg>')
+            expected = bytes(resvg_py.svg_to_bytes(svg_string=literal, font_files=[str(font)], skip_system_fonts=True))
+            with Image.open(io.BytesIO(expected)) as reference, Image.open(first["png_path"]) as image:
+                region = (100, 60, 500, 190)
+                pixels_match = (image.convert("RGB").crop(region).tobytes()
+                                == reference.convert("RGB").crop(region).tobytes())
+                assert pixels_match, "Completed Count glyph pixels differ from the literal native oracle"
+        elif kind == "morph":
+            assert record["chronology_action_ids"] == ["peer", "split-1", "return-1"]
+            assert last["state_versions"]["origin"] == 2 and last["state_versions"]["source"] == 3
+            with Image.open(first["png_path"]) as image:
+                assert image.convert("RGB").getpixel((160, 100) if portrait else (80, 150)) == ink
+        else:
+            assert kind == "descendants"
+            boxes = ({"source": (160., 80., 200., 120.), "part-1": (100., 400., 200., 120.),
+                      "part-2": (160., 400., 200., 120.)} if portrait else
+                     {"source": (80., 100., 200., 120.), "part-1": (400., 100., 200., 120.),
+                      "part-2": (460., 100., 200., 120.)})
+            reference = literal_structured_frame(portrait, True, "write", 40, boxes,
+                                                font, nonidentity=True)
+            with Image.open(io.BytesIO(reference)) as expected, Image.open(last["png_path"]) as image:
+                pixels_match = image.convert("RGB").tobytes() == expected.convert("RGB").tobytes()
+                assert pixels_match, "Nested descendant pixels differ from the literal native oracle"
+            for key in set(last["state_versions"]) - {"source", "part-1", "part-2"}:
+                assert last["state_versions"][key] == 1
+    with Image.open(record["contact_sheet_path"]) as sheet:
+        assert sheet.width == len(frames) * 240
+
+
+@pytest.mark.parametrize("kind,reverse_objects", [("not-authored", False), ("morph", "yes")])
+def test_split_history_proof_rejects_unauthored_selectors(tmp_path, kind, reverse_objects):
+    benchmark = split_benchmark()
+    assert hasattr(benchmark, "history_case"), "Task10 authored history cross-matrix proof is missing"
+    with pytest.raises(ValueError, match="^Unsupported authored history selector$"):
+        benchmark.history_case(tmp_path, False, kind, reverse_objects=reverse_objects)
+    assert not list(tmp_path.iterdir())
+
+
+def test_split_history_diagnostic_never_grants_final_acceptance(tmp_path):
+    benchmark = split_benchmark()
+    assert hasattr(benchmark, "history_case"), "Task10 authored history cross-matrix proof is missing"
+    record = benchmark.history_case(tmp_path, False, "distinct-clip")
+    assert benchmark.write_report(tmp_path, [record], diagnostic="history") == 0
+    report = json.loads((tmp_path / "split-history-diagnostic.json").read_text(encoding="utf-8"))
+    assert report["status"] == "DIAGNOSTIC ONLY" and report["final_acceptance"] is False
+    assert report["missing_required_proofs"] and report["cases"][0]["case_id"] == record["case_id"]
+
+
+def test_split_history_cli_routes_existing_parent_and_history_matrix(tmp_path, monkeypatch):
+    benchmark = split_benchmark()
+    assert hasattr(benchmark, "history_case"), "Task10 authored history cross-matrix proof is missing"
+    expected = [(portrait, kind, reverse) for portrait in (False, True) for kind in HISTORY_CASES
+                for reverse in (False, True)]
+    calls = []
+
+    def route(directory, portrait, kind, *, reverse_objects=False):
+        assert directory == tmp_path
+        calls.append((portrait, kind, reverse_objects))
+        return {"route": calls[-1]}
+
+    def report(directory, cases, *, diagnostic):
+        assert directory == tmp_path and diagnostic == "history"
+        assert cases == [{"route": row} for row in expected]
+        return 0
+
+    monkeypatch.setattr(benchmark, "history_case", route)
+    monkeypatch.setattr(benchmark, "write_report", report)
+    assert benchmark.main(["--output-dir", str(tmp_path), "--diagnostic-family", "history"]) == 0
+    assert calls == expected
+
+
+def test_split_retained_baselines_regenerate_all_50_exact_frames(tmp_path, monkeypatch):
+    benchmark = split_benchmark()
+    assert hasattr(benchmark, "retained_frames_case"), "Task10 fresh retained50 proof is missing"
+    baseline_dir = benchmark.ROOT / "docs/visual-acceptance"
+    names = ("phase-3z-annotation", "phase-3aa-group-annotation")
+    originals = {name + suffix: (baseline_dir / (name + suffix)).read_bytes()
+                 for name in names for suffix in (".json", ".png")}
+    original_open, original_save = Path.open, Image.Image.save
+
+    def guarded_open(path, mode="r", *args, **kwargs):
+        assert not (path.resolve().is_relative_to(baseline_dir.resolve()) and any(c in mode for c in "wax+"))
+        return original_open(path, mode, *args, **kwargs)
+
+    def guarded_save(image, fp, *args, **kwargs):
+        if isinstance(fp, (str, Path)):
+            assert not Path(fp).resolve().is_relative_to(baseline_dir.resolve())
+        return original_save(image, fp, *args, **kwargs)
+
+    calls = {"annotation": 0, "group": 0}
+    original_compose, original_raster = benchmark.compose_png_frame, benchmark._rasterize_svg_frame
+
+    def compose(*args, **kwargs):
+        calls["annotation"] += 1
+        return original_compose(*args, **kwargs)
+
+    def raster(*args, **kwargs):
+        calls["group"] += 1
+        return original_raster(*args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guarded_open)
+    monkeypatch.setattr(Image.Image, "save", guarded_save)
+    monkeypatch.setattr(benchmark, "compose_png_frame", compose)
+    monkeypatch.setattr(benchmark, "_rasterize_svg_frame", raster)
+    record = benchmark.retained_frames_case(tmp_path)
+    assert record["frame_count"] == 50 and calls == {"annotation": 30, "group": 80}
+    assert record["network_forbidden"] and record["random_seek_parity"]
+    assert record["immutable_input_keys_unchanged"] and record["original_baselines_unchanged"]
+    assert record["final_acceptance"] is False and record["origins_after"] >= record["origins_before"] > 0
+    for corpus, name in zip(record["corpora"], names, strict=True):
+        expected = json.loads(originals[name + ".json"])
+        assert corpus["frames"] == expected["frames"]
+        assert corpus["contact_sheet_sha256"] == expected["contact_sheet_sha256"]
+        assert len(corpus["frame_paths"]) == len(expected["frames"])
+        for row, path in zip(corpus["frames"], corpus["frame_paths"], strict=True):
+            assert benchmark.sha256(Path(path).read_bytes()).hexdigest() == row.get("png_sha256", row.get("sha256"))
+        assert benchmark.sha256(Path(corpus["contact_sheet_path"]).read_bytes()).hexdigest() == corpus["contact_sheet_sha256"]
+    assert "obsolete" in record["historical_scope_qualification"] and "public Group closed" in record["historical_scope_qualification"]
+    assert {name: (baseline_dir / name).read_bytes() for name in originals} == originals
+    assert benchmark.write_report(tmp_path, [record], diagnostic="retained-baselines") == 0
+    report = json.loads((tmp_path / "split-retained-baselines-diagnostic.json").read_text(encoding="utf-8"))
+    assert report["status"] == "DIAGNOSTIC ONLY" and report["final_acceptance"] is False
+    assert report["missing_required_proofs"] and report["cases"][0]["frame_count"] == 50
+
+
+def test_split_retained_baselines_fail_closed_on_changed_pixels(tmp_path, monkeypatch):
+    benchmark = split_benchmark()
+    assert hasattr(benchmark, "retained_frames_case"), "Task10 fresh retained50 proof is missing"
+    monkeypatch.setattr(benchmark, "compose_png_frame", lambda *args, **kwargs: types.SimpleNamespace(png=b"changed frame"))
+    with pytest.raises(AssertionError, match="Retained annotation frame 0 differs"):
+        benchmark.retained_frames_case(tmp_path)
+    assert not list(tmp_path.rglob("*.json"))
+
+
+@pytest.mark.parametrize("child", ["", "new-proof"])
+def test_split_retained_baselines_refuse_accepted_destination(child):
+    benchmark = split_benchmark()
+    assert hasattr(benchmark, "retained_frames_case"), "Task10 fresh retained50 proof is missing"
+    with pytest.raises(ValueError, match="Accepted baseline directory is read-only"):
+        benchmark.retained_frames_case(benchmark.ROOT / "docs/visual-acceptance" / child)
+
+
+def test_split_retained_baselines_cli_routes_explicit_output(tmp_path, monkeypatch):
+    benchmark = split_benchmark()
+    assert hasattr(benchmark, "retained_frames_case"), "Task10 fresh retained50 proof is missing"
+    calls = []
+
+    def retained(directory):
+        assert directory == tmp_path
+        calls.append(directory)
+        return {"frame_count": 50}
+
+    def report(directory, cases, *, diagnostic):
+        assert directory == tmp_path and cases == [{"frame_count": 50}] and diagnostic == "retained-baselines"
+        return 0
+
+    monkeypatch.setattr(benchmark, "retained_frames_case", retained)
+    monkeypatch.setattr(benchmark, "write_report", report)
+    assert benchmark.main(["--output-dir", str(tmp_path), "--diagnostic-family", "retained-baselines"]) == 0
+    assert calls == [tmp_path]

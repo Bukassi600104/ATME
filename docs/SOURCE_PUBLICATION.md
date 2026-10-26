@@ -1,10 +1,12 @@
 # Source publication and recovery
 
-This document records the 2026-10-25 GitHub publication. Product status remains in the [Phase 3 ledger](ATME_VISUAL_PIPELINE_PHASE_3_LEDGER.md); publication does not satisfy a renderer, phase, installed-build or release gate.
+This document records the original 2026-10-25 publication and the accepted-source checkpoint of 2026-10-26. Product status remains in the [Phase 3 ledger](ATME_VISUAL_PIPELINE_PHASE_3_LEDGER.md); publication does not satisfy a renderer, phase, installed-build or release gate.
 
 ## Source identity
 
-The source snapshot comes from integration commit `4a121faa8265eb30717998da11ef1b5467cdce42`, including latest bounded accepted source `510f3be96e74b5af3a56e84d127bd4148c64a209`. The main checkout's corresponding ledger-only commit is `e24aa31d8ec0761e4cce0ccb24430272d5bf6e8b`.
+The current source snapshot comes from integration commit `d6fdfea5667446695717eea8fb5d0f91ce050ccb`, including latest bounded accepted product source `94281c334ce050ad38f390cf1b1c460e82c4a75d`. The corresponding main ledger-only commit is `68d6caff57fe721f85575ddad25cfaa909fbc3ff`. All 525 published source blobs match the committed integration snapshot; the professional repository README and contribution/reporting documents are preserved separately.
+
+This checkpoint includes reviewed parent/history and retained-frame work, the authenticated cold Count/frozen-capture repair (422 passing named checks), and original v1/Caleb adjacency (57 passing checks with independent native inspection). The prior 421-pass/one-failure compatibility run remains recorded with no aggregate green credit. Earlier large retained inventories are historical rather than blanket-current regression claims after runtime changes. Phase 3 remains 79 items / 4,925 of 7,900 points = 62.3%. Uncommitted project-flow and maximum-measurement work is excluded from this source publication.
 
 Application source, tests, contracts, benchmarks and required production assets are copied from committed Git blobs. Publication adds repository documentation, contribution/reporting templates and the approved historical execution blueprint/audit documents. Those documentation changes do not alter the renderer or project architecture. Source-file identity is verified separately from publication commit identity.
 
@@ -26,6 +28,14 @@ The full bundle is 254,928,697 bytes with SHA-256 `a58a9095d5c94288e3976924b57e3
 The execution ZIP SHA-256 is `f6f9c501256bdcef9ddeb734479eb30dbe7b366bc1370c7bb6d0512384813cf0`. Every archived file was read back and matched its recorded checksum. Private diagnostic dumps, original user media, runtime databases, credentials, dependencies and uncommitted packaging outputs are outside these archives. They require their own backup; a Git push is not a backup of all local files.
 
 The draft is a recovery asset, not an ATME installer or production release. It is visible to repository maintainers, not ordinary public visitors. An ordinary source clone does not include the bundle's archived original ancestry.
+
+## 2026-10-26 recovery supplement
+
+The same maintainer-only draft also stores `atme-history-supplement-2026-10-26.bundle`, `atme-task10-supplement-2026-10-26.zip`, dated checkpoint/snapshot/checksum files and `SUPPLEMENT_2026-10-26.md`. The 44,154-byte incremental bundle preserves newer committed history without duplicating or rewriting the original large object. Its SHA-256 is `f6afdabe277e8e14d7341b8c1a27138626179a7b1320d8161452e07a2e3357da`.
+
+All seven new data/manifest assets were authenticated-downloaded and matched byte-for-byte, including every entry in the 220-entry ZIP. A fresh two-stage restore using the previously authenticated original archive and downloaded supplement passed bundle verification and fsck, recovered all 22 captured refs and 787 commits, and preserved the original FFmpeg blob and accepted integration/main heads. The original 18 asset names, IDs and sizes stayed unchanged. `github-supplement-readback-2026-10-26.json` records this proof; a pending-readback field in the captured checkpoint is historical rather than the final verification state.
+
+The ZIP includes five explicitly unfinished source-file snapshots for disaster recovery, separate from accepted source publication. They do not close project-flow, performance, Task 10, phase or release gates. Original user media, runtime databases, credentials, private diagnostic dumps, dependencies and unrelated packaging outputs remain excluded. For the newer checkpoint, restore the original archive first, then follow `SUPPLEMENT_2026-10-26.md`; extract unfinished snapshots separately and reconcile them before use.
 
 ## Restore into a new directory
 

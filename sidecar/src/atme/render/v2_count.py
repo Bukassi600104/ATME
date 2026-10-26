@@ -112,7 +112,8 @@ def count_value_at_ms(policy, start_ms: int, end_ms: int, at_ms: int, easing: st
 
 @lru_cache(maxsize=64)
 def _validate_glyph_inventory(object_json: str, policy_json: str, style_version: str,
-                              registry_version: str, profile_id: str, width: int, height: int) -> None:
+                              registry_version: str, profile_id: str, width: int, height: int,
+                              *, frozen_style_json: str | None = None, frozen_font: bytes | None = None) -> None:
     # Deferred imports keep the policy formatter independent of contract/paint
     # module initialization. Cache keys are immutable authored data and pins.
     from atme.render.style_bundle import resolve_contract_bundle
@@ -120,23 +121,46 @@ def _validate_glyph_inventory(object_json: str, policy_json: str, style_version:
     from atme.store.contracts_v2 import CountPolicy, TextObject
 
     obj, policy = TextObject.model_validate_json(object_json), CountPolicy.model_validate_json(policy_json)
-    style, _, root = resolve_contract_bundle(style_version, registry_version)
+    if frozen_style_json is None:
+        if frozen_font is not None:
+            raise UnsupportedCount("frozen Count font needs its checked style")
+        style, _, root = resolve_contract_bundle(style_version, registry_version)
+    else:
+        from atme.render.style_contracts import PaperInkStyle
+
+        style = PaperInkStyle.model_validate_json(frozen_style_json)
     aspect = style.aspects["landscape-16:9" if profile_id == "LONG_FORM_16_9" else "portrait-9:16"]
     scale = width / aspect.width
     if abs(scale - height / aspect.height) > 1e-6:
         raise UnsupportedCount("count profile cannot uniformly scale the pinned style")
     role = _text_role(obj, style)
     font = next(font for font in style.fonts if font.id == role.font_id)
+    if frozen_style_json is not None:
+        from hashlib import sha256
+
+        if type(frozen_font) is not bytes or sha256(frozen_font).hexdigest() != font.sha256:
+            raise UnsupportedCount("frozen Count font differs from its checked style pin")
+    source = root / font.file if frozen_style_json is None else frozen_font
     for index in range(policy.step_count + 1):
         candidate = obj.model_copy(update={"text": count_step_text(policy, index)}, deep=True)
         _text(candidate, style.colors["ink"], font.family, font.weight, role.size_px * scale,
-              role.line_height, role.max_characters_per_line, root / font.file)
+              role.line_height, role.max_characters_per_line, source)
 
 
-def validate_count_glyphs(obj, policy, layout) -> None:
+def validate_count_glyphs(obj, policy, layout, *, split_inputs=None) -> None:
     profile = layout.output_profile
-    _validate_glyph_inventory(obj.model_dump_json(), policy.model_dump_json(), layout.style_system_version,
-                              layout.asset_registry_version, profile.profile_id, profile.width, profile.height)
+    args = (obj.model_dump_json(), policy.model_dump_json(), layout.style_system_version,
+            layout.asset_registry_version, profile.profile_id, profile.width, profile.height)
+    if split_inputs is None:
+        _validate_glyph_inventory(*args)
+    else:
+        from atme.render.v2_split_paint import _checked_split_resources
+        from atme.render.v2_svg import _text_role
+
+        style, _, files, _ = _checked_split_resources(layout, split_inputs)
+        role = _text_role(obj, style)
+        font = next(font for font in style.fonts if font.id == role.font_id)
+        _validate_glyph_inventory(*args, frozen_style_json=split_inputs.style_json, frozen_font=files[font.file])
 
 
 def validate_count_display(token: str, *, nonblank: bool = False) -> None:
