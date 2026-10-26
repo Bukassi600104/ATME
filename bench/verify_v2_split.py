@@ -7,9 +7,11 @@ import json
 import socket
 import sys
 from contextlib import ExitStack
+from copy import deepcopy
 from dataclasses import asdict
 from functools import partial
 from hashlib import sha256
+from io import BytesIO
 from pathlib import Path
 from time import perf_counter
 from unittest.mock import patch
@@ -34,6 +36,7 @@ from test_v2_split_list_family import (
     text_list_split_family,
 )
 from test_v2_split_media_family import media_family
+from test_v2_split_return import retained_history
 from test_v2_split_reusable_family import reusable_split_family
 from test_v2_split_visual_family import illustration_boundary, split_timeline
 from test_v2_split_visual_family_boundaries import aperture_boundary, registry_boundary
@@ -46,6 +49,7 @@ from atme.render.v2_svg import (
     _authored_annotation_bindings,
     _compose_validated_svg_frame,
     _rasterize_svg_frame,
+    compose_png_frame,
 )
 from atme.render.v2_timeline_replay import _replay_split_chronology
 
@@ -62,6 +66,8 @@ CONNECTOR_ROUTES = ("straight", "elbow", "curve")
 APERTURE_KINDS = ("group", "clip", "mask")
 REGISTRY_ROLES = (("source", "reveal"), ("part-1", "reveal"), ("part-1", "enter"),
                   ("part-2", "reveal"), ("part-2", "enter"))
+HISTORY_KINDS = ("common-group", "distinct-group", "common-clip", "distinct-clip", "nested-clips",
+                 "count-group", "group-count", "morph", "descendants")
 
 
 def no_network(*args, **kwargs):
@@ -87,7 +93,7 @@ def verify_import_origins() -> int:
 
 
 def _native_case(output_dir: Path, portrait: bool, kind: str, mode: str, family: str, fixture,
-                 *, extra_offsets: tuple[int, ...] = ()) -> dict:
+                 *, extra_offsets: tuple[int, ...] = (), extra_times: tuple[int, ...] = ()) -> dict:
     """Each fixture supplies layout, initial state, action, timeline and checked assets."""
     origins_before = verify_import_origins()
     case_id = f"{family}-{kind}-{mode}-{'portrait' if portrait else 'landscape'}"
@@ -106,6 +112,7 @@ def _native_case(output_dir: Path, portrait: bool, kind: str, mode: str, family:
         seek_order = (action.end_ms, action.start_ms, midpoint, action.end_ms - 1,
                       first_end, source_end, midpoint, action.start_ms, action.end_ms)
         seek_order += tuple(action.start_ms + offset for offset in extra_offsets)
+        seek_order += extra_times
         inputs = verify_split_paint_inputs(layout, assets)
         keys_before = (layout.model_dump_json(), timeline.model_dump_json(), inputs.inputs_sha256,
                        inputs.manifest_json, inputs.bundle_bytes, inputs.asset_pins_json, inputs.project_assets)
@@ -338,6 +345,213 @@ def connector_case(output_dir: Path, portrait: bool, kind: str, mode: str, routi
     return record
 
 
+def _history_fixture(portrait, kind, _mode, *, reverse_objects):
+    from test_v2_split_capture import ancestor_boundary
+    from test_v2_split_contract import split_with_earlier_ancestor
+    from test_v2_split_identity import sample_for_layout
+    from v2_fixtures import digest
+    from v2_split_fixtures import split_documents
+
+    from atme.render.v2_hierarchy_replay import completed_hierarchy_basis
+    from atme.render.v2_split import _observed_split_placements
+    from atme.render.v2_split_identity import split_content_receipts
+    from atme.store.contracts_v2 import (
+        ExecutableLayoutV2,
+        ResolvedAction,
+        ResolvedVisualTimelineV2,
+        SplitPolicy,
+        _split_expected_completion,
+    )
+
+    if kind in HISTORY_KINDS[:5]:
+        layout, _, split = ancestor_boundary(aperture="clip" in kind, distinct=kind.startswith("distinct"))
+        drawing = layout.model_dump(mode="json")
+        _, profile, _ = split_documents("SHORT_FORM_9_16" if portrait else "LONG_FORM_16_9")
+        drawing.update(output_profile=profile["output_profile"], canvas=profile["canvas"])
+        if kind == "nested-clips":
+            earlier = next(row for row in drawing["objects"] if row["object_id"] == "earlier")
+            outer = deepcopy(earlier)
+            outer.update(object_id="outer-stage", parent_id=None, child_ids=["earlier"],
+                initial_state="visible", visible=True, anchors=[],
+                style={"stroke": None, "fill": None, "text": None, "effect": None})
+            outer["geometry"]["bounds"].update(x=100., y=50., width=30., height=50.)
+            outer["transform"].update(position={"x": 0., "y": 0.}, scale_x=1., scale_y=1.,
+                                      rotation_degrees=0., origin={"x": 0., "y": 0.})
+            earlier["parent_id"] = "outer-stage"
+            drawing["objects"].append(outer)
+            drawing["boards"][0]["object_ids"].append("outer-stage")
+        layout = ExecutableLayoutV2.model_validate(drawing)
+        initial = sample_for_layout(layout)
+        _, _, clock = split_with_earlier_ancestor()
+        prior = ResolvedAction.model_validate(clock["actions"][0])
+        before = _replay_split_chronology(layout, initial, (prior,), clock["duration_ms"], {}).at(split.start_ms)
+        packet = split.model_dump(mode="json")
+        packet["end_ms"] = packet["start_ms"] + 40
+        policy = packet["action"]["split_policy"]
+        if kind == "nested-clips":
+            for dependency in policy["source_basis"]["read_dependencies"]:
+                dependency["object_ids"] = ["earlier", "outer-stage"]
+        objects = before.hierarchy.object_map({obj.object_id: obj for obj in layout.objects})
+        contents = {row.object_id: row for row in split_content_receipts(layout, before, {})}
+        policy["source_basis"]["placements"] = [row.model_dump(mode="json") for row in
+            _observed_split_placements(before, objects, set(objects), contents)]
+        for row in policy["correspondences"]:
+            row.update(source_content_sha256=contents["source"].content_sha256,
+                       result_content_sha256=contents[row["result_object_id"]].content_sha256)
+        policy["source_basis_sha256"] = digest(policy["source_basis"])
+        receipt = _split_expected_completion(SplitPolicy.model_validate(policy))
+        receipt["completion_sha256"] = digest(receipt)
+        packet["split_completion_receipt"] = receipt
+        clock["actions"] = [prior.model_dump(mode="json"), packet]
+    else:
+        layout, timeline = retained_history(kind, portrait)
+        drawing, clock = layout.model_dump(mode="json"), timeline.model_dump(mode="json")
+        split = next(row for row in clock["actions"] if row["action"]["verb"] == "split")
+        split["end_ms"] = split["start_ms"] + 40
+    if reverse_objects:
+        drawing["objects"].reverse()
+    layout = ExecutableLayoutV2.model_validate(drawing)
+    initial = sample_for_layout(layout)
+    clock.update(layout_sha256=digest(drawing), output_profile=drawing["output_profile"],
+        initial_object_states=[{"object_id": row.object_id, "state": row.state, "visible": row.visible,
+            "state_version": dict(initial.state_versions)[row.object_id]} for row in initial.objects])
+    if clock.get("initial_hierarchy_basis") is not None:
+        basis = completed_hierarchy_basis(initial.hierarchy, {row.object_id: row for row in initial.objects})
+        clock.update(initial_hierarchy_basis=basis.model_dump(mode="json"), initial_hierarchy_basis_sha256=basis.checksum())
+    timeline = ResolvedVisualTimelineV2.model_validate(clock)
+    action = next(row for row in timeline.actions if row.action.verb == "split")
+    return layout, initial, action, timeline, {}
+
+
+def history_case(output_dir: Path, portrait: bool, kind: str, *, reverse_objects: bool = False) -> dict:
+    if kind not in HISTORY_KINDS or type(reverse_objects) is not bool:
+        raise ValueError("Unsupported authored history selector")
+    record = _native_case(output_dir, portrait, kind, "authored", f"history-{'reversed' if reverse_objects else 'authored'}",
+        partial(_history_fixture, reverse_objects=reverse_objects), extra_offsets=(1, 36, 41, 1, 41),
+        extra_times=(0, 100, 499) if kind in HISTORY_KINDS[:5] else (1999, 2500, 3000, 3001))
+    record.update(family="history", reverse_objects=reverse_objects)
+    return record
+
+
+def retained_frames_case(output_dir: Path) -> dict:
+    """Regenerate the original paired pixels without rewriting their historical reports."""
+    from test_v2_annotation_action import append_target
+    from test_v2_annotation_contract import leader_documents
+    from test_v2_group_annotation import (
+        annotation_group_documents,
+        consumer_clock,
+        private_svg,
+        regroup_first_documents,
+    )
+    from v2_fixtures import digest
+
+    baseline_dir = ROOT / "docs/visual-acceptance"
+    if output_dir.resolve().is_relative_to(baseline_dir.resolve()):
+        raise ValueError("Accepted baseline directory is read-only")
+    pins = {
+        "phase-3z-annotation.json": "86d4e25c6c969281891862f8de2f589b5efc66404a7f6b7d3a4560f7127b0b70",
+        "phase-3z-annotation.png": "112a6c9f980f05d62f6d0fbbaf83a317f7d9f5d859122c2f7507c3a2c4ef6a4f",
+        "phase-3aa-group-annotation.json": "7489307543d1d562a10b22eb782c79392cc0ec0144e3aba9bc2223adb5aed08a",
+        "phase-3aa-group-annotation.png": "4b04705e56c18687c7bb289c375c5f16e14b83c5dfa92cba4ca00033cf43549c",
+    }
+    assert all(sha256((baseline_dir / name).read_bytes()).hexdigest() == value for name, value in pins.items())
+    origins_before = verify_import_origins()
+    destination = output_dir / "retained-baselines"
+    destination.mkdir(parents=True, exist_ok=False)
+    corpora = []
+    with ExitStack() as offline:
+        for entry in ("socket", "create_connection", "getaddrinfo", "gethostbyname", "gethostbyname_ex",
+                      "gethostbyaddr", "getnameinfo", "getfqdn"):
+            offline.enter_context(patch.object(socket, entry, no_network))
+        for kind, stem, size in (("annotation", "phase-3z-annotation", (1920, 720)),
+                                 ("group", "phase-3aa-group-annotation", (2000, 2880))):
+            expected = json.loads((baseline_dir / (stem + ".json")).read_text(encoding="utf-8"))
+            corpus = {"corpus": kind, "frames": [], "frame_paths": []}
+            sheet = Image.new("RGB", size, "#101722")
+            labels = ImageDraw.Draw(sheet)
+            selections = ((None, False), (None, True)) if kind == "annotation" else tuple(
+                (mode, portrait) for mode in ("ungroup", "group", "note-after-exit", "target-after-exit")
+                for portrait in (False, True))
+            for row_index, (mode, portrait) in enumerate(selections):
+                if kind == "annotation":
+                    _, layout, timeline = leader_documents()
+                    if portrait:
+                        for doc in (layout, timeline):
+                            doc["output_profile"] = {"profile_id": "SHORT_FORM_9_16", "width": 720, "height": 1280, "fps": 30}
+                        layout["canvas"].update(width=720, height=1280)
+                        layout["objects"][-1]["geometry"]["bounds"]["width"] = 600
+                        timeline["layout_sha256"] = digest(layout)
+                    moments = (6000, 6250, 6500, 6750, 7000)
+                    origin_y = 280 if portrait else 0
+                    original = deepcopy((layout, timeline))
+                else:
+                    if mode in {"group", "ungroup"}:
+                        builder = regroup_first_documents if mode == "group" else annotation_group_documents
+                        layout, timeline = builder(nested=True, portrait=portrait)
+                        moments = (5999, 6000, 6500, 6750, 7999)
+                    else:
+                        shell = "annotation-group" if mode == "note-after-exit" else "target-group"
+                        layout, timeline = annotation_group_documents(shell, 8250, 8700, portrait=portrait)
+                        append_target(timeline, "annotation-leader", "exit", 8000, 8250)
+                        moments = (7999, 8125, 8250, 8699, 8700)
+                    timeline["layout_sha256"] = digest(layout)
+                    original = deepcopy((layout, timeline))
+                    context, replay, camera = consumer_clock(layout, timeline)
+                    origin_y = row_index * 360
+                profile = layout["output_profile"]["profile_id"]
+                label = profile + " / authored note then pointer" if kind == "annotation" else f"{mode} / {profile}"
+                labels.text((10, origin_y + 4), label, fill="white")
+                for column, moment in enumerate(moments):
+                    if kind == "annotation":
+                        raw = compose_png_frame(layout, timeline, moment).png
+                        compose_png_frame(layout, timeline, 7999)
+                        repeated = compose_png_frame(layout, timeline, moment).png
+                        frame_row = {"profile": profile, "at_ms": moment, "sha256": sha256(raw).hexdigest()}
+                    else:
+                        svg = private_svg(context, replay, camera, moment)
+                        raw = _rasterize_svg_frame(context.layout, svg).png
+                        private_svg(context, replay, camera, 9000)
+                        repeated = _rasterize_svg_frame(context.layout, private_svg(context, replay, camera, moment)).png
+                        frame_row = {"mode": mode, "profile": profile, "at_ms": moment,
+                            "layout_sha256": digest(layout), "timeline_sha256": digest(timeline),
+                            "svg_sha256": sha256(svg.svg.encode("utf-8")).hexdigest(), "png_sha256": sha256(raw).hexdigest()}
+                    pixels_match = raw == repeated
+                    assert pixels_match, f"Retained {kind} random seek differs at {moment}"
+                    index = len(corpus["frames"])
+                    assert frame_row == expected["frames"][index], f"Retained {kind} frame {index} differs"
+                    frame_path = destination / f"{stem}-{index:02d}.png"
+                    frame_path.write_bytes(raw)
+                    corpus["frames"].append(frame_row)
+                    corpus["frame_paths"].append(str(frame_path))
+                    with Image.open(BytesIO(raw)) as image:
+                        frame = image.convert("RGB")
+                    if kind == "annotation":
+                        frame = frame.resize((224, 398) if portrait else (384, 216))
+                        x = column * 384
+                    else:
+                        frame.thumbnail((384, 320), Image.Resampling.LANCZOS)
+                        x = column * 400
+                    sheet.paste(frame, (x, origin_y + 35))
+                    labels.text((x + 10, origin_y + 20), f"{moment} ms", fill="white")
+                assert (layout, timeline) == original, f"Retained {kind} inputs changed"
+            assert corpus["frames"] == expected["frames"]
+            sheet_path = destination / (stem + ".png")
+            sheet.save(sheet_path)
+            sheet_sha = sha256(sheet_path.read_bytes()).hexdigest()
+            assert sheet_sha == expected["contact_sheet_sha256"], f"Retained {kind} contact sheet differs"
+            corpus.update(contact_sheet_path=str(sheet_path), contact_sheet_sha256=sheet_sha)
+            corpora.append(corpus)
+    assert all(sha256((baseline_dir / name).read_bytes()).hexdigest() == value for name, value in pins.items())
+    assert sum(len(corpus["frames"]) for corpus in corpora) == 50
+    return {"case_id": "retained-50-annotation-group", "family": "retained-baselines", "frame_count": 50,
+        "final_acceptance": False, "network_forbidden": True, "random_seek_parity": True,
+        "immutable_input_keys_unchanged": True, "original_baselines_unchanged": True,
+        "baseline_file_sha256": pins, "corpora": corpora,
+        "origins_before": origins_before, "origins_after": verify_import_origins(),
+        "historical_scope_qualification": "The original public Group closed scope and rejection assertion are obsolete; "
+            "current proof preserves the original private consumer, ordered rows and exact pixels, not that assertion."}
+
+
 def write_report(output_dir: Path, cases: list[dict], *, diagnostic: str | None = None) -> int:
     """Retain measured evidence without silently upgrading a partial proof."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -365,11 +579,17 @@ def main(argv=None) -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--diagnostic-family", choices=(
         "geometry", "text-list", "code", "callout", "chart", "media", "visual", "container", "evidence", "connector",
-        "visual-state", "aperture", "registry"))
+        "visual-state", "aperture", "registry", "history", "retained-baselines", "cold-count"))
     args = parser.parse_args(argv)
     verify_import_origins()
     cases = []
-    if args.diagnostic_family == "geometry":
+    if args.diagnostic_family == "retained-baselines":
+        cases.append(retained_frames_case(args.output_dir))
+    elif args.diagnostic_family == "cold-count":
+        from test_v2_split_cold_count import cold_count_case
+
+        cases.extend(cold_count_case(args.output_dir, portrait) for portrait in (False, True))
+    elif args.diagnostic_family == "geometry":
         for portrait in (False, True):
             for kind in GEOMETRY_KINDS:
                 for mode in ("draw", "reveal", "enter"):
@@ -420,6 +640,11 @@ def main(argv=None) -> int:
         for portrait in (False, True):
             for owner, mode in REGISTRY_ROLES:
                 cases.append(registry_case(args.output_dir, portrait, owner, mode))
+    elif args.diagnostic_family == "history":
+        for portrait in (False, True):
+            for kind in HISTORY_KINDS:
+                for reverse_objects in (False, True):
+                    cases.append(history_case(args.output_dir, portrait, kind, reverse_objects=reverse_objects))
     elif args.diagnostic_family == "container":
         for portrait in (False, True):
             for kind in CONTAINER_KINDS:

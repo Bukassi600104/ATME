@@ -763,7 +763,8 @@ def replay_chronology(objects: dict, hierarchy: HierarchySnapshot, frames: dict,
             paired = _validate_pair_static(split_layout, split_timeline,
                 (_split_context.layout_sha256 if _split_context.layout_sha256 is not None
                  else _split_packet_digest(split_layout.model_dump(mode="json"))), hierarchy,
-                structural_timeline=structural_timeline, registry_inputs=_split_context.registry_inputs)
+                structural_timeline=structural_timeline, registry_inputs=_split_context.registry_inputs,
+                split_inputs=_split_context.split_inputs)
             if {key: row.state_version for key, row in paired.initial.items()} != state_versions:
                 raise ReplayError("Split lifecycle timeline differs from the actual initial versions")
     _validate_operators(actions, _split_context)
@@ -813,7 +814,8 @@ def replay_chronology(objects: dict, hierarchy: HierarchySnapshot, frames: dict,
             if isinstance(action, SplitAction):
                 before = ReplaySample(time, _ordered(sample), tuple(sorted(versions.items())), hierarchy)
                 active[index] = _capture_split_observed(split_layout, before, actions, index, count_origins,
-                                                       _split_context.asset_bytes, lifecycle_timeline=split_timeline)
+                                                       _split_context.asset_bytes, lifecycle_timeline=split_timeline,
+                                                       split_inputs=_split_context.split_inputs)
                 checkpoint = ReplayCheckpoint(time, _ordered(committed), tuple(sorted(versions.items())),
                                               hierarchy, tuple(active[key] for key in sorted(active)))
                 if checkpoints[-1].at_ms == time:
@@ -936,7 +938,8 @@ def replay_chronology(objects: dict, hierarchy: HierarchySnapshot, frames: dict,
     return replay
 
 
-def _capture_split_observed(layout, before, actions, index, origins, asset_bytes, *, lifecycle_timeline=None):
+def _capture_split_observed(layout, before, actions, index, origins, asset_bytes, *, lifecycle_timeline=None,
+                             split_inputs=None):
     from atme.render.v2_split import (
         CapturedSplitAction,
         _AttributedSplitCapture,
@@ -946,7 +949,9 @@ def _capture_split_observed(layout, before, actions, index, origins, asset_bytes
     )
 
     owner = actions[index]
-    capture = _capture_split(owner, layout, before, asset_bytes, tuple(origins[key] for key in sorted(origins)))
+    args = (owner, layout, before, asset_bytes, tuple(origins[key] for key in sorted(origins)))
+    capture = (_capture_split(*args) if split_inputs is None
+               else _capture_split(*args, split_inputs=split_inputs))
     if (capture.start_ms, capture.end_ms) != (owner.start_ms, owner.end_ms):
         raise ReplayError("Split capture interval differs from verified owner")
     _require_proven_history_relationships(capture, owner, actions,

@@ -1096,7 +1096,8 @@ def _split_focus_bounds(capture, layout, timeline, replay, inputs, camera_action
     registry = registry_endpoint_inputs_for_objects(authored, frozen_files=resources[2])
     paired = _validate_pair_static(layout, timeline,
         layout_sha256 if layout_sha256 is not None else sha256(_json(layout.model_dump(mode="json")).encode()).hexdigest(),
-        replay.checkpoints[0].hierarchy, registry_inputs=registry, structural_timeline=structural_timeline)
+        replay.checkpoints[0].hierarchy, registry_inputs=registry, structural_timeline=structural_timeline,
+        split_inputs=inputs)
     recorded = {row.resolved_index: row for checkpoint in replay.checkpoints for row in checkpoint.active}
     if (replay.duration_ms != timeline.duration_ms
             or tuple(recorded[key].resolved for key in sorted(recorded)) != tuple(timeline.actions)

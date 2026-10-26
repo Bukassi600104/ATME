@@ -372,7 +372,7 @@ class _PairContext:
 
 
 def _validate_static_action(item, layout, timeline, objects, mask_sources, managed_connectors,
-                            connector_endpoints) -> None:
+                            connector_endpoints, *, split_inputs=None) -> None:
     """Operator form/binding checks must precede construction of its replay."""
     action = item.action
     if isinstance(action, GroupAction) and action.container_id is not None:
@@ -460,7 +460,7 @@ def _validate_static_action(item, layout, timeline, objects, mask_sources, manag
                    and item.end_ms <= a.end_ms for a in layout.activations):
             raise V2FrameError(f"count {action.action_id} needs one active board")
         try:
-            validate_count_glyphs(obj, action.count_policy, layout)
+            validate_count_glyphs(obj, action.count_policy, layout, split_inputs=split_inputs)
         except ValueError as exc:
             raise V2FrameError(str(exc)) from exc
         return
@@ -525,7 +525,7 @@ def _validate_static_action(item, layout, timeline, objects, mask_sources, manag
 def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
                    layout_sha256: str, hierarchy: HierarchySnapshot,
                    *, structural_timeline: ResolvedVisualTimelineV2 | None = None,
-                   registry_inputs=None) -> _PairContext:
+                   registry_inputs=None, split_inputs=None) -> _PairContext:
     if (layout.project_id != timeline.project_id or layout.layout_id != timeline.layout_id
             or layout.plan_id != timeline.plan_id or layout.plan_revision != timeline.plan_revision
             or layout.plan_sha256 != timeline.plan_sha256
@@ -798,7 +798,7 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
             except ValueError as exc:
                 raise V2FrameError(str(exc)) from exc
         _validate_static_action(item, layout, timeline, layout_objects, mask_sources,
-                                managed_connectors, connector_endpoints)
+                                managed_connectors, connector_endpoints, split_inputs=split_inputs)
         if isinstance(action, TargetAction) and action.annotation_policy is not None:
             participants = set(action.target_ids) | set(_annotation_object_ids(action))
             # Parentage is temporal. Only direct participants and whole-board
@@ -1271,10 +1271,11 @@ def validate_resolved_return_history(layout: ExecutableLayoutV2, timeline: Resol
     # All static and temporal consumer scans share this same resolved-order slice.
     context = _validate_pair_static(layout, causal_timeline, layout_sha256, hierarchy,
                                     structural_timeline=timeline if return_indices else None,
-                                    registry_inputs=registry_inputs)
+                                    registry_inputs=registry_inputs, split_inputs=split_inputs)
     replay, _ = _validate_consumer_history(context, split_inputs=split_inputs)
     if has_split and len(causal_actions) != len(timeline.actions):
-        full = _validate_pair_static(layout, timeline, layout_sha256, hierarchy, registry_inputs=registry_inputs)
+        full = _validate_pair_static(layout, timeline, layout_sha256, hierarchy,
+                                    registry_inputs=registry_inputs, split_inputs=split_inputs)
         replay, _ = _validate_consumer_history(full, split_inputs=split_inputs)
     if has_split:
         from atme.render.v2_split import CapturedSplitAction, _AttributedSplitCapture

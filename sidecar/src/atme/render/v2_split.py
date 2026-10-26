@@ -284,7 +284,8 @@ def capture_split(resolved: ResolvedAction, layout: ExecutableLayoutV2, before: 
     return _capture_split(resolved, layout, before, asset_bytes, ())
 
 
-def _capture_split(resolved, layout, before, asset_bytes, count_origins: tuple[_SplitCountOrigin, ...]):
+def _capture_split(resolved, layout, before, asset_bytes, count_origins: tuple[_SplitCountOrigin, ...],
+                   *, split_inputs=None):
     """Trusted history is produced only by the private chronology capture hook."""
     # Reparse mutable contract inputs; callers cannot bypass checks with model_copy.
     resolved = ResolvedAction.model_validate(_stored_value(resolved))
@@ -304,7 +305,12 @@ def _capture_split(resolved, layout, before, asset_bytes, count_origins: tuple[_
     logical_owners = _split_logical_write_owners(policy)
     if not logical_owners and any(row.kind == "annotation_anchor" for row in policy.source_basis.read_dependencies):
         raise ValueError("Split annotation dependencies require retained chronology context")
-    resolve_contract_bundle(layout.style_system_version, layout.asset_registry_version)
+    if split_inputs is None:
+        resolve_contract_bundle(layout.style_system_version, layout.asset_registry_version)
+    else:
+        from atme.render.v2_split_paint import _checked_split_resources
+
+        _checked_split_resources(layout, split_inputs)
     if not any(window.board_id == action.board_id and window.start_ms <= resolved.start_ms
                and resolved.end_ms <= window.end_ms for window in layout.activations):
         raise ValueError("Split must fit one actual active-board window")
