@@ -579,10 +579,24 @@ def main(argv=None) -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--diagnostic-family", choices=(
         "geometry", "text-list", "code", "callout", "chart", "media", "visual", "container", "evidence", "connector",
-        "visual-state", "aperture", "registry", "history", "retained-baselines", "cold-count"))
+        "visual-state", "aperture", "registry", "history", "retained-baselines", "cold-count", "project-flows"))
+    parser.add_argument("--source-video", type=Path, help="Local recording for project-flows diagnostics")
     args = parser.parse_args(argv)
     verify_import_origins()
     cases = []
+    if args.diagnostic_family == "project-flows":
+        if args.source_video is None:
+            parser.error("--source-video is required for project-flows")
+        from test_v2_split_project_flows import (
+            PROJECT_FLOW_KINDS,
+            project_flow_case,
+            project_flow_report,
+        )
+
+        video = args.source_video.read_bytes()
+        cases = [project_flow_case(args.output_dir, portrait, kind, video)
+                 for kind in PROJECT_FLOW_KINDS for portrait in (False, True)]
+        return project_flow_report(args.output_dir, cases)
     if args.diagnostic_family == "retained-baselines":
         cases.append(retained_frames_case(args.output_dir))
     elif args.diagnostic_family == "cold-count":
