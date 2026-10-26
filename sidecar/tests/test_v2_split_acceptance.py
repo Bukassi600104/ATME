@@ -1520,3 +1520,40 @@ def test_split_retained_baselines_cli_routes_explicit_output(tmp_path, monkeypat
     monkeypatch.setattr(benchmark, "write_report", report)
     assert benchmark.main(["--output-dir", str(tmp_path), "--diagnostic-family", "retained-baselines"]) == 0
     assert calls == [tmp_path]
+
+
+def test_split_project_flow_cli_requires_source_video(tmp_path, capsys):
+    with pytest.raises(SystemExit) as error:
+        split_benchmark().main(["--output-dir", str(tmp_path), "--diagnostic-family", "project-flows"])
+    assert error.value.code == 2
+    assert "--source-video is required" in capsys.readouterr().err
+    assert not list(tmp_path.iterdir())
+
+
+def test_split_project_flow_cli_routes_exact_video_to_closed_ten_cases(tmp_path, monkeypatch):
+    benchmark = split_benchmark()
+    source = tmp_path / "original.mp4"
+    video = b"exact local recording bytes for CLI routing only"
+    source.write_bytes(video)
+    helper = types.ModuleType("test_v2_split_project_flows")
+    helper.__file__ = str(benchmark.ROOT / "sidecar/tests/test_v2_split_project_flows.py")
+    helper.PROJECT_FLOW_KINDS = ("geometry", "count-group", "group-count", "morph", "descendants")
+    calls = []
+
+    def case(directory, portrait, kind, recording):
+        assert directory == tmp_path and recording == video
+        calls.append((kind, portrait))
+        return {"kind": kind, "portrait": portrait, "final_acceptance": False}
+
+    def report(directory, cases):
+        assert directory == tmp_path
+        assert [(row["kind"], row["portrait"]) for row in cases] == calls
+        assert len(cases) == 10 and all(row["final_acceptance"] is False for row in cases)
+        return 7
+
+    helper.project_flow_case, helper.project_flow_report = case, report
+    monkeypatch.setitem(sys.modules, helper.__name__, helper)
+    assert benchmark.main(["--output-dir", str(tmp_path), "--diagnostic-family", "project-flows",
+                           "--source-video", str(source)]) == 7
+    assert calls == [(kind, portrait) for kind in helper.PROJECT_FLOW_KINDS for portrait in (False, True)]
+    assert source.read_bytes() == video
