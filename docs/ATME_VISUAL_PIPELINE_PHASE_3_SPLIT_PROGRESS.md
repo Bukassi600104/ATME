@@ -4,7 +4,16 @@ This is supporting evidence, not a second completion ledger. Status and scoring 
 
 
 
-## 2026-10-29 UTC — Exact737 interrupted; partial contract failure preserved
+## 2026-10-30 local — Bounded repair accepted; fresh742 gate under verification
+
+Current Task11 checkpoint, **2026-10-30 local (29 October UTC)**: the bounded bare-Split admission-order repair has independent source/custody **PASS A9B61AA5**, with **83 passed / 0 failed / 0 skipped** on the final frozen bytes. Root verification F773ED54 authenticates all249 stage reports, exact IDs, current9 owned/907 protected files and consumed helpers. The94 real native input/output hash pairs support owning in-memory SVG/PNG assertions; no94 persisted image pairs are claimed. Scoped lint is clean. Private paint validation, schemas, legacy loadability, policy-bearing authority, invalid-input rejection and non-Split paths remain unchanged. This is bounded repair acceptance only, with no Phase3 status or score promotion.
+
+One fresh **742-case candidate gate is live**, preserving the original737 IDs in exact order and appending only the five D460 regression controls. These tests clarify existing R-13/15 unsupported-action/public-parity obligations; they add no visual family, primitive, action, ledger item or acceptance condition. BeforeBF24B415/order76E23AEC bind the same source9 and helpers; original session26471/realpytest35240 was independently verified by creation time, parent and image. There is no candidate terminal or acceptance claim. The next boundary is actual742 completion and independent terminal review, then exact nine-file commit/integration and the mandatory final integrated full suite. No rerun or source edit is authorized merely because output is quiet.
+
+The previous737 interruption remains cause-unknown; the separately reproduced test failure does not explain process loss or exonerate the prior native fault. P3-46, Windows protection skips, incomplete private contexts, final admission and later production/installed/human gates remain unchanged. Recovery integrity is accepted separately for825 commit identities and the frozen nine-file source overlay (C2FC34AE/3A74987C); the unpublished draft excludes runtime/private/user/project artifacts from the overlay. Fixed79 rows, all statuses and exact5250/7900=66.5% remain unchanged.
+
+## 2026-10-29 UTC — Previous exact737 interruption and partial contract failure
+
 
 Fresh process observations85c565/c2de0f and receipt7C2E9AC1 find allsix original roles absent. Retained diagnostics7352b9 have510 call reports:509 passed/1 failed/0 skipped, with the sole failed call `tests/test_v2_split_contract.py::test_split_public_evaluator_remains_unavailable[True]`. The next canonical persisted-evidence boundary2 test has setup only. Session finish, JUnit, launcher exit and supervisor final record are missing. Actual exits and interruption cause remain unobserved/UNKNOWN; host boot date alone establishes no cause. No retry, product edit or candidate integration occurred. Same-worker interruption custody and the existing independent disposition are pending; the next eligible investigation is read-only tracing of the reported bare-action failure. Zero aggregate acceptance credit; fixed79/5250=66.5%,0A/65RP/5I/3IP/1B/5NS unchanged.
 
