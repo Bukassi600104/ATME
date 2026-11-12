@@ -15,16 +15,14 @@ from __future__ import annotations
 
 import io
 import logging
-import os
-import shutil
 import subprocess
-import sys
 import time
 from collections import OrderedDict
 from pathlib import Path
 
 from PIL import Image
 
+from atme.ffmpeg import find_ffmpeg
 from atme.render.camera import validate_camera_intent, viewbox_at
 from atme.render.svg_builder import element_group, element_stroke_info, frame_svg
 from atme.render.visibility import validate_visibility, visible_elements
@@ -34,26 +32,6 @@ log = logging.getLogger(__name__)
 MIN_DRAW_MS = 250
 MAX_DRAW_MS = 800
 PAPER = "#FAF9F5"
-
-
-def find_ffmpeg() -> str | None:
-    exe = os.environ.get("ATME_FFMPEG") or shutil.which("ffmpeg")
-    if exe:
-        return exe
-    if getattr(sys, "frozen", False):  # PyInstaller: check beside exe, then Tauri resource dir
-        exe_dir = Path(sys.executable).parent
-        for candidate in (exe_dir / "ffmpeg.exe",
-                          exe_dir / "ffmpeg" / "ffmpeg.exe",
-                          exe_dir / "_internal" / "ffmpeg" / "ffmpeg.exe"):
-            if candidate.exists():
-                return str(candidate)
-    root = os.environ.get("LOCALAPPDATA", "")
-    if root:
-        for cand in sorted(Path(root).glob("Microsoft/WinGet/Packages/Gyan.FFmpeg*")):
-            hits = list(cand.rglob("bin/ffmpeg.exe")) or list(cand.rglob("ffmpeg.exe"))
-            if hits:
-                return str(hits[0])
-    return None
 
 
 def build_draw_windows(elements: list[dict]) -> dict[str, int]:

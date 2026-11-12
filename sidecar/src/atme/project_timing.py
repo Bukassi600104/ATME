@@ -5,7 +5,6 @@ import hashlib
 import json
 import os
 import shutil
-import threading
 import time
 from pathlib import Path
 from uuid import uuid4
@@ -67,6 +66,7 @@ class ProjectTiming:
             media_metadata = json.loads(media["metadata"])
             parent = self.service.store.db_path.resolve().parent
             media_path, timing_metadata, _ = timing_audio(self.service, project_id)
+            self.service._expected(self.service._row(project_id), expected_revision)
             identity = {"contract_version": "1", "project_id": project_id,
                         "project_revision": expected_revision, "mode": source["mode"],
                         "media_revision": media["revision"], "media_id": media["media_id"],
@@ -104,46 +104,17 @@ class ProjectTiming:
 
     def request(self, project_id, expected_revision):
         snapshot = self._snapshot(project_id, expected_revision)
-        run_id = snapshot["source_fingerprint"][:24]
-        now = time.time()
-        with self.service.store._lock:
-            conn = self.service.store.conn
-            try:
-                conn.execute("BEGIN IMMEDIATE")
-                existing = conn.execute(
-                    "SELECT status FROM project_timing_runs WHERE job_id=? AND run_id=?",
-                    (project_id, run_id)).fetchone()
-                if existing and existing["status"] in ("queued", "running", "done"):
-                    conn.commit()
-                    return self.status(project_id, run_id)
-                conn.execute(
-                    "INSERT INTO project_timing_runs VALUES(?,?,?,?,?,?,?,?,?) "
-                    "ON CONFLICT(job_id,run_id) DO UPDATE SET status='queued',document=NULL,error=NULL,updated_at=excluded.updated_at",
-                    (project_id, run_id, expected_revision, snapshot["source_fingerprint"],
-                     "queued", None, None, now, now))
-                conn.commit()
-            except Exception:
-                conn.rollback()
-                raise
-        worker = threading.Thread(target=_background_prepare,
-            args=(self.service.store.db_path, project_id, expected_revision, snapshot),
-            name=f"atme-timing-{project_id}-{run_id}", daemon=False)
-        self._workers[run_id] = worker
-        worker.start()
-        return self.status(project_id, run_id)
+        from atme.project_workers import submit
+        return submit(self, "timing", project_id, expected_revision, snapshot,
+                      lambda: _background_prepare(self.service.store.db_path, project_id, expected_revision, snapshot),
+                      True)
 
     def prepare(self, project_id, expected_revision):
+        from atme.project_workers import submit
         snapshot = self._snapshot(project_id, expected_revision)
         run_id = snapshot["source_fingerprint"][:24]
-        now = time.time()
-        with self.service.store._lock:
-            self.service.store.conn.execute(
-                "INSERT INTO project_timing_runs VALUES(?,?,?,?,?,?,?,?,?) "
-                "ON CONFLICT(job_id,run_id) DO UPDATE SET status='running',document=NULL,error=NULL,updated_at=excluded.updated_at",
-                (project_id, run_id, expected_revision, snapshot["source_fingerprint"],
-                 "running", None, None, now, now))
-            self.service.store.conn.commit()
-        return self._execute(snapshot, project_id, expected_revision, run_id)
+        return submit(self, "timing", project_id, expected_revision, snapshot,
+                      lambda: self._execute(snapshot, project_id, expected_revision, run_id), False)
 
     def _execute(self, snapshot, project_id, expected_revision, run_id):
         root = Path(snapshot["runtime_dir"])
@@ -218,6 +189,10 @@ class ProjectTiming:
                 "FROM project_timing_runs WHERE job_id=? AND run_id=?", (project_id, run_id)).fetchone()
             if row is None:
                 raise ProjectError("not_found", "Timing run does not exist")
+            if row["status"] in ("queued", "running"):
+                from atme.project_workers import mark_interrupted
+                if mark_interrupted(self.service.store, "timing", project_id, run_id):
+                    return self.status(project_id, run_id)
             result = {"project_id": project_id, "run_id": run_id,
                       "project_revision": row["project_revision"], "status": row["status"],
                       "current_project_revision": current["revision"],
@@ -248,10 +223,7 @@ def _background_prepare(database, project_id, expected_revision, snapshot):
             store.conn.execute("UPDATE project_timing_runs SET status='running',updated_at=? "
                                "WHERE job_id=? AND run_id=?", (time.time(), project_id, run_id))
             store.conn.commit()
-        try:
-            timing._execute(snapshot, project_id, expected_revision, run_id)
-        except ProjectError:
-            pass
+        timing._execute(snapshot, project_id, expected_revision, run_id)
     finally:
         store.close()
 

@@ -87,6 +87,6 @@ def test_new_write_stores_exact_group_and_ungroup_a_b_a_receipts_with_public_pix
         duplicate_frame = service.runner.preview_v2_source(copy["project_id"], copy["revision"], 7000)
         assert frame["png"] == duplicate_frame["png"]
         assert (frame["width"], frame["height"]) == (1280, 720)
-        assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1"]
+        assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1", "2.0.0"]
     finally:
         service.store.close()

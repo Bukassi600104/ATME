@@ -4,9 +4,10 @@ from uuid import uuid4
 
 from fastapi import Depends, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 
 from atme.mcp_activity import McpActivity
-from atme.media_delivery import ticket_response
+from atme.media_delivery import render_ticket, ticket_response
 from atme.project_service import ProjectError, ProjectService
 
 
@@ -168,7 +169,7 @@ def register_projects(app, store, auth):
     @app.post("/projects/{project_id}/playback-ticket", dependencies=[Depends(auth)])
     async def playback_ticket(project_id: int, request: Request):
         value = await body(request, ("expected_revision", "media_id", "cleaned"))
-        return call(service.playback_ticket, project_id, value["expected_revision"],
+        return await run_in_threadpool(call, service.playback_ticket, project_id, value["expected_revision"],
                     value["media_id"], value["cleaned"])
 
     @app.get("/media-playback/{ticket}")
@@ -301,7 +302,7 @@ def register_projects(app, store, auth):
     @app.post("/projects/{project_id}/timing", dependencies=[Depends(auth)])
     async def prepare_timing(project_id: int, request: Request):
         value = await body(request, ("expected_revision",))
-        return call(service.prepare_timing, project_id, value["expected_revision"])
+        return await run_in_threadpool(call, service.prepare_timing, project_id, value["expected_revision"])
 
     @app.get("/projects/{project_id}/timing/{run_id}", dependencies=[Depends(auth)])
     def timing_status(project_id: int, run_id: str):
@@ -316,7 +317,7 @@ def register_projects(app, store, auth):
     @app.post("/projects/{project_id}/renders", dependencies=[Depends(auth)])
     async def render(project_id: int, request: Request):
         value = await body(request, ("expected_revision", "confirmed"))
-        return call(service.render_project, project_id, value["expected_revision"], value["confirmed"])
+        return await run_in_threadpool(call, service.render_project, project_id, value["expected_revision"], value["confirmed"])
 
     @app.get("/projects/{project_id}/renders", dependencies=[Depends(auth)])
     def list_renders(project_id: int):
@@ -325,6 +326,10 @@ def register_projects(app, store, auth):
     @app.get("/projects/{project_id}/renders/{run_id}", dependencies=[Depends(auth)])
     def render_status(project_id: int, run_id: str):
         return call(service.render_status, project_id, run_id)
+
+    @app.post("/projects/{project_id}/renders/{run_id}/playback-ticket", dependencies=[Depends(auth)])
+    def render_playback_ticket(project_id: int, run_id: str):
+        return call(render_ticket, service, project_id, run_id)
 
     @app.get("/projects/{project_id}/renders/{run_id}/output", dependencies=[Depends(auth)])
     def render_output(project_id: int, run_id: str):
@@ -337,7 +342,9 @@ def register_projects(app, store, auth):
         if state["revision"] != expected_revision:
             raise HTTPException(409, {"code": "revision_conflict", "message": "Project changed; reload before exporting"})
         from atme.timeline_media import materialize_video
-        path, _metadata, _timeline = materialize_video(service, project_id)
+        path, _metadata, _timeline = call(materialize_video, service, project_id, True)
+        with service.store._lock:
+            call(service._expected, service._row(project_id), expected_revision)
         return FileResponse(path, media_type="video/mp4", filename=f"ATME-project-{project_id}-timeline.mp4")
 
     @app.post("/projects/{project_id}/media/wav", dependencies=[Depends(auth)])
@@ -349,7 +356,7 @@ def register_projects(app, store, auth):
             raw.extend(chunk)
             if len(raw) > MAX_MEDIA_BYTES:
                 raise HTTPException(413, {"code": "too_large", "message": "WAV exceeds 64 MiB"})
-        return call(service.attach_wav, project_id, raw, expected_revision, x_filename)
+        return await run_in_threadpool(call, service.attach_wav, project_id, raw, expected_revision, x_filename)
 
     @app.post("/projects/{project_id}/media/video", dependencies=[Depends(auth)])
     async def attach_video(project_id: int, expected_revision: int, request: Request,
@@ -375,7 +382,7 @@ def register_projects(app, store, auth):
                     if received > MAX_VIDEO_BYTES:
                         raise HTTPException(413, {"code": "too_large", "message": "Video exceeds 1 GiB"})
                     output.write(chunk)
-            return call(service.attach_video_file, project_id, staged, x_filename, expected_revision)
+            return await run_in_threadpool(call, service.attach_video_file, project_id, staged, x_filename, expected_revision)
         finally:
             staged.unlink(missing_ok=True)
 

@@ -87,12 +87,14 @@ def attach_video_file(service, project_id, staged_file, filename, expected_revis
     decoded_pending = directory / ("." + media_id + ".timing.pending.wav")
     from atme.render.animator import find_ffmpeg
     command = [find_ffmpeg(), "-y", "-hide_banner", "-v", "error", "-i", str(staged),
-               "-vn", "-ac", "1", "-ar", "24000", "-c:a", "pcm_s16le", str(decoded_pending)]
-    result = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                            text=True, check=False)
-    if result.returncode != 0 or not decoded_pending.is_file():
+               "-vn", "-ac", "1", "-ar", "24000", "-c:a", "pcm_s16le", str(decoded_pending),
+               "-map", "0:V:0", "-frames:v", "1", "-vf", "scale=1:1", "-pix_fmt", "gray",
+               "-f", "rawvideo", "pipe:1"]
+    # The one decoded pixel excludes audio-only containers and attached cover art.
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+    if result.returncode != 0 or len(result.stdout) != 1 or not decoded_pending.is_file():
         decoded_pending.unlink(missing_ok=True)
-        raise ProjectError("invalid_media", "Video must contain a decodable audio track")
+        raise ProjectError("invalid_media", "Video must contain a decodable video track and audio track")
     try:
         with wave.open(str(decoded_pending), "rb") as audio:
             frames, rate = audio.getnframes(), audio.getframerate()

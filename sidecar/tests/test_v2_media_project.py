@@ -480,7 +480,7 @@ def test_stored_original_media_project_duplicate_and_offline_moving_pixels(
             png = _rasterize_svg_frame(typed, frame, split_inputs=inputs).png
             assert png == expected[at]
             (tmp_path / f"frozen-media-{kind}-{portrait}-{at}.png").write_bytes(png)
-        assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1"]
+        assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1", "2.0.0"]
     finally:
         service.store.close()
 

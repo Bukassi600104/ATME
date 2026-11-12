@@ -281,7 +281,7 @@ def test_real_duplicate_rebind_preserves_receipt_and_public_offline_return_pixel
             frame = service.runner.preview_v2_source(current["project_id"], current["revision"], 9000)
             assert frame["png"] == pixels[0][9000]
             assert (frame["width"], frame["height"]) == ((720, 1280) if portrait else (1280, 720))
-        assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1"]
+        assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1", "2.0.0"]
         assert {kind: service.artifact(pid, kind) for kind in originals} == originals
         assert service.source_timeline.get(pid) == source
     finally:

@@ -144,11 +144,14 @@ class ProjectService:
         return {"schema_version": "1", "api_keys_required": False,
                 "visual_contracts": {
                     "authoring_versions": ["1", "2.0.0"],
-                    "renderer_versions": ["1"],
+                    "renderer_versions": ["1", "2.0.0"],
                     "active_renderer_version": "1",
-                    "v2_render_status": "implementation_pending",
+                    "v2_render_status": "stored_resolved_timeline",
+                    "v2_export_audio": "mastered_narration",
+                    "v2_export_profiles_fps": 30,
+                    "v2_export_limits": ["authored_sound_mix"],
                 },
-                "artifact_kinds": ["brief", "script", "storyboard", "layout"],
+                "artifact_kinds": ["brief", "script", "storyboard", "layout", "resolved_timeline"],
                 "output_profiles": list(PROFILES),
                 "operations": ["create_project", "open_project", "list_projects", "duplicate_project", "archive_project",
                                "get_schema", "write_artifact", "get_artifact", "approve_script",
@@ -172,7 +175,7 @@ class ProjectService:
                                      "max_bytes": 8388608,
                                      "format": "strict_png",
                                      "provenance": "externally_declared_not_internally_researched",
-                                     "v2_renderer_available": False},
+                                     "v2_renderer_available": True},
                 "semantic_authority": {
                     "script_authority": "approved_external_script",
                     "recording_authority": "user_recording",
@@ -840,6 +843,7 @@ class ProjectService:
                         or stored["sha256"] != asset.checksum_sha256
                         or stored["bytes"] != asset.byte_length
                         or stored["media_type"] != asset.media_type
+                        or ("duration_ms" in stored and stored["duration_ms"] != asset.duration_ms)
                         or declared.duration_ms != asset.duration_ms):
                     raise ProjectError("invalid_artifact", "Sound asset differs from its owned immutable pins")
                 path, metadata = self.asset(project_id, asset.asset_id)

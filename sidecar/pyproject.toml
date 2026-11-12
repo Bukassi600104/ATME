@@ -20,7 +20,7 @@ dependencies = [
 dev = ["pytest>=8.2", "ruff>=0.4", "mypy>=1.10"]
 # The retired internal provider gateway remains only as migration-era source;
 # production dependencies and frozen builds contain no model-provider client.
-audio = ["numpy>=1.26", "soundfile>=0.12", "noisereduce>=3.0", "pedalboard>=0.9", "pyloudnorm>=0.1.1"]
+audio = ["numpy>=1.26", "soundfile>=0.12", "av>=11", "noisereduce>=3.0", "pedalboard>=0.9", "pyloudnorm>=0.1.1"]
 # resvg-py bundles its own native rasterizer (no GTK/cairo DLL hunt on Windows);
 # cairosvg kept as documented fallback only.
 render = ["resvg-py>=0.0.8", "pillow>=10.3", "numpy>=1.26", "regex>=2024.11"]

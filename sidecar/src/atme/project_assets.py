@@ -461,6 +461,13 @@ def attach_asset_file(service, project_id, staged_file, filename, expected_revis
     metadata = {"asset_id": asset_id, "name": safe_name, "format": extension[1:],
                 "media_type": media_type, "bytes": staged.stat().st_size,
                 "sha256": _sha256(staged), "role": "supporting_asset"}
+    from atme.audio.editorial import AUDIO_FORMATS, decode_sound
+
+    if extension in AUDIO_FORMATS:
+        try:
+            metadata["duration_ms"] = decode_sound(staged, file_format=AUDIO_FORMATS[extension])
+        except (ValueError, OSError, EOFError) as exc:
+            raise ProjectError("invalid_asset", "Supporting audio must contain a decodable audio stream") from exc
     parent = service.store.db_path.resolve().parent
     directory = (parent / "project-assets" / str(project_id)).resolve()
     if not directory.is_relative_to(parent):

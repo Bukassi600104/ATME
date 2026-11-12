@@ -10,15 +10,32 @@ from atme.project_service import ProjectError
 RECORDING_AUTHORITY_KINDS = frozenset({"audio-only", "video-only"})
 
 
+def selected_media_row(service, project_id, input_kind, timeline):
+    """Choose from the edited timeline before considering an unplaced recording."""
+    rows = service.store.conn.execute(
+        "SELECT m.media_id,m.revision,m.relative_path,m.metadata FROM project_source_media m "
+        "LEFT JOIN project_media_removals r ON r.job_id=m.job_id AND r.media_id=m.media_id "
+        "WHERE m.job_id=? AND r.media_id IS NULL ORDER BY m.revision DESC", (project_id,)).fetchall()
+    placed = timeline["document"]["clips"]
+    if placed:
+        by_id = {row["media_id"]: row for row in rows}
+        rows = [by_id[clip["media_id"]] for clip in placed if clip["media_id"] in by_id]
+    elif timeline["timeline_revision"] or input_kind in ("idea-first", "script-first"):
+        return None
+    if input_kind in ("idea-first", "script-first"):
+        return next(iter(rows), None)
+    kind = "video" if input_kind in ("video-only", "script+video") else "audio"
+    return next((row for row in rows if json.loads(row["metadata"])["kind"] == kind),
+                next(iter(rows), None))
+
+
 def describe(service, project_id):
     """Describe authority without confusing a derived transcript with its source."""
     with service.store._lock:
         row = service._row(project_id)
         recording_authority = row["input_kind"] in RECORDING_AUTHORITY_KINDS
-        media = service.store.conn.execute(
-            "SELECT m.media_id,m.revision,m.metadata FROM project_source_media m "
-            "LEFT JOIN project_media_removals r ON r.job_id=m.job_id AND r.media_id=m.media_id "
-            "WHERE m.job_id=? AND r.media_id IS NULL ORDER BY m.revision DESC LIMIT 1", (project_id,)).fetchone()
+        timeline = service.source_timeline.get(project_id)
+        media = selected_media_row(service, project_id, row["input_kind"], timeline)
         try:
             script = service.artifact(project_id, "script")
         except ProjectError:
@@ -36,7 +53,6 @@ def describe(service, project_id):
             script and row["approved_script_revision"] == script["revision"])
         timing_ready = media_compatible and (recording_authority or script_current_and_approved)
         structure_ready = script is not None
-        timeline = service.source_timeline.get(project_id)
         timing_duration = timeline["document"]["duration_ms"]
         # A declared narration source remains usable before the editor places it
         # on the timeline. Idea-first imports remain supporting media.

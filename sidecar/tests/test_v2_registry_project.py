@@ -91,7 +91,7 @@ def test_real_bound_project_and_duplicate_preserve_authority_and_offline_pixels(
             sample = v2_state._evaluate_frame_with_registry_inputs(copied_layout, copied_timeline, t, registry_inputs)
             frame = _compose_validated_svg_frame(typed, resolved, sample, {}, split_inputs=inputs)
             assert _rasterize_svg_frame(typed, frame, split_inputs=inputs).png == expected[t]
-        assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1"]
+        assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1", "2.0.0"]
     finally:
         service.store.close()
 

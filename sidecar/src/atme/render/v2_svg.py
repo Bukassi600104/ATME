@@ -861,7 +861,7 @@ def _annotation_paint_modes(bindings, at_ms):
 
 def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int,
                       asset_bytes: dict[str, bytes | VerifiedEvidenceBytes] | None = None,
-                      *, split_inputs=None) -> SVGFrame:
+                      *, split_inputs=None, paper_background=True) -> SVGFrame:
     """Draw supported objects in deterministic z order; never substitute boxes."""
     layout = ExecutableLayoutV2.model_validate(layout_document)
     timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
@@ -882,8 +882,10 @@ def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int
         if policy.leader_connector_id is not None
     }
     if split_inputs is None:
-        return _compose_validated_svg_frame(layout, timeline, snapshot, held_frames, asset_bytes)
-    return _compose_validated_svg_frame(layout, timeline, snapshot, held_frames, asset_bytes, split_inputs=split_inputs)
+        return _compose_validated_svg_frame(layout, timeline, snapshot, held_frames, asset_bytes,
+                                            paper_background=paper_background)
+    return _compose_validated_svg_frame(layout, timeline, snapshot, held_frames, asset_bytes,
+                                        split_inputs=split_inputs, paper_background=paper_background)
 
 
 def _prepare_project_rasters(layout, objects, states, actions, resolved_assets, asset_bytes, at_ms,
@@ -1012,7 +1014,7 @@ def _prepare_evidence_rasters(objects, resolved_assets, asset_bytes, evidence_tr
 def _compose_validated_svg_frame(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
                                  snapshot: FrameSnapshot, held_frames: dict[str | tuple[str, str], FrameSnapshot],
                                  asset_bytes: dict[str, bytes | VerifiedEvidenceBytes] | None = None,
-                                 *, split_inputs=None) -> SVGFrame:
+                                 *, split_inputs=None, paper_background=True) -> SVGFrame:
     """Pure paint from requested and held snapshots of the same proven history.
 
     This internal consumer does not admit an action or advertise a capability.
@@ -1148,7 +1150,7 @@ def _compose_validated_svg_frame(layout: ExecutableLayoutV2, timeline: ResolvedV
         media_rasters=media_rasters, media_view=media_view, paint_canvas=layout.canvas)
     paper = (f'<rect x="{_n(layout.canvas.x)}" y="{_n(layout.canvas.y)}" '
              f'width="{_n(layout.canvas.width)}" height="{_n(layout.canvas.height)}" '
-             f'fill="{style.colors["paper"]}"/>')
+             f'fill="{style.colors["paper"]}"/>') if paper_background else ""
     width, height = layout.output_profile.width, layout.output_profile.height
     viewport = snapshot.camera
     code_bundle = (_code_font_inputs(root, resources)
@@ -1367,7 +1369,7 @@ def _compose_object_tree(objects, states, paint_ordinals, style, root, scale_x,
 
 def compose_png_frame(layout_document: dict, timeline_document: dict, at_ms: int,
                       asset_bytes: dict[str, bytes | VerifiedEvidenceBytes] | None = None,
-                      *, split_inputs=None) -> PNGFrame:
+                      *, split_inputs=None, paper_background=True) -> PNGFrame:
     """Rasterize a supported frame with verified, pinned fonts and no system-font fallback."""
     layout = ExecutableLayoutV2.model_validate(layout_document)
     timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
@@ -1376,11 +1378,12 @@ def compose_png_frame(layout_document: dict, timeline_document: dict, at_ms: int
         from atme.render.v2_split_paint import _public_split_paint_inputs
 
         split_inputs = _public_split_paint_inputs(layout, split_inputs, asset_bytes)
-        frame = compose_svg_frame(layout_document, timeline_document, at_ms, asset_bytes, split_inputs=split_inputs)
+        frame = compose_svg_frame(layout_document, timeline_document, at_ms, asset_bytes,
+                                  split_inputs=split_inputs, paper_background=paper_background)
         return _rasterize_svg_frame(layout, frame, split_inputs=split_inputs)
     if split_inputs is not None:
         raise ValueError("Split authority requires a Split timeline")
-    frame = compose_svg_frame(layout_document, timeline_document, at_ms, asset_bytes)
+    frame = compose_svg_frame(layout_document, timeline_document, at_ms, asset_bytes, paper_background=paper_background)
     return _rasterize_svg_frame(ExecutableLayoutV2.model_validate(layout_document), frame)
 
 

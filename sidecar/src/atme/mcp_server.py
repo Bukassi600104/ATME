@@ -31,7 +31,7 @@ from atme.store.db import JobStore
 
 Id = Annotated[int, Field(strict=True, ge=1)]
 Revision = Annotated[int, Field(strict=True, ge=0)]
-Kind = Literal["brief", "script", "storyboard", "layout"]
+Kind = Literal["brief", "script", "storyboard", "layout", "resolved_timeline"]
 SchemaKind = Literal["brief", "script", "storyboard", "layout", "resolved_timeline", "migration_report"]
 SchemaVersion = Literal["1", "2.0.0"]
 MAX_RESOURCE_BYTES = 128 * 1024 * 1024
@@ -98,7 +98,7 @@ def create_mcp(service: ProjectService, activity: McpActivity | None = None):
 
     @server.tool(name="atme.get_schema", annotations=read)
     def get_schema(kind: SchemaKind, version: SchemaVersion = "1") -> CallToolResult:
-        """Read one explicit contract version; v2 authoring does not imply v2 render support."""
+        """Read one explicit contract version. Stored v2 preview and export use a validated resolved timeline."""
         return invoke(service.schema, kind, version, tool="atme.get_schema")
 
     @server.tool(name="atme.list_projects", annotations=read)

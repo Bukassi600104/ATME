@@ -1,11 +1,30 @@
 import hashlib
+import subprocess
 from copy import deepcopy
 
 import pytest
-from atme.project_service import ProjectError, ProjectService
-from atme.store.db import JobStore
 from test_external_inputs import external_payload
 from test_server_controls import _client, _wav_bytes
+
+from atme.project_service import ProjectError, ProjectService
+from atme.store.db import JobStore
+
+
+def test_audio_only_mp4_cannot_be_imported_as_video(tmp_path):
+    from atme.render.animator import find_ffmpeg
+
+    staged = tmp_path / "recording.mp4"
+    subprocess.run([find_ffmpeg(), "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
+                    "-c:a", "aac", str(staged)], check=True)
+    core = ProjectService(JobStore(tmp_path / "project.db"))
+    pid = core.create("Video project", "LONG_FORM_16_9", "video-only")["project_id"]
+    with pytest.raises(ProjectError, match="decodable video track"):
+        core.attach_video_file(pid, staged, staged.name, 0)
+    assert core.open(pid)["revision"] == 0
+    assert core.list_media(pid) == []
+    assert staged.is_file()
+    assert not any((tmp_path / "project-media" / str(pid)).iterdir())
+    core.store.close()
 
 
 def test_pcm_wav_is_retained_exactly_and_invalidates_old_plan(tmp_path):

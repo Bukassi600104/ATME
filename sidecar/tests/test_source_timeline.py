@@ -57,6 +57,34 @@ def test_source_cleanup_is_immutable_undoable_and_authoritative(tmp_path):
     core.store.close()
 
 
+def test_supporting_import_does_not_replace_placed_recording(tmp_path):
+    from atme.project_media import attach_video_file
+    core = ProjectService(JobStore(tmp_path / "authority.db"))
+    try:
+        pid = core.create("Narrated video", "LONG_FORM_16_9", "video-only")["project_id"]
+        video = attach_video_file(core, pid, video_file(tmp_path), "recording.mp4", 0)
+        placed = place(core, pid, video)
+        core.attach_wav(pid, silence_wav(), placed["project"]["revision"])
+        source = core.narrative_source(pid)
+        assert source["ready_for_timing"]
+        assert source["timing_authority"]["media"]["media_id"] == video["media"]["media_id"]
+        assert core.validate_project(pid)["selected_revisions"]["media"] == video["media"]["revision"]
+    finally:
+        core.store.close()
+
+
+def test_supporting_source_becomes_timing_authority_when_placed(tmp_path):
+    core = ProjectService(JobStore(tmp_path / "selection.db"))
+    try:
+        pid = core.create("Storyboard", "LONG_FORM_16_9", "idea-first")["project_id"]
+        wav = core.attach_wav(pid, silence_wav(), 0)
+        assert core.narrative_source(pid)["timing_authority"]["media"] is None
+        place(core, pid, wav)
+        assert core.narrative_source(pid)["timing_authority"]["media"]["media_id"] == wav["media"]["media_id"]
+    finally:
+        core.store.close()
+
+
 def test_waveform_levels_silence_and_safe_source_removal(tmp_path):
     core = ProjectService(JobStore(tmp_path / "analysis.db"))
     project = core.create("Evidence", "LONG_FORM_16_9", "audio-only")

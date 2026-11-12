@@ -1,9 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ATME",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "identifier": "dev.atme.engine",
   "build": {
+    "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist"
   },
   "app": {

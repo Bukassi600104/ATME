@@ -342,8 +342,10 @@ def test_schema_registry_dispatch_is_explicit_and_renderer_capability_truthful()
     assert ProjectService.schema("storyboard", "1")["properties"]["contract_version"]["const"] == "1"
     assert ProjectService.schema("storyboard", "2.0.0")["properties"]["contract_version"]["const"] == "2.0.0"
     assert ProjectService.capabilities()["visual_contracts"] == {
-        "authoring_versions": ["1", "2.0.0"], "renderer_versions": ["1"],
-        "active_renderer_version": "1", "v2_render_status": "implementation_pending"}
+        "authoring_versions": ["1", "2.0.0"], "renderer_versions": ["1", "2.0.0"],
+        "active_renderer_version": "1", "v2_render_status": "stored_resolved_timeline",
+        "v2_export_audio": "mastered_narration", "v2_export_profiles_fps": 30,
+        "v2_export_limits": ["authored_sound_mix"]}
     with pytest.raises(ProjectError, match="No 'layout' contract"):
         ProjectService.schema("layout", "9")
 
@@ -409,7 +411,7 @@ mcp_server.main()
             caps = await client.call_tool("atme.get_capabilities", {})
             visual = caps.structured_content["result"]["visual_contracts"]
             assert visual["authoring_versions"] == ["1", "2.0.0"]
-            assert visual["renderer_versions"] == ["1"]
+            assert visual["renderer_versions"] == ["1", "2.0.0"]
 
     asyncio.run(exercise())
 
@@ -498,7 +500,7 @@ def test_v2_revisions_are_stored_but_never_sent_to_v1_renderer(tmp_path):
     stored = service.artifact(project["project_id"], "layout")
     assert stored["contract_version"] == "2.0.0"
     report = service.runner.validate(project["project_id"])
-    assert any(issue["code"] == "renderer_contract_unsupported" for issue in report["issues"])
+    assert any(issue["code"] == "resolved_timeline_missing" for issue in report["issues"])
     assert report["ready"] is False
 
 
@@ -542,10 +544,11 @@ def test_all_v2_preview_and_compile_entries_fail_before_frame_renderer(tmp_path,
                                                   project["project_id"], project["revision"], 100),
         lambda: service.runner.compile(project["project_id"], project["revision"]),
     ]
-    for call in calls:
+    for call, code in zip(calls, ["resolved_timeline_missing", "renderer_contract_unsupported",
+                                 "renderer_contract_unsupported", "project_not_ready"], strict=True):
         with pytest.raises(ProjectError) as failure:
             call()
-        assert failure.value.code == "renderer_contract_unsupported"
+        assert failure.value.code == code
 
 
 def test_service_migration_appends_revisions_and_preserves_v1_history(tmp_path):
@@ -563,7 +566,7 @@ def test_service_migration_appends_revisions_and_preserves_v1_history(tmp_path):
     assert current_plan["contract_version"] == current_layout["contract_version"] == "2.0.0"
     assert current_plan["migration_report"] == current_layout["migration_report"] == result["migration_report"]
     assert service.runner.validate(project_id)["ready"] is False
-    assert any(x["code"] == "renderer_contract_unsupported"
+    assert any(x["code"] == "resolved_timeline_missing"
                for x in service.runner.validate(project_id)["issues"])
 
 

@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
+import subprocess
+import wave
 from copy import deepcopy
 
 import pytest
@@ -17,15 +20,20 @@ from atme.project_service import ProjectError, _resolved_compilation_fingerprint
 
 
 def stored_v2_basis(tmp_path, *, real_evidence=False, real_image=False,
-                    image_object_asset_id="valid", profile="LONG_FORM_16_9"):
+                    image_object_asset_id="valid", profile="LONG_FORM_16_9", narration=None, camera=None):
     service, project, plan = _store_v2_plan(tmp_path, profile=profile)
     project_id = project["project_id"]
-    imported = service.attach_wav(project_id, wav_bytes(seconds=10), project["revision"])
+    imported = service.attach_wav(project_id, narration or wav_bytes(seconds=10), project["revision"])
     project = imported["project"]
     placed = service.source_timeline.command(
         project_id, "insert", {"media_id": imported["media"]["media_id"], "at_ms": 0},
         project["revision"], 0,
     )
+    if camera is not None:
+        uploaded = service.attach_video_file(project_id, camera, camera.name, placed["project"]["revision"])
+        placed = service.source_timeline.command(
+            project_id, "insert", {"media_id": uploaded["media"]["media_id"], "at_ms": 0},
+            uploaded["project"]["revision"], placed["timeline"]["timeline_revision"])
     project = placed["project"]
     timing = placed["timeline"]
     media = describe(service, project_id)["timing_authority"]["media"]
@@ -348,12 +356,57 @@ def test_v2_preview_rejects_stale_script_or_invalid_time(tmp_path):
     service.store.close()
 
 
-def test_public_v2_preview_remains_closed_until_phase_three_exit(tmp_path):
-    service, project, _, _, timeline = stored_v2_basis(tmp_path, real_evidence=True)
-    project_id = project["project_id"]
-    project = service.write(project_id, "resolved_timeline", timeline, project["revision"])
-    with pytest.raises(ProjectError) as failure:
-        service.preview_project(project_id, project["revision"], 4900)
-    assert failure.value.code == "renderer_contract_unsupported"
-    assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1"]
-    service.store.close()
+@pytest.mark.parametrize("profile", ["LONG_FORM_16_9", "SHORT_FORM_9_16"])
+def test_public_v2_export_preserves_preview_frames_and_mastered_audio(tmp_path, profile):
+    import numpy as np
+    from PIL import ImageChops, ImageStat
+    from atme.render.animator import find_ffmpeg
+
+    ffmpeg = find_ffmpeg()
+    wav = io.BytesIO()
+    with wave.open(wav, "wb") as audio:
+        audio.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+        audio.writeframes((np.sin(np.arange(160000) * 2 * np.pi * 440 / 16000) * 14000).astype("<i2").tobytes())
+    camera = None
+    if profile == "SHORT_FORM_9_16":
+        camera = tmp_path / "camera.mp4"
+        subprocess.run([ffmpeg, "-v", "error", "-f", "lavfi", "-i", "color=blue:s=180x320:r=30:d=10",
+                        "-f", "lavfi", "-i", "anullsrc=r=16000:cl=mono", "-t", "10", "-c:v", "libx264",
+                        "-c:a", "aac", "-pix_fmt", "yuv420p", str(camera)], check=True)
+    service, project, _, _, timeline = stored_v2_basis(tmp_path, real_evidence=True,
+                                                        profile=profile, narration=wav.getvalue(), camera=camera)
+    pid = project["project_id"]
+    try:
+        project = service.write(pid, "resolved_timeline", timeline, project["revision"])
+        revision = project["revision"]
+        assert service.validate_project(pid)["ready"]
+        previews = [service.preview_project(pid, revision, at)["png"] for at in (0, 4900)]
+        assert previews[0] != previews[1]
+        if camera:
+            corner = Image.open(io.BytesIO(previews[0])).convert("RGB").getpixel((10, 10))
+            assert corner[2] > 200 and max(corner[:2]) < 20
+        result = service.render_project(pid, revision, True)
+        worker = service.runner._workers.get(result["run_id"])
+        if worker is not None:
+            worker.join(600)
+        finished = service.runner.status(pid, result["run_id"])
+        assert finished["status"] == "done", finished.get("error")
+        output = service.runner.output_path(pid, result["run_id"])
+        work = output.parents[1]
+        manifest = json.loads((work / "manifest.json").read_text(encoding="utf-8"))
+        assert hashlib.sha256(output.read_bytes()).hexdigest() == finished["manifest"]["video"]["sha256"]
+        assert manifest["render"] == {"frames": 300, "contract_version": "2.0.0"}
+        for at, preview in zip((0, 4900), previews, strict=True):
+            raw = subprocess.check_output([ffmpeg, "-v", "error", "-ss", str(at / 1000), "-i", str(output),
+                                           "-map", "0:v:0", "-frames:v", "1", "-f", "image2pipe", "-c:v", "png", "-"])
+            frame = Image.open(io.BytesIO(raw)).convert("RGB")
+            expected = Image.open(io.BytesIO(preview)).convert("RGB")
+            assert frame.size == (timeline["output_profile"]["width"], timeline["output_profile"]["height"])
+            assert max(ImageStat.Stat(ImageChops.difference(frame, expected)).mean) < 4
+        packets = subprocess.check_output([ffmpeg, "-v", "error", "-i", str(output),
+                                           "-map", "0:a:0", "-c:a", "copy", "-f", "adts", "-"])
+        expected = subprocess.check_output([ffmpeg, "-v", "error", "-i", str(work / "audio" / "final.wav"),
+                                            "-c:a", "aac", "-b:a", "160k", "-f", "adts", "-"])
+        assert packets and packets == expected
+    finally:
+        service.store.close()

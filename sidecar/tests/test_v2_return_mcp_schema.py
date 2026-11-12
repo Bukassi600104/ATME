@@ -2,6 +2,7 @@
 
 import asyncio
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 from mcp import Client
@@ -11,9 +12,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_real_source_mcp_exposes_return_receipt_and_preserves_renderer_capability(tmp_path):
+    from test_v2_resolved_project import stored_v2_basis
+
+    service, project, _, _, timeline = stored_v2_basis(tmp_path, real_evidence=True)
+    db_path = service.store.db_path
+    service.store.close()
     params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "atme.mcp_server", "--database", str(tmp_path / "return-receipt.db")],
+        args=["-m", "atme.mcp_server", "--database", str(db_path)],
         cwd=ROOT / "sidecar", env={"PYTHONPATH": str(ROOT / "sidecar/src")},
     )
 
@@ -29,6 +35,18 @@ def test_real_source_mcp_exposes_return_receipt_and_preserves_renderer_capabilit
                 assert not result.is_error
                 assert "ReturnHierarchyReceipt" not in result.structured_content["result"]["$defs"]
             caps = await client.call_tool("atme.get_capabilities", {})
-            assert caps.structured_content["result"]["visual_contracts"]["renderer_versions"] == ["1"]
+            assert caps.structured_content["result"]["visual_contracts"]["renderer_versions"] == ["1", "2.0.0"]
+            args = {"project_id": project["project_id"], "expected_revision": project["revision"],
+                    "kind": "resolved_timeline"}
+            invalid = deepcopy(timeline)
+            invalid["compilation_fingerprint"] = "0" * 64
+            rejected = await client.call_tool("atme.write_artifact", {**args, "document": invalid})
+            assert rejected.is_error
+            stored = await client.call_tool("atme.write_artifact", {**args, "document": timeline})
+            assert not stored.is_error
+            preview = await client.call_tool("atme.preview_project", {
+                "project_id": project["project_id"], "expected_revision": project["revision"] + 1, "at_ms": 4900})
+            assert not preview.is_error
+            assert any(item.type == "image" for item in preview.content)
 
     asyncio.run(exercise())

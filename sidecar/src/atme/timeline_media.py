@@ -5,7 +5,9 @@ import hashlib
 import json
 import os
 import subprocess
+from contextlib import contextmanager
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import soundfile as sf
@@ -35,8 +37,25 @@ def _root(service, project_id, digest):
     return root
 
 
-def materialize_audio(service, project_id):
-    timeline = service.source_timeline.get(project_id)
+@contextmanager
+def _publish_media(path):
+    pending = path.with_name(f".{uuid4().hex}{path.suffix}")
+    try:
+        yield pending
+        if not path.is_file():
+            try:
+                os.replace(pending, path)
+            except PermissionError:
+                # Windows can pin a winner's completed file during concurrent playback.
+                if not path.is_file():
+                    raise
+    finally:
+        pending.unlink(missing_ok=True)
+
+
+def materialize_audio(service, project_id, *, timeline=None):
+    if timeline is None:
+        timeline = service.source_timeline.get(project_id)
     document = timeline["document"]
     if not document["clips"]:
         raise ProjectError("narrative_recording_missing", "The source timeline contains no recording")
@@ -75,41 +94,40 @@ def materialize_audio(service, project_id):
             weights[destination:limit] += envelope
         mask = weights > 1
         output[mask] /= weights[mask]
-        pending = path.with_suffix(".pending.wav")
-        sf.write(str(pending), output, TARGET_RATE, subtype="PCM_16")
-        os.replace(pending, path)
+        with _publish_media(path) as pending:
+            sf.write(str(pending), output, TARGET_RATE, subtype="PCM_16")
     metadata = {"format": "wav", "sample_rate": TARGET_RATE, "channels": 1,
                 "duration_ms": document["duration_ms"], "sha256": _sha256(path),
                 "timeline_revision": timeline["timeline_revision"], "timeline_fingerprint": digest}
     return path, metadata, timeline
 
 
-def materialize_video(service, project_id):
-    timeline = service.source_timeline.get(project_id)
+def materialize_video(service, project_id, export_profile=False):
+    from atme.project_runner import PROFILE_SETTINGS
+    with service.store._lock:
+        timeline = service.source_timeline.get(project_id)
+        profile = PROFILE_SETTINGS[service._row(project_id)["profile"]]
     document = timeline["document"]
     clips = [clip for clip in document["clips"] if clip["kind"] == "video"]
     if not clips:
         raise ProjectError("video_unavailable", "The active source timeline is not a video sequence")
     digest = fingerprint(service, project_id, timeline)
     root = _root(service, project_id, digest)
-    path = root / "cleaned-preview.mp4"
+    size = f"{profile['width']}x{profile['height']}"
+    path = root / f"cleaned-preview-{size}-{profile['fps']}fps.mp4"
     detached_audio = any(c["kind"] == "audio" or (c["kind"] == "video" and c.get("audio_enabled", True) is False)
                          for c in document["clips"])
-    if len(clips) == 1 and not detached_audio:
+    if not export_profile and len(clips) == 1 and not detached_audio:
         clip = clips[0]
         source, metadata, _ = managed_media_path(service, project_id, clip["media_id"])
         if (clip["source_start_ms"] == 0 and clip["source_end_ms"] == metadata["duration_ms"]
                 and clip["timeline_start_ms"] == 0):
             return source, metadata, timeline
     if not path.is_file():
-        from atme.project_runner import PROFILE_SETTINGS
         from atme.render.animator import find_ffmpeg
-        with service.store._lock:
-            profile = PROFILE_SETTINGS[service._row(project_id)["profile"]]
-        size = f"{profile['width']}x{profile['height']}"
         total = max(.04, document["duration_ms"] / 1000)
         command = [find_ffmpeg(), "-y", "-hide_banner", "-v", "error", "-f", "lavfi", "-t", f"{total:.3f}",
-                   "-i", f"color=c=black:s={size}:r=30"]
+                   "-i", f"color=c=black:s={size}:r={profile['fps']}"]
         filters = []
         ordered = sorted(clips, key=lambda item: (item.get("track_index", 0), item["timeline_start_ms"], item["clip_id"]))
         for index, clip in enumerate(ordered, 1):
@@ -124,18 +142,16 @@ def materialize_video(service, project_id):
             out = "[vout]" if index == len(ordered) else f"[base{index}]"
             filters.append(f"{previous}[v{index}]overlay=eof_action=pass:enable='between(t,{clip['timeline_start_ms']/1000:.3f},{end:.3f})'{out}")
             previous = out
-        audio_path, _, _ = materialize_audio(service, project_id)
+        audio_path, _, _ = materialize_audio(service, project_id, timeline=timeline)
         command += ["-i", str(audio_path)]
-        pending = path.with_suffix(".pending.mp4")
-        command += ["-filter_complex", ";".join(filters), "-map", "[vout]", "-map", f"{len(ordered)+1}:a:0",
-                    "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-                    "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(pending)]
-        result = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, check=False)
-        if result.returncode or not pending.is_file():
-            pending.unlink(missing_ok=True)
-            raise ProjectError("preview_failed", "Could not materialize cleaned source-video preview",
-                               [{"message": result.stderr[-500:]}])
-        os.replace(pending, path)
+        with _publish_media(path) as pending:
+            command += ["-filter_complex", ";".join(filters), "-map", "[vout]", "-map", f"{len(ordered)+1}:a:0",
+                        "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                        "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(pending)]
+            result = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, check=False)
+            if result.returncode or not pending.is_file():
+                raise ProjectError("preview_failed", "Could not materialize cleaned source-video preview",
+                                   [{"message": result.stderr[-500:]}])
     return path, {"kind": "video", "format": "mp4", "duration_ms": document["duration_ms"],
                   "sha256": _sha256(path), "timeline_fingerprint": digest}, timeline
 

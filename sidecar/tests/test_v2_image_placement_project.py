@@ -148,7 +148,7 @@ def test_stored_duplicate_source_preview_and_frozen_offline_pixels(tmp_path, por
             snapshot = v2_state._evaluate_frame_with_registry_inputs(copied_layout, copied_clock, at, registry)
             frame = _compose_validated_svg_frame(typed, resolved, snapshot, {}, copied_bytes, split_inputs=inputs)
             assert _rasterize_svg_frame(typed, frame, split_inputs=inputs).png == expected[at]
-        assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1"]
+        assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1", "2.0.0"]
     finally:
         service.store.close()
 

@@ -14,6 +14,7 @@ interface ValidationIssue { code: string; message: string }
 interface Validation { ready: boolean; project_revision: number; issues: ValidationIssue[]; selected_revisions: Record<string, number | null> }
 interface ScriptScene { scene_id: number; phase: string; spoken_text: string; visual_directive: string; est_seconds?: number }
 interface ScriptDoc { topic?: string; title?: string; scenes: ScriptScene[] }
+interface StoryboardDoc { beats: Array<{ beat_id: string; narration?: string; narration_summary?: string; purpose?: string; visual_purpose?: string }> }
 interface LayoutElement { id: string; scene_id: number; board_id: string; appear_at_ms: number; kind?: string; layer?: number; visibility_intervals?: Array<{ start_ms: number; end_ms: number }> }
 interface LayoutDoc { elements: LayoutElement[]; board_timeline?: { activations: Array<{ board_id: string; start_ms: number; end_ms: number }> } }
 interface RevisionRequest { request_id: string; project_revision: number; selection: { kind: string; id: string; start_ms: number; end_ms: number }; instruction: string; status: string; proposal?: { artifact_kind: string; document: object; summary: string } }
@@ -25,12 +26,12 @@ interface EditHistory { can_undo: boolean; can_redo: boolean; undo_label: string
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const state: {
   project: ProjectState | null; projects: ProjectState[]; media: MediaItem[]; assets: AssetItem[];
-  script: ScriptDoc | null; layout: LayoutDoc | null; validation: Validation | null;
+  script: ScriptDoc | null; storyboard: StoryboardDoc | null; layout: LayoutDoc | null; validation: Validation | null;
   playheadMs: number; durationMs: number; zoom: number; previewUrl: string | null;
   selected: { kind: string; id: string; label: string; startMs: number; endMs: number } | null;
   projectVersion: string | null; mcp: McpActivity | null;
   editHistory: EditHistory; sourceTimeline: SourceTimeline | null; showSilences: boolean;
-} = { project: null, projects: [], media: [], assets: [], script: null, layout: null, validation: null,
+} = { project: null, projects: [], media: [], assets: [], script: null, storyboard: null, layout: null, validation: null,
   playheadMs: 0, durationMs: 60_000, zoom: 1, previewUrl: null, selected: null,
   projectVersion: null, mcp: null,
   editHistory: { can_undo: false, can_redo: false, undo_label: null, redo_label: null },
@@ -41,6 +42,8 @@ let previewTimer: number | null = null;
 let rangeAnchorMs: number | null = null;
 let syncInFlight = false;
 let projectCatalogLoaded = false;
+let projectRequest = 0;
+let previewRequest = 0;
 let connectionDetailsRoot: HTMLElement | null = null;
 let lastOverlayRefresh = 0;
 let viewerClip: TimelineClip | null = null;
@@ -237,28 +240,33 @@ async function removeProject(project: ProjectState): Promise<void> {
   catch (error) { toast(error instanceof Error ? error.message : "Project could not be removed."); }
 }
 
-async function optionalArtifact<T>(kind: string): Promise<T | null> {
-  if (!state.project?.artifacts[kind]) return null;
-  try { return (await api<{ document: T }>(`/projects/${state.project.project_id}/artifacts/${kind}`)).document; }
-  catch { return null; }
+async function optionalArtifact<T>(project: ProjectState, kind: string): Promise<T | null> {
+  const revision = project.artifacts[kind];
+  if (revision == null) return null;
+  return (await api<{ document: T }>(`/projects/${project.project_id}/artifacts/${kind}?revision=${revision}`)).document;
 }
 
 async function openProject(id: number, hideDrawer = true, preservePosition = false): Promise<void> {
+  const request = ++projectRequest;
+  ++previewRequest;
   const previousPlayhead = preservePosition ? state.playheadMs : 0;
   stopPreviewPlayback();
-  for (const url of objectUrls) URL.revokeObjectURL(url); objectUrls.clear();
-  state.project = await api<ProjectState>(`/projects/${id}`);
-  $("project-launcher").classList.add("hidden"); $("studio").classList.remove("hidden");
-  await invoke("set_studio_open", { open: true }).catch(() => undefined);
-  const [media, assets, script, layout, sourceTimeline] = await Promise.all([
+  clearViewerMedia();
+  const project = await api<ProjectState>(`/projects/${id}`);
+  if (request !== projectRequest) return;
+  const [media, assets, script, storyboard, layout, sourceTimeline] = await Promise.all([
     api<{ media?: MediaItem[] } | MediaItem[]>(`/projects/${id}/media`),
     api<{ assets: AssetItem[] }>(`/projects/${id}/assets`),
-    optionalArtifact<ScriptDoc>("script"), optionalArtifact<LayoutDoc>("layout"),
+    optionalArtifact<ScriptDoc>(project, "script"), optionalArtifact<StoryboardDoc>(project, "storyboard"), optionalArtifact<LayoutDoc>(project, "layout"),
     api<SourceTimeline>(`/projects/${id}/source-timeline`),
   ]);
+  if (request !== projectRequest) return;
+  state.project = project;
+  $("project-launcher").classList.add("hidden"); $("studio").classList.remove("hidden");
+  void invoke("set_studio_open", { open: true }).catch(() => undefined);
   state.media = Array.isArray(media) ? media : media.media || [];
   state.assets = assets.assets;
-  state.script = script; state.layout = layout; state.sourceTimeline = sourceTimeline; state.editHistory = sourceTimeline.history; state.validation = null; state.selected = null;
+  state.script = script; state.storyboard = storyboard; state.layout = layout; state.sourceTimeline = sourceTimeline; state.editHistory = sourceTimeline.history; state.validation = null; state.selected = null;
   state.durationMs = Math.max(1000, sourceTimeline.document.duration_ms || deriveLayoutDuration(layout) || 60_000);
   state.playheadMs = Math.min(previousPlayhead, Math.max(0, state.durationMs - 1));
   $("project-name").textContent = state.project.title;
@@ -269,7 +277,12 @@ async function openProject(id: number, hideDrawer = true, preservePosition = fal
   document.querySelectorAll<HTMLButtonElement>("[data-profile]").forEach((button) => button.classList.toggle("active", button.dataset.profile === state.project?.profile));
   renderProjectList(); renderSources(); renderTimeline(); renderInspector(); updateClock(); updateEditCommands();
   $("viewer-empty").classList.add("hidden");
-  await loadSourcePlayback(); await refreshValidation(false); await refreshPreview();
+  await loadSourcePlayback();
+  if (request !== projectRequest) return;
+  await refreshValidation(false);
+  if (request !== projectRequest) return;
+  await refreshPreview();
+  if (request !== projectRequest) return;
   const workspaceDialog = $<HTMLDialogElement>("workspace-dialog");
   if (workspaceDialog.open && $("workspace-dialog-title").textContent === "Script") showScript();
   else if (workspaceDialog.open && $("workspace-dialog-title").textContent === "Storyboard") showStoryboard();
@@ -306,9 +319,22 @@ function showMediaPanel(tab: "sources" | "assets"): void {
   window.setTimeout(() => panel.classList.remove("focused"), 700);
 }
 
+function clearViewerMedia(): void {
+  for (const url of objectUrls) URL.revokeObjectURL(url);
+  objectUrls.clear();
+  if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
+  state.previewUrl = null;
+  $("preview-image").removeAttribute("src");
+  $("save-render").classList.add("hidden");
+  const video = $<HTMLVideoElement>("render-video");
+  video.pause(); video.removeAttribute("src"); video.load(); video.classList.add("hidden");
+}
+
 function renderEmptyStudio(): void {
+  clearViewerMedia();
+  ++projectRequest; ++previewRequest;
   stopPreviewPlayback();
-  state.project = null; state.media = []; state.assets = []; state.script = null; state.layout = null;
+  state.project = null; state.media = []; state.assets = []; state.script = null; state.storyboard = null; state.layout = null;
   state.sourceTimeline = null;
   state.editHistory = { can_undo: false, can_redo: false, undo_label: null, redo_label: null };
   $("project-name").textContent = "No project open"; $("save-state").textContent = "Local studio";
@@ -540,7 +566,10 @@ function updatePlayhead(): void {
 function updateClock(): void { $("viewer-time").textContent = `${formatTime(state.playheadMs)} / ${formatTime(state.durationMs)}`; }
 
 async function refreshPreview(): Promise<void> {
+  const request = ++previewRequest;
   if (!state.project) return;
+  const project = state.project;
+  const at = Math.min(state.playheadMs, state.durationMs - 1);
   const image = $<HTMLImageElement>("preview-image"); const message = $("viewer-message");
   $<HTMLVideoElement>("render-video").classList.add("hidden");
   const sourceVideo = $<HTMLVideoElement>("source-video");
@@ -555,15 +584,22 @@ async function refreshPreview(): Promise<void> {
     return;
   }
   try {
-    const info = await sidecar(); const at = Math.min(state.playheadMs, state.durationMs - 1);
-    const response = await fetch(`http://127.0.0.1:${info.port}/projects/${state.project.project_id}/preview?expected_revision=${state.project.revision}&at_ms=${at}`, { headers: { Authorization: `Bearer ${info.token}` } });
+    const info = await sidecar();
+    const response = await fetch(`http://127.0.0.1:${info.port}/projects/${project.project_id}/preview?expected_revision=${project.revision}&at_ms=${at}`, { headers: { Authorization: `Bearer ${info.token}` } });
     if (!response.ok) throw new Error("Preview is not available for this revision.");
-    if (state.previewUrl) URL.revokeObjectURL(state.previewUrl); state.previewUrl = URL.createObjectURL(await response.blob());
+    const frame = await response.blob();
+    if (request !== previewRequest || project !== state.project) return;
+    if (state.previewUrl) URL.revokeObjectURL(state.previewUrl); state.previewUrl = URL.createObjectURL(frame);
     image.src = state.previewUrl; image.classList.remove("hidden"); message.classList.add("hidden");
-  } catch (error) { image.classList.add("hidden"); message.textContent = error instanceof Error ? error.message : "Preview unavailable."; message.classList.remove("hidden"); }
+  } catch (error) {
+    if (request !== previewRequest || project !== state.project) return;
+    image.classList.add("hidden"); message.textContent = error instanceof Error ? error.message : "Preview unavailable."; message.classList.remove("hidden");
+  }
 }
 
 async function loadSourcePlayback(): Promise<void> {
+  const request = projectRequest;
+  const project = state.project;
   const video = $<HTMLVideoElement>("source-video"); video.pause(); video.removeAttribute("src"); video.load(); video.classList.add("hidden"); video.classList.remove("audio-preview");
   $("viewer").classList.remove("source-video-active");
   $<HTMLVideoElement>("render-video").classList.add("hidden");
@@ -574,7 +610,11 @@ async function loadSourcePlayback(): Promise<void> {
   const allVideo = videoClips.length === state.sourceTimeline.document.clips.length;
   viewerClip = playableClips[0]; viewerUsesCleanedTimeline = allVideo;
   try {
-    const info = await sidecar(); const ticket = await api<{ path: string }>(`/projects/${state.project.project_id}/playback-ticket`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expected_revision: state.project.revision, media_id: allVideo ? null : viewerClip.media_id, cleaned: allVideo }) });
+    const mediaId = allVideo ? null : viewerClip.media_id;
+    const info = await sidecar();
+    if (!project || request !== projectRequest) return;
+    const ticket = await api<{ path: string }>(`/projects/${project.project_id}/playback-ticket`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expected_revision: project.revision, media_id: mediaId, cleaned: allVideo }) });
+    if (request !== projectRequest) return;
     video.src = `http://127.0.0.1:${info.port}${ticket.path}`; video.classList.toggle("audio-preview", viewerClip?.kind === "audio"); video.classList.remove("hidden"); $("viewer").classList.add("source-video-active");
     $("preview-image").classList.add("hidden"); $("viewer-message").classList.add("hidden");
     video.onloadedmetadata = () => { if (viewerUsesCleanedTimeline && Number.isFinite(video.duration) && video.duration > 0) state.durationMs = Math.max(1000, Math.round(video.duration * 1000)); else if (viewerClip) video.currentTime = viewerClip.source_start_ms / 1000; renderTimeline(); updateClock(); };
@@ -590,7 +630,7 @@ async function loadSourcePlayback(): Promise<void> {
     };
     video.onplay = () => { $("play-preview").textContent = "Ⅱ"; };
     video.onpause = () => { $("play-preview").textContent = "▶"; };
-  } catch (error) { toast(error instanceof Error ? error.message : "Source preview unavailable."); }
+  } catch (error) { if (request === projectRequest) toast(error instanceof Error ? error.message : "Source preview unavailable."); }
 }
 
 function updatePlayheadPositionOnly(): void { $("playhead").style.left = `${145 + state.playheadMs / state.durationMs * timelineWidth()}px`; updateClock(); }
@@ -639,7 +679,10 @@ function viewerStatusMessage(): string {
 
 async function refreshValidation(showDialog = true): Promise<void> {
   if (!state.project) return;
-  state.validation = await api<Validation>(`/projects/${state.project.project_id}/validate`).catch(() => null as unknown as Validation);
+  const project = state.project;
+  const validation = await api<Validation>(`/projects/${project.project_id}/validate`).catch(() => null);
+  if (state.project !== project || (validation && validation.project_revision !== project.revision)) return;
+  state.validation = validation;
   const pill = $("validation-pill"); const dot = pill.querySelector(".status-dot") as HTMLElement; const label = pill.lastElementChild as HTMLElement;
   dot.className = `status-dot ${state.validation?.ready ? "good" : state.validation ? "warn" : "bad"}`;
   label.textContent = state.validation?.ready ? "Ready to export" : state.validation ? `${state.validation.issues.length} export items` : "Export check failed";
@@ -951,17 +994,18 @@ function showValidationDialog(): void {
   else if (state.validation.ready) wrap.innerHTML = "<div class='workspace-card'><h3>Ready to render</h3><p>The current project revision has all required production artifacts and media.</p></div>";
   else for (const issue of state.validation.issues) {
     const card = document.createElement("div"); card.className = "workspace-card"; const title = document.createElement("h3"); title.textContent = issue.message; const code = document.createElement("p"); code.textContent = issue.code.replaceAll("_", " "); card.append(title, code);
-    if (issue.code === "script_not_approved") { const approve = document.createElement("button"); approve.className = "small-primary"; approve.textContent = "Approve current script"; approve.onclick = () => void approveCurrentScript(); card.append(approve); }
+    if (issue.code === "script_not_approved") { const review = document.createElement("button"); review.className = "small-primary"; review.textContent = "Review script"; review.onclick = showScript; card.append(review); }
     wrap.append(card);
   }
   showDialog("Export Check", state.project?.title || "Current project", wrap);
 }
 
-async function approveCurrentScript(): Promise<void> {
-  if (!state.project?.artifacts.script) return;
+async function approveCurrentScript(project: ProjectState): Promise<void> {
+  if (state.project !== project) { toast("The project changed. Review the current script before approving."); return; }
   try {
-    await api<ProjectState>(`/projects/${state.project.project_id}/script-approval`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script_revision: state.project.artifacts.script, expected_revision: state.project.revision, approved: true }) });
-    $<HTMLDialogElement>("workspace-dialog").close(); await openProject(state.project.project_id); toast("Current external script approved.");
+    await api<ProjectState>(`/projects/${project.project_id}/script-approval`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script_revision: project.artifacts.script, expected_revision: project.revision, approved: true }) });
+    if (state.project !== project) return;
+    $<HTMLDialogElement>("workspace-dialog").close(); await openProject(project.project_id); toast("Current external script approved.");
   } catch (error) { toast(error instanceof Error ? error.message : "Script approval failed."); }
 }
 
@@ -1010,33 +1054,42 @@ function showScript(): void {
   if (!state.script) { card.innerHTML = "<h3>No semantic script yet</h3><p>Your connected AI can derive or author the scene structure through MCP.</p>"; showDialog("Script", state.project.title, card); return; }
   const heading = document.createElement("h3"); heading.textContent = state.script.title || state.project.title;
   const copy = document.createElement("p"); copy.className = "script-copy"; copy.textContent = state.script.scenes.map((scene) => scene.spoken_text).join("\n\n");
-  const currentRevision = state.project.artifacts.script;
+  const project = state.project;
+  const currentRevision = project.artifacts.script;
   if (state.project.authoritative_narrative_source.mode === "script_authority") {
     if (state.project.approved_script_revision === currentRevision) {
       const approved = document.createElement("p"); approved.className = "retention-note"; approved.textContent = "✓ Script approved. The connected AI can continue production."; card.append(heading, copy, approved);
     } else {
-      const approve = document.createElement("button"); approve.className = "primary-button"; approve.textContent = "Approve script and continue"; approve.onclick = () => void approveCurrentScript(); card.append(heading, copy, approve);
+      const approve = document.createElement("button"); approve.className = "primary-button"; approve.textContent = "Approve script and continue"; approve.onclick = () => void approveCurrentScript(project); card.append(heading, copy, approve);
     }
   } else card.append(heading, copy);
   const override = document.createElement("details"); const summary = document.createElement("summary"); summary.textContent = "Manual override";
   const note = document.createElement("p"); note.textContent = "Use this only for a targeted correction. External AI remains the primary authoring path.";
   const editor = document.createElement("textarea"); editor.value = JSON.stringify(state.script, null, 2);
   const save = document.createElement("button"); save.className = "small-primary"; save.textContent = "Save manual revision";
-  save.onclick = () => void saveScriptOverride(editor.value); override.append(summary, note, editor, save); card.append(override); showDialog("Script", "Externally authored · local override available", card);
+  save.onclick = () => void saveScriptOverride(project, editor.value); override.append(summary, note, editor, save); card.append(override); showDialog("Script", "Externally authored · local override available", card);
 }
 
-async function saveScriptOverride(raw: string): Promise<void> {
-  if (!state.project) return;
+async function saveScriptOverride(project: ProjectState, raw: string): Promise<void> {
+  if (state.project !== project) { toast("The project changed. Reopen the script before saving."); return; }
   try {
     const document = JSON.parse(raw) as ScriptDoc;
-    await api<ProjectState>(`/projects/${state.project.project_id}/artifacts/script`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ document, expected_revision: state.project.revision }) });
-    $<HTMLDialogElement>("workspace-dialog").close(); await openProject(state.project.project_id); toast("Manual script edit saved to this project.");
+    await api<ProjectState>(`/projects/${project.project_id}/artifacts/script`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ document, expected_revision: project.revision }) });
+    if (state.project !== project) return;
+    $<HTMLDialogElement>("workspace-dialog").close(); await openProject(project.project_id); toast("Manual script edit saved to this project.");
   } catch (error) { toast(error instanceof Error ? error.message : "Script revision failed."); }
 }
 
 function showStoryboard(): void {
   const wrap = document.createElement("div"); const activations = state.layout?.board_timeline?.activations || [];
-  if (!activations.length) wrap.innerHTML = "<div class='workspace-card'><h3>No storyboard yet</h3><p>Your connected AI can add the storyboard and production layout through MCP.</p></div>";
+  const beats = state.storyboard?.beats || [];
+  if (!beats.length && !activations.length) wrap.innerHTML = "<div class='workspace-card'><h3>No storyboard yet</h3><p>Your connected AI can add the storyboard through MCP.</p></div>";
+  for (const beat of beats) {
+    const card = document.createElement("article"); card.className = "workspace-card";
+    const title = document.createElement("strong"); title.textContent = beat.beat_id;
+    const description = document.createElement("p"); description.textContent = beat.narration_summary || beat.narration || "";
+    card.append(title, description); wrap.append(card);
+  }
   for (const item of activations) { const card = document.createElement("button"); card.className = "workspace-card project-row"; const label = document.createElement("strong"); label.textContent = item.board_id; const meta = document.createElement("small"); meta.textContent = `${formatTime(item.start_ms)} – ${formatTime(item.end_ms)}`; card.append(label, meta); card.onclick = () => { state.playheadMs = item.start_ms; state.selected = { kind: "illustration", id: item.board_id, label: item.board_id, startMs: item.start_ms, endMs: item.end_ms }; $<HTMLDialogElement>("workspace-dialog").close(); updatePlayhead(); renderInspector(); void refreshPreview(); }; wrap.append(card); }
   showDialog("Storyboard", state.project?.title || "Current project", wrap);
 }
@@ -1044,62 +1097,89 @@ function showStoryboard(): void {
 async function showRenders(): Promise<void> {
   const wrap = document.createElement("div");
   if (!state.project) { wrap.innerHTML = "<div class='workspace-card'><h3>No project open</h3></div>"; showDialog("Renders", "", wrap); return; }
+  const project = state.project;
   try {
-    const response = await api<{ renders: Array<{ run_id: string; status: string; project_revision: number; manifest?: { duration_ms?: number } }> }>(`/projects/${state.project.project_id}/renders`);
+    const response = await api<{ renders: Array<{ run_id: string; status: string; error?: string; project_revision: number; manifest?: { duration_ms?: number } }> }>(`/projects/${project.project_id}/renders`);
+    if (project !== state.project) return;
     if (!response.renders.length) wrap.innerHTML = "<div class='workspace-card'><h3>No renders yet</h3><p>Validate the project, then use Render in the project bar.</p></div>";
     for (const run of response.renders) {
       const card = document.createElement("button"); card.className = "workspace-card project-row";
       const label = document.createElement("strong"); label.textContent = run.status === "done" ? "Completed render" : `Render ${run.status}`;
       const meta = document.createElement("small"); meta.textContent = `Revision ${run.project_revision} · ${run.run_id.slice(0, 8)}`; card.append(label, meta);
-      if (run.status === "done") card.onclick = () => { $<HTMLDialogElement>("workspace-dialog").close(); void showRenderedVideo(state.project!.project_id, run.run_id); };
+      if (run.error) { const message = document.createElement("p"); message.textContent = run.error; card.append(message); }
+      if (run.status === "done") card.onclick = () => { $<HTMLDialogElement>("workspace-dialog").close(); void showRenderedVideo(project.project_id, run.run_id); };
       wrap.append(card);
     }
   } catch (error) {
     const card = document.createElement("div"); card.className = "workspace-card"; const heading = document.createElement("h3"); heading.textContent = "Renders unavailable";
     const detail = document.createElement("p"); detail.textContent = error instanceof Error ? error.message : "Try again."; card.append(heading, detail); wrap.append(card);
   }
-  showDialog("Renders", state.project.title, wrap);
+  if (state.project === project) showDialog("Renders", project.title, wrap);
 }
 
 async function setProfile(profile: ProjectState["profile"]): Promise<void> {
   if (!state.project || state.project.profile === profile) return;
-  const previous = state.project.profile;
-  state.project.profile = profile; applyViewerProfile(profile);
+  const project = state.project;
   try {
-    const project = await api<ProjectState>(`/projects/${state.project.project_id}/profile`, {
+    await api<ProjectState>(`/projects/${project.project_id}/profile`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile, expected_revision: state.project.revision }),
+      body: JSON.stringify({ profile, expected_revision: project.revision }),
     });
+    if (state.project !== project) return;
     await openProject(project.project_id); toast("Output profile changed. The connected AI may need to revise the layout.");
-  } catch (error) { state.project.profile = previous; applyViewerProfile(previous); toast(error instanceof Error ? error.message : "Profile change failed."); }
+  } catch (error) { toast(error instanceof Error ? error.message : "Profile change failed."); }
 }
 
 async function renderProject(): Promise<void> {
   if (!state.project) return;
+  const project = state.project;
   await refreshValidation(false);
+  if (state.project !== project) return;
   if (!state.validation?.ready) { if(state.sourceTimeline?.document.clips.some(clip=>clip.kind==="video")){await exportManualTimeline();return;} showValidationDialog(); return; }
   if (!window.confirm("Render this exact saved project revision?")) return;
   try {
-    const run = await api<{ run_id: string; status: string }>(`/projects/${state.project.project_id}/renders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expected_revision: state.project.revision, confirmed: true }) });
-    toast("Render queued."); void pollRender(state.project.project_id, run.run_id);
+    const run = await api<{ run_id: string; status: string }>(`/projects/${project.project_id}/renders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expected_revision: project.revision, confirmed: true }) });
+    toast("Render queued."); void pollRender(project.project_id, run.run_id).catch(error => toast(error.message));
   } catch (error) { toast(error instanceof Error ? error.message : "Render could not start."); }
 }
 
-async function exportManualTimeline():Promise<void>{if(!state.project)return;if(!window.confirm("Export the current manually edited timeline as an MP4?"))return;try{const info=await sidecar(),response=await fetch(`http://127.0.0.1:${info.port}/projects/${state.project.project_id}/timeline-export?expected_revision=${state.project.revision}`,{headers:{Authorization:`Bearer ${info.token}`}});if(!response.ok)throw new Error("Timeline export could not be created.");const url=URL.createObjectURL(await response.blob()),link=document.createElement("a");link.href=url;link.download=`ATME-${state.project.title.replace(/[^a-z0-9]+/gi,"-")}-timeline.mp4`;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);toast("Manual timeline export ready.");}catch(error){toast(error instanceof Error?error.message:"Timeline export failed.");}}
+async function exportManualTimeline():Promise<void>{const project=state.project;if(!project)return;if(!window.confirm("Export the current manually edited timeline as an MP4?"))return;try{const info=await sidecar(),response=await fetch(`http://127.0.0.1:${info.port}/projects/${project.project_id}/timeline-export?expected_revision=${project.revision}`,{headers:{Authorization:`Bearer ${info.token}`}});if(!response.ok)throw new Error("Timeline export could not be created.");const url=URL.createObjectURL(await response.blob()),link=document.createElement("a");link.href=url;link.download=`ATME-${project.title.replace(/[^a-z0-9]+/gi,"-")}-timeline.mp4`;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);toast("Manual timeline export ready.");}catch(error){toast(error instanceof Error?error.message:"Timeline export failed.");}}
 
 async function pollRender(projectId: number, runId: string): Promise<void> {
   for (let count = 0; count < 720; count++) {
+    if (state.project?.project_id !== projectId) return;
     const run = await api<{ status: string; error?: string }>(`/projects/${projectId}/renders/${runId}`);
     if (run.status === "done") { await showRenderedVideo(projectId, runId); toast("Render complete."); return; }
     if (run.status === "failed") { toast(run.error || "Render failed."); return; }
     await new Promise((resolve) => window.setTimeout(resolve, 1000));
   }
+  toast("Render is still processing. Open Renders to check its status.");
 }
 
 async function showRenderedVideo(projectId: number, runId: string): Promise<void> {
-  const info = await sidecar(); const response = await fetch(`http://127.0.0.1:${info.port}/projects/${projectId}/renders/${runId}/output`, { headers: { Authorization: `Bearer ${info.token}` } });
-  if (!response.ok) return; const url = URL.createObjectURL(await response.blob()); const video = $<HTMLVideoElement>("render-video"); video.src = url;
-  $("preview-image").classList.add("hidden"); $("viewer-message").classList.add("hidden"); $<HTMLVideoElement>("source-video").classList.add("hidden"); video.classList.remove("hidden"); void video.play();
+  const project = state.project;
+  if (!project || project.project_id !== projectId) return;
+  const request = ++previewRequest;
+  const info = await sidecar();
+  const ticketUrl = async () => {
+    const ticket = await api<{path: string}>(`/projects/${projectId}/renders/${runId}/playback-ticket`, { method: "POST" });
+    return `http://127.0.0.1:${info.port}${ticket.path}`;
+  };
+  try {
+    const url = await ticketUrl();
+    if (state.project !== project || request !== previewRequest) return;
+    const video = $<HTMLVideoElement>("render-video"); video.src = url;
+    const save = $("save-render"); save.classList.remove("hidden");
+    save.onclick = async () => {
+      try {
+        const url = await ticketUrl();
+        if (state.project !== project) return;
+        const link = document.createElement("a"); link.href = url + "?download=1"; link.download = ""; link.click();
+      } catch (error) { toast(error instanceof Error ? error.message : "Could not save the MP4."); }
+    };
+    $("preview-image").classList.add("hidden"); $("viewer-message").classList.add("hidden");
+    $<HTMLVideoElement>("source-video").classList.add("hidden"); video.classList.remove("hidden"); void video.play().catch(() => undefined);
+  } catch (error) { toast(error instanceof Error ? error.message : "Could not open the rendered video."); }
 }
 
 function navigate(workspace: string): void {

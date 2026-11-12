@@ -12,6 +12,7 @@ import json
 import logging
 import subprocess
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -282,11 +283,13 @@ def render_stage(job_dir: Path, align_state: dict, width: int, height: int, fps:
 
 
 def assemble_stage(job_dir: Path, script: dict, audio_state: dict,
-                   align_state: dict, render_state: dict) -> dict:
+                   align_state: dict, render_state: dict, *,
+                   talking_head_mux: Callable[[Path, Path, Path], None] | None = None) -> dict:
     started = time.perf_counter()
     job_dir = Path(job_dir)
     final_mp4 = job_dir / "out" / "final.mp4"
-    _mux(Path(render_state["silent_video"]), Path(audio_state["final_wav"]), final_mp4)
+    mux = _mux if talking_head_mux is None else talking_head_mux
+    mux(Path(render_state["silent_video"]), Path(audio_state["final_wav"]), final_mp4)
     manifest = {
         "job": job_dir.name, "title": script.get("title", script.get("topic")),
         "duration_ms": int(audio_state["duration_ms"]),
@@ -302,11 +305,16 @@ def assemble_stage(job_dir: Path, script: dict, audio_state: dict,
             "layout": {"path": align_state["layout_file"]},
             "cue_timeline": {"path": align_state["cues_file"]},
             "visual_plan": {"path": align_state["visual_plan_file"]},
-            "words_aligned": align_state["words"],
             "silence_removed_spans": len(audio_state["edl"]),
             "render_segments": len(render_state["segments"]),
         },
     }
+    if "words" in align_state:
+        manifest["artifacts"]["words_aligned"] = align_state["words"]
+    if talking_head_mux is not None:
+        manifest["composition_mode"] = "talking_head_with_caleb_overlays"
+    elif "composition_mode" in render_state:
+        manifest["composition_mode"] = render_state["composition_mode"]
     if align_state.get("planning_context_file"):
         manifest["artifacts"]["planning_context"] = {"path": align_state["planning_context_file"]}
     if align_state.get("voice_similarity") is not None:

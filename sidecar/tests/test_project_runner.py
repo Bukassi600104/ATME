@@ -1,40 +1,83 @@
+import hashlib
 import io
 import json
-import wave
+import shutil
 import subprocess
+import wave
 from copy import deepcopy
 from pathlib import Path
 from threading import Event
 
 import pytest
-from atme.project_service import ProjectError, ProjectService
-from atme.store.db import JobStore
 from test_board_continuity import board_doc
 from test_external_inputs import external_payload
 
+from atme.project_service import ProjectError, ProjectService
+from atme.store.db import JobStore
 
-def test_talking_head_compositor_preserves_source_and_adds_caleb_ink(tmp_path):
+
+def test_talking_head_export_uses_mastered_audio_and_final_manifest(tmp_path, monkeypatch):
     from PIL import Image
-    from atme.project_runner import _compose_talking_head
+
+    from atme import pipeline
     from atme.render.animator import find_ffmpeg
 
     ffmpeg = find_ffmpeg()
-    source, overlay, output, frame = (tmp_path / name for name in
-        ("source.mp4", "overlay.mp4", "result.mp4", "frame.png"))
+    source, overlay, master, reference, frame = (tmp_path / name for name in
+        ("source.mp4", "overlay.mp4", "master.wav", "reference.mp4", "frame.png"))
     subprocess.run([ffmpeg, "-y", "-hide_banner", "-v", "error", "-f", "lavfi",
-                    "-i", "color=c=blue:s=320x180:d=1", "-f", "lavfi", "-i", "anullsrc",
+                    "-i", "color=c=blue:s=320x180:d=7", "-f", "lavfi", "-i", "sine=frequency=220:duration=7",
                     "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(source)], check=True)
     subprocess.run([ffmpeg, "-y", "-hide_banner", "-v", "error", "-f", "lavfi",
-                    "-i", "color=c=0xFAF9F5:s=320x180:d=1",
+                    "-i", "color=c=0xFAF9F5:s=320x180:d=7",
                     "-vf", "drawbox=x=130:y=60:w=60:h=60:color=red:t=fill",
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", str(overlay)], check=True)
-    _compose_talking_head(source, overlay, output, {"width": 320, "height": 180, "fps": 30})
+    subprocess.run([ffmpeg, "-v", "error", "-f", "lavfi", "-i", "sine=frequency=880:duration=7",
+                    "-c:a", "pcm_s16le", str(master)], check=True)
+    pipeline._mux(overlay, master, reference)
+
+    def audio_packets(video):
+        return subprocess.check_output([ffmpeg, "-v", "error", "-i", str(video), "-map", "0:a:0",
+                                        "-c:a", "copy", "-f", "adts", "pipe:1"])
+
+    expected_audio = audio_packets(reference)
+    assert expected_audio and audio_packets(source) != expected_audio
+    core, state = ready_project(tmp_path, source_video=source)
+    pid = state["project_id"]
+
+    def polish(work, **_):
+        wav = work / "audio" / "final.wav"
+        shutil.copyfile(master, wav)
+        return {"final_wav": str(wav), "duration_ms": 7000, "edl": [],
+                "sha256": hashlib.sha256(wav.read_bytes()).hexdigest()}
+
+    def render(work, aligned, **_):
+        (work / "out").mkdir()
+        return {"silent_video": str(overlay), "render": {}, "segments": []}
+
+    monkeypatch.setattr(pipeline, "polish_stage", polish)
+    monkeypatch.setattr(pipeline, "align_stage", lambda *a, **k: {
+        "layout_file": "layout.json", "cues_file": "cues.json", "visual_plan_file": "visual_plan.json", "words": 0})
+    monkeypatch.setattr(pipeline, "render_stage", render)
+    queued = core.render_project(pid, state["revision"], True)
+    run_id = queued["run_id"]
+    core.runner._workers[run_id].join(60)
+    finished = core.runner.status(pid, run_id)
+    assert finished["status"] == "done", finished.get("error")
+    output = core.runner.output_path(pid, run_id)
+    assert audio_packets(output) == expected_audio
+    stored = json.loads((output.parents[1] / "manifest.json").read_text(encoding="utf-8"))
+    actual_video = {"sha256": hashlib.sha256(output.read_bytes()).hexdigest(), "bytes": output.stat().st_size}
+    assert finished["manifest"]["video"] == actual_video
+    assert stored["artifacts"]["video"] == {"path": str(output), **actual_video}
+    assert stored["composition_mode"] == "talking_head_with_caleb_overlays"
     subprocess.run([ffmpeg, "-y", "-hide_banner", "-v", "error", "-ss", "0.5",
                     "-i", str(output), "-frames:v", "1", str(frame)], check=True)
     image = Image.open(frame).convert("RGB")
-    corner, centre = image.getpixel((20, 20)), image.getpixel((160, 90))
+    corner, centre = image.getpixel((20, 20)), image.getpixel((image.width // 2, image.height // 2))
     assert corner[2] > corner[0] * 2  # talking-head/base picture remains visible
     assert centre[0] > centre[2] * 2  # Caleb overlay remains visible
+    core.store.close()
 
 
 def wav_bytes(seconds=7, rate=8000):
@@ -59,19 +102,25 @@ def storyboard(script):
         for index, scene in enumerate(script["scenes"], start=1)]}
 
 
-def ready_project(tmp_path, profile="LONG_FORM_16_9"):
+def ready_project(tmp_path, profile="LONG_FORM_16_9", *, source_video=None):
     core = ProjectService(JobStore(tmp_path / "projects.db"))
-    project = core.create("Ready external production", profile, "script+audio")
+    project = core.create("Ready external production", profile, "script+video" if source_video else "script+audio")
     pid = project["project_id"]
     script = external_payload()["script"]
     core.write(pid, "script", script, 0)
     core.approve_script(pid, 1, 1, True)
-    core.attach_wav(pid, wav_bytes(), 2)
-    core.write(pid, "storyboard", storyboard(script), 3)
+    if source_video:
+        uploaded = core.attach_video_file(pid, source_video, source_video.name, 2)
+        placed = core.edit_source_timeline(pid, "insert", {"media_id": uploaded["media"]["media_id"], "at_ms": 0},
+                                           uploaded["project"]["revision"], 0)
+        revision = placed["project"]["revision"]
+    else:
+        revision = core.attach_wav(pid, wav_bytes(), 2)["project"]["revision"]
+    core.write(pid, "storyboard", storyboard(script), revision)
     layout = board_doc()
     layout["canvas"] = ({"width": 1280, "height": 720} if profile == "LONG_FORM_16_9"
                         else {"width": 720, "height": 1280})
-    state = core.write(pid, "layout", layout, 4)
+    state = core.write(pid, "layout", layout, revision + 1)
     return core, state
 
 

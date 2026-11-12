@@ -233,7 +233,7 @@ def test_stored_evidence_duplicate_return_preview_and_frozen_offline_pixels(tmp_
             frame = _compose_validated_svg_frame(typed, resolved_clock, snapshot, held, assets, split_inputs=inputs)
             actual = _rasterize_svg_frame(typed, frame, split_inputs=inputs).png
             assert sha256(actual).hexdigest() == sha256(expected[at]).hexdigest()
-        assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1"]
+        assert service.capabilities()["visual_contracts"]["renderer_versions"] == ["1", "2.0.0"]
     finally:
         service.store.close()
 

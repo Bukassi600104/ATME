@@ -21,6 +21,13 @@ fn gen_token() -> String {
 }
 
 fn configured_data_dir(app: &tauri::App) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    if let Some(value) = std::env::var_os("ATME_DATA_DIR").filter(|value| !value.is_empty()) {
+        let directory = PathBuf::from(value);
+        if !directory.is_absolute() {
+            return Err("ATME_DATA_DIR must be an absolute directory".into());
+        }
+        return Ok(directory);
+    }
     #[cfg(windows)] { use winreg::{enums::HKEY_CURRENT_USER, RegKey}; if let Ok(key)=RegKey::predef(HKEY_CURRENT_USER).open_subkey("Software\\ATME") { if let Ok(value)=key.get_value::<String,_>("ProjectDataDir") { if !value.trim().is_empty(){return Ok(PathBuf::from(value));} } } }
     Ok(app.path().app_data_dir()?)
 }

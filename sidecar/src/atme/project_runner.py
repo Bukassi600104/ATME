@@ -10,8 +10,8 @@ import hashlib
 import json
 import os
 import shutil
-import threading
 import time
+from functools import partial
 from pathlib import Path
 from uuid import uuid4
 
@@ -43,11 +43,10 @@ class ProjectRunner:
             """)
             service.store.conn.commit()
 
-    def _latest_media_row(self, project_id):
-        return self.service.store.conn.execute(
-            "SELECT m.media_id,m.revision,m.relative_path,m.metadata FROM project_source_media m "
-            "LEFT JOIN project_media_removals r ON r.job_id=m.job_id AND r.media_id=m.media_id "
-            "WHERE m.job_id=? AND r.media_id IS NULL ORDER BY m.revision DESC LIMIT 1", (project_id,)).fetchone()
+    def _selected_media_row(self, project_id):
+        from atme.narrative_source import selected_media_row
+        return selected_media_row(self.service, project_id, self.service._row(project_id)["input_kind"],
+                                  self.service.source_timeline.get(project_id))
 
     def validate(self, project_id):
         with self.service.store._lock:
@@ -79,16 +78,26 @@ class ProjectRunner:
                         layout = value
                 except ProjectError:
                     issues.append({"code": kind + "_missing", "message": f"An externally authored {kind} is required"})
-            media = self._latest_media_row(project_id)
+            media = source["timing_authority"]["media"]
             if source["timing_authority"]["media"] is None:
                 issues.append({"code": "narration_missing", "message": "Upload an original PCM WAV narration"})
             elif not source["media_compatible"]:
                 issues.append({"code": "narrative_media_mismatch",
                                "message": f"This project requires {source['expected_media_kind']} narrative media"})
             if layout is not None:
-                if layout["document"].get("contract_version") != "1":
+                version = layout["document"].get("contract_version")
+                if version == "2.0.0":
+                    from atme.project_v2_render import check_export_inputs, resolved_record
+
+                    timing = self.service.source_timeline.get(project_id)
+                    try:
+                        resolved = resolved_record(self.service, row, layout, storyboard, timing)
+                        check_export_inputs(storyboard, resolved)
+                    except ProjectError as exc:
+                        issues.append({"code": exc.code, "message": str(exc)})
+                elif version != "1":
                     issues.append({"code": "renderer_contract_unsupported",
-                                   "message": "Visual contract v2 is stored safely but is not executable until the v2 renderer phase is installed"})
+                                   "message": "Unknown visual contract version"})
                 canvas = layout["document"].get("canvas", {})
                 actual = float(canvas.get("width", 0)) / max(1.0, float(canvas.get("height", 0)))
                 profile = PROFILE_SETTINGS[state["profile"]]
@@ -118,11 +127,6 @@ class ProjectRunner:
                         "source_timeline": self.service.source_timeline.get(project_id)["timeline_revision"]}}
 
     def _selection(self, project_id, expected_revision):
-        try:
-            self._require_v1_renderer(self.service.artifact(project_id, "layout")["document"])
-        except ProjectError as exc:
-            if exc.code == "renderer_contract_unsupported":
-                raise
         report = self.validate(project_id)
         if report["project_revision"] != expected_revision:
             raise ProjectError("revision_conflict", "Project changed; reload before compiling")
@@ -133,7 +137,8 @@ class ProjectRunner:
             script = self.service.artifact(project_id, "script")
             storyboard = self.service.artifact(project_id, "storyboard")
             layout = self.service.artifact(project_id, "layout")
-            media = self._latest_media_row(project_id)
+            media = self._selected_media_row(project_id)
+            self.service._expected(self.service._row(project_id), expected_revision)
             return state, script, storyboard, layout, media
 
     def compile(self, project_id, expected_revision):
@@ -154,11 +159,31 @@ class ProjectRunner:
                      "source_timeline_revision": timing_metadata["timeline_revision"],
                      "source_timeline_fingerprint": timing_metadata["timeline_fingerprint"],
                      "semantic_role": state["authoritative_narrative_source"]["semantic_structure"]["role"]}
-        timeline_document = self.service.source_timeline.get(project_id)["document"]
+        timing = self.service.source_timeline.get(project_id)
+        timeline_document = timing["document"]
+        resolved = None
+        if layout["document"].get("contract_version") == "2.0.0":
+            from atme import project_v2_render
+            from atme.project_service import _visual_digest
+
+            with self.service.store._lock:
+                row = self.service._row(project_id)
+                self.service._expected(row, expected_revision)
+                resolved = project_v2_render.resolved_record(self.service, row, layout, storyboard, timing)
+                project_v2_render.check_export_inputs(storyboard, resolved)
+                assets = project_v2_render.verified_assets(self.service, row, resolved, layout["document"])
+            index = project_v2_render.asset_index(assets)
+            selection.update(visual_contract="2.0.0", resolved_timeline_revision=resolved["revision"],
+                             resolved_timeline_sha256=resolved["document"]["compilation_fingerprint"],
+                             visual_assets_sha256=_visual_digest(index))
         source_video = None
         if any(clip["kind"] == "video" for clip in timeline_document["clips"]):
-            source_video, source_video_metadata, _ = materialize_video(self.service, project_id)
+            source_video, source_video_metadata, _ = materialize_video(self.service, project_id, export_profile=True)
             selection["source_video_sha256"] = source_video_metadata["sha256"]
+            selection["video_composition_version"] = 2  # Final video carries mastered narration.
+        # Project revisions are monotonic across desktop and MCP database connections.
+        with self.service.store._lock:
+            self.service._expected(self.service._row(project_id), expected_revision)
         fingerprint = hashlib.sha256(json.dumps(selection, sort_keys=True,
             separators=(",", ":")).encode("utf-8")).hexdigest()
         runtime_root = (parent / "project-runs" / str(project_id)).resolve()
@@ -177,6 +202,11 @@ class ProjectRunner:
             _write_json(inputs / "script.json", script["document"])
             _write_json(inputs / "visual_plan.json", storyboard["document"])
             _write_json(inputs / "layout.json", layout["document"])
+            if resolved is not None:
+                from atme.render.v2_sound_mix import freeze_sources
+
+                project_v2_render.save_inputs(inputs, resolved, assets, index)
+                freeze_sources(self.service, project_id, resolved["document"], storyboard["document"], inputs)
             shutil.copyfile(source, inputs / "narration.wav")
             if source_video is not None:
                 shutil.copyfile(source_video, inputs / "source-video.mp4")
@@ -203,23 +233,9 @@ class ProjectRunner:
             raise ProjectError("render_confirmation_required", "Rendering must be explicitly requested")
         compiled = self.compile(project_id, expected_revision)
         run_id = compiled["fingerprint"][:24]
-        now = time.time()
-        with self.service.store._lock:
-            existing = self.service.store.conn.execute(
-                "SELECT status,manifest,error FROM project_render_runs WHERE job_id=? AND run_id=?",
-                (project_id, run_id)).fetchone()
-            if existing and existing["status"] == "done" and existing["manifest"]:
-                try:
-                    self.output_path(project_id, run_id)
-                    return self.status(project_id, run_id)
-                except ProjectError:
-                    pass  # Missing/corrupt derived output is rebuilt from the immutable snapshot.
-            self.service.store.conn.execute(
-                "INSERT INTO project_render_runs VALUES(?,?,?,?,?,?,?,?,?) "
-                "ON CONFLICT(job_id,run_id) DO UPDATE SET status='running',error=NULL,updated_at=excluded.updated_at",
-                (project_id, run_id, expected_revision, compiled["fingerprint"], "running", None, None, now, now))
-            self.service.store.conn.commit()
-        return self._execute_render(compiled, project_id, expected_revision, run_id)
+        from atme.project_workers import submit
+        return submit(self, "render", project_id, expected_revision, compiled,
+                      lambda: self._execute_render(compiled, project_id, expected_revision, run_id), False)
 
     def _execute_render(self, compiled, project_id, expected_revision, run_id):
         snapshot = Path(compiled["runtime_dir"])
@@ -237,19 +253,21 @@ class ProjectRunner:
             script = json.loads((directory / "script.json").read_text(encoding="utf-8"))
             layout = json.loads((directory / "layout.json").read_text(encoding="utf-8"))
             audio = pipeline.polish_stage(directory, voice_mode="upload", remove_silence=False)
-            aligned = pipeline.align_stage(directory, script, audio, voice_mode="upload",
-                                           layout_dict=layout,
-                                           semantic_authority=compiled["semantic_role"])
-            rendered = pipeline.render_stage(directory, aligned, **profile)
-            manifest = pipeline.assemble_stage(directory, script, audio, aligned, rendered)
+            if compiled.get("visual_contract") == "2.0.0":
+                from atme.project_v2_render import render
+
+                aligned, rendered, audio = render(directory, inputs, compiled, layout, audio)
+            else:
+                aligned = pipeline.align_stage(directory, script, audio, voice_mode="upload",
+                                               layout_dict=layout,
+                                               semantic_authority=compiled["semantic_role"])
+                rendered = pipeline.render_stage(directory, aligned, **profile)
             source_video = inputs / "source-video.mp4"
-            if source_video.is_file():
-                _compose_talking_head(source_video, Path(manifest["artifacts"]["video"]["path"]),
-                                      Path(manifest["artifacts"]["video"]["path"]), profile)
-                final_path = Path(manifest["artifacts"]["video"]["path"])
-                manifest["artifacts"]["video"].update(
-                    sha256=_sha256(final_path), bytes=final_path.stat().st_size)
-                manifest["composition_mode"] = "talking_head_with_caleb_overlays"
+            talking_head_mux = None
+            if source_video.is_file() and compiled.get("visual_contract") != "2.0.0":
+                talking_head_mux = partial(_compose_talking_head, source_video, profile=profile)
+            manifest = pipeline.assemble_stage(directory, script, audio, aligned, rendered,
+                                               talking_head_mux=talking_head_mux)
             public_manifest = {"run_id": run_id, "status": "done", "project_id": project_id,
                                "project_revision": expected_revision,
                                "duration_ms": manifest["duration_ms"],
@@ -266,40 +284,10 @@ class ProjectRunner:
         if confirmed is not True:
             raise ProjectError("render_confirmation_required", "Rendering must be explicitly requested")
         compiled = self.compile(project_id, expected_revision)
-        run_id = compiled["fingerprint"][:24]
-        now = time.time()
-        # Integrity-check completed output before opening the short write transaction.
-        try:
-            existing = self.status(project_id, run_id)
-            if existing["status"] == "done":
-                self.output_path(project_id, run_id)
-                return existing
-        except ProjectError:
-            pass
-        with self.service.store._lock:
-            conn = self.service.store.conn
-            try:
-                conn.execute("BEGIN IMMEDIATE")
-                existing = conn.execute(
-                    "SELECT status FROM project_render_runs WHERE job_id=? AND run_id=?",
-                    (project_id, run_id)).fetchone()
-                if existing and existing["status"] in ("queued", "running"):
-                    conn.commit()
-                    return self.status(project_id, run_id)
-                conn.execute(
-                    "INSERT INTO project_render_runs VALUES(?,?,?,?,?,?,?,?,?) "
-                    "ON CONFLICT(job_id,run_id) DO UPDATE SET status='queued',manifest=NULL,error=NULL,updated_at=excluded.updated_at",
-                    (project_id, run_id, expected_revision, compiled["fingerprint"], "queued", None, None, now, now))
-                conn.commit()
-            except Exception:
-                conn.rollback()
-                raise
-        worker = threading.Thread(target=_background_render,
-                                  args=(self.service.store.db_path, project_id, expected_revision, compiled),
-                                  name=f"atme-render-{project_id}-{run_id}", daemon=False)
-        self._workers[run_id] = worker
-        worker.start()
-        return self.status(project_id, run_id)
+        from atme.project_workers import submit
+        return submit(self, "render", project_id, expected_revision, compiled,
+                      lambda: _background_render(self.service.store.db_path, project_id, expected_revision, compiled),
+                      True)
 
     def preview(self, project_id, expected_revision, at_ms):
         if type(at_ms) is not int or at_ms < 0:
@@ -317,6 +305,8 @@ class ProjectRunner:
             except ProjectError as exc:
                 raise ProjectError("layout_missing", "A layout is required for visual preview") from exc
             doc = layout["document"]
+            if doc.get("contract_version") == "2.0.0":
+                return self._preview_v2_project(project_id, row, expected_revision, doc, at_ms)
             self._require_v1_renderer(doc)
             timeline_duration = self.service.source_timeline.get(project_id)["document"]["duration_ms"]
             layout_duration = max(
@@ -332,7 +322,7 @@ class ProjectRunner:
         return self._preview_document(doc, profile, project_id, expected_revision, at_ms)
 
     def preview_v2_source(self, project_id, expected_revision, at_ms):
-        """Source-only integration proof; not the public preview/export dispatcher."""
+        """Preview a stored v2 project, explicitly rejecting legacy layouts."""
         if type(at_ms) is not int or at_ms < 0:
             raise ProjectError("invalid_request", "Preview time must be a nonnegative integer")
         with self.service.store._lock:
@@ -346,62 +336,33 @@ class ProjectRunner:
     def _preview_v2_project(self, project_id, row, expected_revision, layout, at_ms):
         """Use the exact stored compiler result and verified project-owned raster bytes."""
         from atme.render.v2_svg import compose_png_frame
-        from atme.store.contracts_v2 import (
-            MEDIA_OBJECT_TYPES,
-            ExecutableLayoutV2,
-            ResolvedVisualTimelineV2,
-        )
+        from atme.project_v2_render import camera_preview, resolved_record, verified_assets
+        from atme.timeline_media import materialize_video
 
-        try:
-            timeline_record = self.service.artifact(project_id, "resolved_timeline")
-        except ProjectError as exc:
-            raise ProjectError("renderer_contract_unsupported",
-                               "A current resolved visual timeline is required for v2 preview") from exc
-        timeline = timeline_record["document"]
-        try:
-            self.service._validate_resolved_timeline(
-                project_id, timeline, row, basis_revision=timeline_record["revision"] - 1,
-                require_return_receipts=False,
-            )
-        except ProjectError:
-            raise
-        except ValueError as exc:
-            raise ProjectError("invalid_artifact", "Resolved visual timeline is invalid") from exc
+        timing = self.service.source_timeline.get(project_id)
+        record = resolved_record(self.service, row, self.service.artifact(project_id, "layout"),
+                                 self.service.artifact(project_id, "storyboard"),
+                                 timing)
+        timeline = record["document"]
         if at_ms >= timeline["duration_ms"]:
             raise ProjectError("invalid_request", "Preview time must be within the current project")
-        parsed_layout = ExecutableLayoutV2.model_validate(layout)
-        parsed_timeline = ResolvedVisualTimelineV2.model_validate(timeline)
-        assets = {item.asset_id: item for item in parsed_timeline.resolved_assets}
-        treatments = {item.object_id: item for item in parsed_layout.evidence_treatments}
-        verified = {}
-        for obj in parsed_layout.objects:
-            if obj.object_type not in {"image", "evidence"} | MEDIA_OBJECT_TYPES:
-                continue
-            asset = assets.get(obj.asset_id)
-            if asset is None:
-                raise ProjectError("invalid_artifact", f"Visual {obj.object_id} has no resolved project asset")
-            if obj.object_type == "evidence":
-                treatment = treatments.get(obj.object_id)
-                if treatment is None:
-                    raise ProjectError("invalid_artifact", "Evidence visual has no approved treatment")
-                verified[asset.asset_id] = self.service.render_evidence_bytes(
-                    project_id, asset, treatment,
-                )
-            elif obj.object_type in MEDIA_OBJECT_TYPES:
-                if asset.asset_id not in verified:
-                    verified[asset.asset_id] = self.service.render_media_bytes(
-                        project_id, asset, layout=parsed_layout).payload
-            else:
-                verified[asset.asset_id] = self.service.render_image_bytes(project_id, asset, layout=parsed_layout).payload
+        verified = verified_assets(self.service, row, record, layout)
         try:
-            frame = compose_png_frame(layout, timeline, at_ms, verified)
+            camera = any(clip["kind"] == "video" for clip in timing["document"]["clips"])
+            fps = int(timeline["output_profile"]["fps"])
+            sample_ms = (at_ms * fps // 1000) * 1000 // fps if camera else at_ms
+            frame = compose_png_frame(layout, timeline, sample_ms, verified, paper_background=not camera)
+            png = frame.png
+            if camera:
+                path, _, _ = materialize_video(self.service, project_id, export_profile=True)
+                png = camera_preview(path, png, at_ms, fps)
         except ValueError as exc:
             raise ProjectError("preview_unavailable", "The visual timeline cannot be previewed",
                                [{"message": str(exc)[:500]}]) from exc
         self.service._expected(self.service._row(project_id), expected_revision)
-        return {"png": frame.png, "at_ms": at_ms,
-                "width": parsed_timeline.output_profile.width,
-                "height": parsed_timeline.output_profile.height,
+        return {"png": png, "at_ms": at_ms,
+                "width": timeline["output_profile"]["width"],
+                "height": timeline["output_profile"]["height"],
                 "project_id": project_id, "project_revision": expected_revision}
 
     def preview_layout(self, project_id, expected_revision, document, at_ms):
@@ -411,7 +372,7 @@ class ProjectRunner:
             row = self.service._row(project_id)
             self.service._expected(row, expected_revision)
             self._require_v1_renderer(document)
-            media = self._latest_media_row(project_id)
+            media = self._selected_media_row(project_id)
             if media is None:
                 raise ProjectError("narration_missing", "A recording is required for proposal preview")
             timeline_duration = self.service.source_timeline.get(project_id)["document"]["duration_ms"]
@@ -444,7 +405,7 @@ class ProjectRunner:
         if document.get("contract_version") != "1":
             raise ProjectError(
                 "renderer_contract_unsupported",
-                "Visual contract v2 is stored safely but cannot be previewed or rendered until the v2 renderer is installed",
+                "This preview requires a v1 layout. Preview a stored v2 layout with its resolved timeline.",
             )
 
     def _finish(self, project_id, run_id, status, manifest, error):
@@ -464,6 +425,10 @@ class ProjectRunner:
                 "WHERE job_id=? AND run_id=?", (project_id, run_id)).fetchone()
             if row is None:
                 raise ProjectError("not_found", "Render run does not exist")
+            if row["status"] in ("queued", "running"):
+                from atme.project_workers import mark_interrupted
+                if mark_interrupted(self.service.store, "render", project_id, run_id):
+                    return self.status(project_id, run_id)
             result = {"project_id": project_id, "run_id": run_id,
                       "project_revision": row["project_revision"], "status": row["status"],
                       "current_project_revision": current["revision"],
@@ -515,7 +480,7 @@ def _write_json(path, document):
                                     allow_nan=False), encoding="utf-8")
 
 
-def _compose_talking_head(source_video, caleb_video, destination, profile):
+def _compose_talking_head(source_video, caleb_video, final_audio, destination, profile):
     """Place Caleb ink over the edited talking-head sequence.
 
     The renderer's paper colour is keyed out, preserving the source picture as
@@ -533,10 +498,10 @@ def _compose_talking_head(source_video, caleb_video, destination, profile):
         "colorkey=0xFAF9F5:0.16:0.08[ink];[base][ink]overlay=shortest=1[v]"
     )
     command = [find_ffmpeg(), "-y", "-hide_banner", "-v", "error",
-               "-i", str(source_video), "-i", str(caleb_video),
-               "-filter_complex", filter_graph, "-map", "[v]", "-map", "0:a?",
+               "-i", str(source_video), "-i", str(caleb_video), "-i", str(final_audio),
+               "-filter_complex", filter_graph, "-map", "[v]", "-map", "2:a:0",
                "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
-               "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(pending)]
+               "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", str(pending)]
     result = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                             text=True, check=False)
     if result.returncode or not pending.is_file():
@@ -560,9 +525,6 @@ def _background_render(database, project_id, expected_revision, compiled):
                 "UPDATE project_render_runs SET status='running',updated_at=? WHERE job_id=? AND run_id=?",
                 (time.time(), project_id, run_id))
             store.conn.commit()
-        try:
-            runner._execute_render(compiled, project_id, expected_revision, run_id)
-        except ProjectError:
-            pass  # _execute_render already persisted the bounded failure status.
+        runner._execute_render(compiled, project_id, expected_revision, run_id)
     finally:
         store.close()
