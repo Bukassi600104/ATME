@@ -1709,6 +1709,68 @@
       "title": "PriorActionTrigger",
       "type": "object"
     },
+    "ProgressivePartsPolicy": {
+      "additionalProperties": false,
+      "description": "Exact real part roots, complete write closure and authenticated read versions.",
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "container_group_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Container Group Id",
+          "type": "string"
+        },
+        "part_root_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Part Root Ids",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "phases": {
+          "items": {
+            "$ref": "#/$defs/StructuredListPhase"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Phases",
+          "type": "array"
+        },
+        "expected_closure_state_versions": {
+          "additionalProperties": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "title": "Expected Closure State Versions",
+          "type": "object"
+        },
+        "expected_read_state_versions": {
+          "additionalProperties": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "title": "Expected Read State Versions",
+          "type": "object"
+        }
+      },
+      "required": [
+        "version",
+        "container_group_id",
+        "part_root_ids",
+        "phases",
+        "expected_closure_state_versions",
+        "expected_read_state_versions"
+      ],
+      "title": "ProgressivePartsPolicy",
+      "type": "object"
+    },
     "Provenance": {
       "additionalProperties": false,
       "properties": {
@@ -2409,6 +2471,244 @@
     },
     "SoundAction": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "sound_policy": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "sound_policy"
+            ]
+          },
+          "then": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "verb": {
+                      "const": "sound_cue"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "asset_id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "state": {
+                      "const": "playing"
+                    },
+                    "expected_state": {
+                      "const": "stopped"
+                    },
+                    "post_state": {
+                      "const": "stopped"
+                    },
+                    "sound_policy": {
+                      "properties": {
+                        "bus_role": {
+                          "const": "effect"
+                        },
+                        "playback": {
+                          "properties": {
+                            "repeat_count": {
+                              "const": 1
+                            }
+                          },
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "playback"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asset_id"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "verb": {
+                      "const": "music_state"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "asset_id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "state": {
+                      "enum": [
+                        "stopped",
+                        "playing",
+                        "paused"
+                      ]
+                    },
+                    "expected_state": {
+                      "enum": [
+                        "stopped",
+                        "playing",
+                        "paused"
+                      ]
+                    },
+                    "post_state": {
+                      "enum": [
+                        "stopped",
+                        "playing",
+                        "paused"
+                      ]
+                    },
+                    "sound_policy": {
+                      "properties": {
+                        "bus_role": {
+                          "const": "music"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "asset_id"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "state": {
+                      "enum": [
+                        "playing",
+                        "paused"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "sound_policy": {
+                      "properties": {
+                        "playback": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "playback"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "state": {
+                      "const": "stopped"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "sound_policy": {
+                      "properties": {
+                        "playback": {
+                          "type": "null"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "state": {
+                      "enum": [
+                        "stopped",
+                        "paused"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "sound_policy": {
+                      "properties": {
+                        "fade_in": {
+                          "properties": {
+                            "duration_ms": {
+                              "const": 0
+                            }
+                          }
+                        },
+                        "fade_out": {
+                          "properties": {
+                            "duration_ms": {
+                              "const": 0
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "verb": {
+                      "const": "purposeful_silence"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "state": {
+                      "const": "silent"
+                    },
+                    "expected_state": {
+                      "const": "clear"
+                    },
+                    "post_state": {
+                      "const": "clear"
+                    },
+                    "asset_id": {
+                      "type": "null"
+                    },
+                    "gain_db": {
+                      "const": 0
+                    },
+                    "sound_policy": {
+                      "properties": {
+                        "playback": {
+                          "type": "null"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ],
+            "properties": {
+              "easing": {
+                "const": "linear"
+              }
+            },
+            "required": [
+              "gain_db",
+              "easing",
+              "expected_state"
+            ]
+          }
+        }
+      ],
       "properties": {
         "action_id": {
           "minLength": 1,
@@ -2528,6 +2828,17 @@
         "state": {
           "title": "State",
           "type": "string"
+        },
+        "sound_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SoundPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -2543,6 +2854,121 @@
         "state"
       ],
       "title": "SoundAction",
+      "type": "object"
+    },
+    "SoundFade": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "easing": {
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out",
+            "step"
+          ],
+          "title": "Easing",
+          "type": "string"
+        }
+      },
+      "required": [
+        "duration_ms",
+        "easing"
+      ],
+      "title": "SoundFade",
+      "type": "object"
+    },
+    "SoundPlayback": {
+      "additionalProperties": false,
+      "properties": {
+        "source_in_ms": {
+          "minimum": 0,
+          "title": "Source In Ms",
+          "type": "integer"
+        },
+        "source_out_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Source Out Ms",
+          "type": "integer"
+        },
+        "repeat_count": {
+          "minimum": 1,
+          "title": "Repeat Count",
+          "type": "integer"
+        },
+        "offset_ms": {
+          "minimum": 0,
+          "title": "Offset Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source_in_ms",
+        "source_out_ms",
+        "repeat_count",
+        "offset_ms"
+      ],
+      "title": "SoundPlayback",
+      "type": "object"
+    },
+    "SoundPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "1.0.0",
+          "title": "Version",
+          "type": "string"
+        },
+        "bus_id": {
+          "minLength": 1,
+          "title": "Bus Id",
+          "type": "string"
+        },
+        "bus_role": {
+          "enum": [
+            "effect",
+            "music"
+          ],
+          "title": "Bus Role",
+          "type": "string"
+        },
+        "narration_priority": {
+          "const": "preserve_narration",
+          "title": "Narration Priority",
+          "type": "string"
+        },
+        "fade_in": {
+          "$ref": "#/$defs/SoundFade"
+        },
+        "fade_out": {
+          "$ref": "#/$defs/SoundFade"
+        },
+        "playback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SoundPlayback"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "version",
+        "bus_id",
+        "bus_role",
+        "narration_priority",
+        "fade_in",
+        "fade_out"
+      ],
+      "title": "SoundPolicy",
       "type": "object"
     },
     "SplitAction": {
@@ -3529,6 +3955,53 @@
               },
               "count_policy": {
                 "type": "null"
+              },
+              "progressive_parts_policy": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "easing",
+              "expected_state"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "progressive_parts_policy": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "progressive_parts_policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "verb": {
+                "const": "progressive_reveal"
+              },
+              "easing": {
+                "const": "linear"
+              },
+              "expected_state": {
+                "const": "hidden"
+              },
+              "post_state": {
+                "const": "visible"
+              },
+              "annotation": {
+                "type": "null"
+              },
+              "annotation_policy": {
+                "type": "null"
+              },
+              "count_policy": {
+                "type": "null"
+              },
+              "structured_list_policy": {
+                "type": "null"
               }
             },
             "required": [
@@ -3690,6 +4163,17 @@
           "anyOf": [
             {
               "$ref": "#/$defs/StructuredListPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "progressive_parts_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProgressivePartsPolicy"
             },
             {
               "type": "null"

@@ -342,7 +342,8 @@ def test_split_public_evaluator_remains_unavailable(bare):
     _plan, layout, timeline = split_documents()
     if bare:
         timeline["actions"][0]["action"].pop("split_policy")
-    with pytest.raises(UnsupportedVisualAction, match="split.*no frame implementation"):
+    # Task11 admits proven packets; these legacy/placeholder documents remain unproved.
+    with pytest.raises(UnsupportedVisualAction if bare else ValueError, match="[Ss]plit"):
         evaluate_frame(layout, timeline, 450)
 
 
@@ -352,7 +353,7 @@ def test_split_policy_limits_and_phase_clock(count):
     assert len(parsed.split_policy.results) == count
     assert split_type().model_validate(parsed.model_dump(mode="json")) == parsed
     from atme.render.v2_timeline_replay import supports_operator
-    assert not supports_operator(parsed)
+    assert supports_operator(parsed)
 
 
 @pytest.mark.parametrize("count", [1, 257])

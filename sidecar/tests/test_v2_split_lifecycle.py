@@ -10,7 +10,6 @@ from atme.render.v2_split_paint import (
     _VerifiedSplitAssetBytes,
 )
 from atme.render.v2_state import (
-    UnsupportedVisualAction,
     V2FrameError,
     _validate_pair_static,
     evaluate_frame,
@@ -1076,8 +1075,8 @@ def test_canonical_evidence_family_proof_does_not_admit_public_or_storage_execut
 
     _, _, _, _, _, layout, timeline, initial, carrier = canonical_evidence_boundary
     split = next(row for row in timeline.actions if row.action.verb == "split")
-    assert not supports_operator(split.action)
-    with pytest.raises(UnsupportedVisualAction, match="split"):
+    assert supports_operator(split.action)
+    with pytest.raises(ValueError, match="[Ss]plit"):
         evaluate_frame(layout.model_dump(mode="json"), timeline.model_dump(mode="json"), split.start_ms)
     with pytest.raises(ValueError, match="[Ss]plit|split"):
         validate_resolved_return_history(layout, timeline, layout_sha256=digest(layout.model_dump(mode="json")))
@@ -1424,7 +1423,7 @@ def test_private_split_evidence_native_uses_each_original_crop_and_actual_clock(
         for at in (4399, 1200, 1900, 1600, 1200):
             assert render(at, None) == sequential[at]
     assert original == ((tmp_path / "external-original.png").read_bytes(), dict(service._row(layout.project_id)))
-    with pytest.raises((UnsupportedVisualAction, V2FrameError), match="split|Split"):
+    with pytest.raises(ValueError, match="split|Split"):
         evaluate_frame(layout.model_dump(mode="json"), timeline.model_dump(mode="json"), 1900)
 
 
@@ -1690,8 +1689,8 @@ def test_pair_context_keeps_every_split_pair_out_of_the_ordinary_action_map(shar
     assert context.treatments_by_action == {}
     assert context.treatments_by_pair == {("split-1", key): treatment
         for key, treatment in zip(("part-1", "part-2"), layout.evidence_treatments, strict=True)}
-    # Static storage inventory is not public renderer admission.
-    with pytest.raises(UnsupportedVisualAction, match="split"):
+    # Public frames still require the verified original evidence carrier.
+    with pytest.raises(ValueError, match="[Ss]plit"):
         evaluate_frame(layout.model_dump(mode="json"), timeline.model_dump(mode="json"), 1500)
 
 

@@ -495,8 +495,8 @@ def test_private_chronology_captures_same_time_completed_count_and_keeps_public_
     assert captured.split_capture.baseline == before.objects
     source = next(frame for frame in captured.split_capture.baseline if frame.object_id == "source")
     assert source.display_text == "10 widgets" and source.count_value == (10, 1)
-    assert not replay_module.supports_operator(split.action)
-    with pytest.raises(replay_module.ReplayError, match="no chronological operator"):
+    assert replay_module.supports_operator(split.action)
+    with pytest.raises(replay_module.ReplayError, match="Split chronology requires exact paired"):
         replay_module.replay_chronology({obj.object_id: obj for obj in layout.objects}, initial.hierarchy,
             {frame.object_id: frame for frame in initial.objects}, dict(initial.state_versions), (*prior, split),
             tuple((row.board_id, row.start_ms, row.end_ms) for row in layout.activations), 2000)

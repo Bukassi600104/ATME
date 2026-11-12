@@ -56,6 +56,7 @@ from atme.render.v2_hierarchy import (
     group_visibility_roots,
 )
 from atme.render.v2_image import validate_image_placement_history
+from atme.render.v2_ink import primary_stroke_width
 from atme.render.v2_isolation import UnsupportedIsolation, isolation_context_roots
 from atme.render.v2_lifecycle import (
     UnsupportedLifecycle,
@@ -79,7 +80,11 @@ from atme.render.v2_morph import (
     geometry_object,
     validate_morph_geometry,
 )
-from atme.render.v2_registry import _registry_endpoint_assets, validate_registry_binding
+from atme.render.v2_registry import (
+    RegistryEndpointInputs,
+    _registry_endpoint_assets,
+    validate_registry_binding,
+)
 from atme.render.v2_return import UnsupportedReturn, validate_return_sample
 from atme.render.v2_technical_frame_lifecycle import (
     UnsupportedTechnicalFrameLifecycle,
@@ -286,7 +291,7 @@ def validate_static_hierarchy(layout: ExecutableLayoutV2, objects: dict | None =
                 )
             if (obj.asset_id is not None or obj.anchors or obj.geometry.points
                     or obj.geometry.corner_radius is not None or obj.style.stroke
-                    or obj.style.fill or obj.style.text or obj.style.effect):
+                    or obj.style.fill or obj.style.text or obj.style.effect is not None):
                 raise V2FrameError(
                     f"v2 {obj.object_type} {obj.object_id} must be a non-painting stacking context"
                 )
@@ -438,6 +443,17 @@ def _validate_static_action(item, layout, timeline, objects, mask_sources, manag
         raise V2FrameError(f"action {action.action_id} carries an annotation it cannot display")
     if action.annotation_policy is not None:
         return
+    if action.progressive_parts_policy is not None:
+        if set(action.progressive_parts_policy.expected_closure_state_versions) & managed_connectors:
+            raise V2FrameError("progressive parts cannot mutate a connection-managed connector")
+        try:
+            _validate_structured_progression_objects(action, objects)
+        except ValueError as exc:
+            raise V2FrameError(str(exc)) from exc
+        if not any(a.board_id == action.board_id and a.start_ms <= item.start_ms
+                   and item.end_ms <= a.end_ms for a in layout.activations):
+            raise V2FrameError("progressive parts require one active board interval")
+        return
     if action.structured_list_policy is not None:
         try:
             _validate_structured_progression_objects(action, objects)
@@ -539,6 +555,15 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
         # Initial ownership/receipt inventory binds the complete document even
         # when consumer execution is restricted to a return's causal prefix.
         validate_resolved_hierarchy(layout, structural_timeline if structural_timeline is not None else timeline)
+        sound_timeline = structural_timeline if structural_timeline is not None else timeline
+        if any(isinstance(item.action, SoundAction) and item.action.sound_policy is not None
+               for item in sound_timeline.actions):
+            from atme.render.v2_sound_events import derive_sound_ledger
+
+            # A return prefix makes no execution claim for future legacy operators.
+            supported = [item for item in sound_timeline.actions
+                         if not isinstance(item.action, SoundAction) or item.action.sound_policy is not None]
+            derive_sound_ledger(sound_timeline.model_copy(update={"actions": supported}))
     except ValueError as exc:
         raise V2FrameError(str(exc)) from exc
     resolved_actions = {item.action.action_id: item for item in timeline.actions}
@@ -636,7 +661,7 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
                 if earlier is item:
                     continue
                 previous = earlier.action
-                if previous.board_id != destination.board_id:
+                if isinstance(previous, SoundAction) or previous.board_id != destination.board_id:
                     continue
                 if (earlier.start_ms < item.start_ms
                         and not any(activation.board_id == destination.board_id
@@ -724,7 +749,17 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
                 or layout_objects[source_id].opacity != 1):
             raise V2FrameError(f"mask source {source_id} must remain fully visible and static")
     for resolved in timeline.actions:
-        if mask_sources.intersection(_action_object_references(resolved.action)):
+        action = resolved.action
+        references = set(_action_object_references(action))
+        if ((isinstance(action, SplitAction) and action.split_policy is not None)
+                or (isinstance(action, TargetAction) and action.progressive_parts_policy is not None)):
+            from atme.render.v2_split import _reservation_footprint
+
+            references, _ = _reservation_footprint(action)
+            references.update(action.target_ids)
+            if isinstance(action, SplitAction):
+                references.add(action.container_id)
+        if mask_sources.intersection(references):
             raise V2FrameError(
                 f"action {resolved.action.action_id} cannot target a mask-only source"
             )
@@ -836,6 +871,13 @@ def _validate_pair_static(layout: ExecutableLayoutV2, timeline: ResolvedVisualTi
             if obj.variant not in assets:
                 raise V2FrameError("registry endpoint inputs lack the exact variant")
             validate_registry_binding(obj, assets[obj.variant])
+    if split_ids:
+        from atme.render.v2_split_paint import _validate_split_paint_modes
+
+        try:
+            _validate_split_paint_modes(timeline, layout_objects)
+        except ValueError as exc:
+            raise V2FrameError(str(exc)) from exc
     return _PairContext(layout, timeline, hierarchy, layout_objects, initial, frames,
                         frozenset(mask_sources), frozenset(managed_connectors),
                         frozenset(connector_endpoints), treatments_by_action, treatments_by_pair, registry_inputs,
@@ -1085,7 +1127,8 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                 raise V2FrameError("output profile cannot uniformly scale Paper & Ink design tokens")
             try:
                 connector_route(layout_objects[action.connector_id], layout_objects, sampled,
-                                style.strokes.regular_px * scale, registry_inputs=context.registry_inputs,
+                                primary_stroke_width(layout_objects[action.connector_id], style, scale),
+                                registry_inputs=context.registry_inputs,
                                 media_view=media_visual_view(layout_objects, sample.at_ms))
                 validate_connection_lifetime(item, sample, context.objects, timeline.actions, timeline.duration_ms)
             except (UnsupportedConnector, UnsupportedLifecycle) as exc:
@@ -1166,6 +1209,7 @@ def _validate_pair_temporal(context: _PairContext, replay: ChronologicalReplay, 
                     raise V2FrameError(f"dim {item.action.action_id} needs visible context without prior edits")
                 if (isinstance(item.action, TargetAction) and item.action.verb == "progressive_reveal"
                         and item.action.structured_list_policy is None
+                        and item.action.progressive_parts_policy is None
                         and (initial[target].visible or initial[target].state != "hidden"
                              or target in last_target_end)):
                     raise V2FrameError(f"action {item.action.action_id} requires a previously untouched hidden list")
@@ -1205,6 +1249,7 @@ def _validate_consumer_history(context: _PairContext, *, split_inputs=None):
                 {key: item.state_version for key, item in context.initial.items()}, tuple(timeline.actions),
                 tuple((item.board_id, item.start_ms, item.end_ms) for item in layout.activations), timeline.duration_ms,
                 evidence_treatments=tuple(context.treatments_by_action.values()),
+                _sound_actions=tuple((context.structural_timeline or timeline).actions),
             )
     except ReplayError as exc:
         raise V2FrameError(str(exc)) from exc
@@ -1227,11 +1272,42 @@ def _validate_consumer_history(context: _PairContext, *, split_inputs=None):
     return replay, camera_plan
 
 
+def _reject_public_bare_split(actions) -> None:
+    for resolved in actions:
+        action = resolved.action
+        if isinstance(action, SplitAction) and action.split_policy is None:
+            raise UnsupportedVisualAction(
+                f"v2 action {action.action_id} uses {action.verb}, which has no frame implementation"
+            )
+
+
 def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
-                   layout_sha256: str, hierarchy: HierarchySnapshot, *, registry_inputs=None):
-    context = _validate_pair_static(layout, timeline, layout_sha256, hierarchy,
-                                    registry_inputs=registry_inputs)
-    # Policy-bearing Group uses the same proven chronology and consumers.
+                   layout_sha256: str, hierarchy: HierarchySnapshot, *, registry_inputs=None, split_inputs=None):
+    _reject_public_bare_split(timeline.actions)
+    has_split = any(isinstance(row.action, SplitAction) for row in timeline.actions)
+    if has_split:
+        from atme.render.v2_split_paint import (
+            _checked_split_resources,
+            _public_split_paint_inputs,
+        )
+
+        split_inputs = _public_split_paint_inputs(layout, split_inputs)
+        resources = _checked_split_resources(layout, split_inputs)
+        derived_registry = registry_endpoint_inputs_for_objects(
+            {obj.object_id: obj for obj in layout.objects}, frozen_files=resources[2])
+        if registry_inputs is not None and (type(registry_inputs) is not RegistryEndpointInputs
+                                           or registry_inputs != derived_registry):
+            raise V2FrameError("Split registry authority differs from its frozen inputs")
+        registry_inputs = derived_registry
+    elif split_inputs is not None:
+        raise V2FrameError("Split authority requires a Split timeline")
+    if has_split:
+        context = _validate_pair_static(layout, timeline, layout_sha256, hierarchy,
+                                        registry_inputs=registry_inputs, split_inputs=split_inputs)
+    else:
+        context = _validate_pair_static(layout, timeline, layout_sha256, hierarchy,
+                                        registry_inputs=registry_inputs)
+    # Policy-bearing Group and Split use the same proven chronology and consumers.
     # Bare Group and other unsupported operators still fail before sampling.
     for resolved in timeline.actions:
         action = resolved.action
@@ -1239,7 +1315,8 @@ def _validate_pair(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV
             raise UnsupportedVisualAction(
                 f"v2 action {action.action_id} uses {action.verb}, which has no frame implementation"
             )
-    return _validate_consumer_history(context)
+    return (_validate_consumer_history(context, split_inputs=split_inputs) if has_split
+            else _validate_consumer_history(context))
 
 
 def validate_resolved_return_history(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,
@@ -1308,13 +1385,17 @@ def evaluate_frame(
     layout_document: dict,
     timeline_document: dict,
     at_ms: int,
+    *, split_inputs=None,
 ) -> FrameSnapshot:
     """Evaluate from immutable initial state, never from a previous frame."""
-    return _evaluate_frame_with_registry_inputs(layout_document, timeline_document, at_ms, None)
+    if split_inputs is None:
+        return _evaluate_frame_with_registry_inputs(layout_document, timeline_document, at_ms, None)
+    return _evaluate_frame_with_registry_inputs(layout_document, timeline_document, at_ms, None,
+                                                 split_inputs=split_inputs)
 
 
 def _evaluate_frame_with_registry_inputs(layout_document: dict, timeline_document: dict,
-                                          at_ms: int, registry_inputs) -> FrameSnapshot:
+                                          at_ms: int, registry_inputs, *, split_inputs=None) -> FrameSnapshot:
     """Internal frozen-byte route with the same public action admission checks."""
     if not isinstance(layout_document, dict) or not isinstance(timeline_document, dict):
         raise V2FrameError("frame evaluation requires the exact stored JSON documents")
@@ -1331,8 +1412,12 @@ def _evaluate_frame_with_registry_inputs(layout_document: dict, timeline_documen
         hierarchy = HierarchySnapshot.from_objects({obj.object_id: obj for obj in layout.objects})
     except UnsupportedHierarchy as exc:
         raise V2FrameError(str(exc)) from exc
-    replay, camera_plan = _validate_pair(layout, timeline, layout_sha256, hierarchy,
-                                       registry_inputs=registry_inputs)
+    if split_inputs is None:
+        replay, camera_plan = _validate_pair(layout, timeline, layout_sha256, hierarchy,
+                                           registry_inputs=registry_inputs)
+    else:
+        replay, camera_plan = _validate_pair(layout, timeline, layout_sha256, hierarchy,
+                                           registry_inputs=registry_inputs, split_inputs=split_inputs)
     return _sample_validated_frame(layout, timeline, replay, camera_plan, at_ms)
 
 

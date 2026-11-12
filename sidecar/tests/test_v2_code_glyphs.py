@@ -2,8 +2,9 @@
 
 import importlib
 import importlib.util
+import json
 import struct
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import FrozenInstanceError, asdict, replace
 from hashlib import sha256
 
 import pytest
@@ -175,3 +176,36 @@ def test_private_sfnt_decoder_rejects_malformed_bounds_unicode_and_metrics(fault
         struct.pack_into(">H", payload, bmp + 18, 65534)
     with pytest.raises(ValueError, match="code glyph"):
         module._decode_code_font_metrics(bytes(payload))
+
+
+def test_verified_font_tables_share_readonly_original_bytes():
+    module = code_module()
+    bundle = load_code_font_bundle()
+    payload = next(raw for name, _, raw in bundle.files if name.endswith(".ttf"))
+    tables = module._tables(payload)
+    count = struct.unpack_from(">H", payload, 4)[0]
+    entries = [struct.unpack_from(">4sIII", payload, 12 + index * 16) for index in range(count)]
+    assert set(tables) == {tag for tag, _, _, _ in entries}
+    for tag, _, offset, length in entries:
+        view = tables[tag]
+        assert isinstance(view, memoryview)
+        assert view.readonly
+        assert view.obj is payload
+        assert view == payload[offset:offset + length]
+
+
+def test_complete_shipped_font_metrics_and_public_records_match_frozen_baseline():
+    module = code_module()
+    bundle = load_code_font_bundle()
+    payload = next(raw for name, _, raw in bundle.files if name.endswith(".ttf"))
+    units, mapping, metrics = module._decode_code_font_metrics(payload)
+    # Frozen 9bad3b95 decoder, canonical JSON: all cmap entries and all hmtx records.
+    decoded = json.dumps([units, sorted(mapping.items()), metrics], separators=(",", ":"))
+    assert (units, len(mapping), len(metrics)) == (1000, 1372, 1754)
+    assert sha256(decoded.encode()).hexdigest() == "544d789874f8623699d7c4eac7f4487919c798f477592aa70b2d0d3f152d94c9"
+    points = [cp for cp in sorted(mapping) if cp >= 32 and not 127 <= cp <= 159
+              and cp not in {0x2028, 0x2029, 0xFFFE, 0xFFFF}]
+    result = module.code_glyph_metrics(authored_code("".join(map(chr, points))), bundle)
+    assert len(result.glyphs) == 1371  # Every cmap scalar admitted by the authored contract.
+    public = json.dumps(asdict(result), sort_keys=True, separators=(",", ":"))
+    assert sha256(public.encode()).hexdigest() == "e7bcd1a5ff923aa27552815eaafdea7d814ca957ab9ba897a55126a8ad3d324d"

@@ -137,7 +137,7 @@ def test_split_full_acceptance_cannot_succeed_with_unexecuted_matrix(tmp_path):
     assert report["status"] == "INCOMPLETE"
     assert report["final_acceptance"] is False
     assert report["missing_required_proofs"]
-    assert report["cases"] == []
+    assert report["native_cases"] == []
 
 
 def test_split_offline_case_does_not_overwrite_prior_evidence(tmp_path):

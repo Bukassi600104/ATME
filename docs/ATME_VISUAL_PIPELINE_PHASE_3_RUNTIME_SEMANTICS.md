@@ -738,3 +738,139 @@ Fresh independent terminal-evidence review is pending due to the auditor's usage
 limit. Original native reliability remains unresolved; public v2,
 renderer capability, frozen/installed, compiler/creative-quality/full-Phase3 and
 Phase4–12 gates remain open. These semantics do not authorize a final release.
+
+## Authored non-list whole-part progressive disclosure (P3-24 semantics)
+
+`TargetAction.progressive_parts_policy` is an optional version `1.0.0` policy for
+`progressive_reveal`. Null or absent policy preserves the historical serialized
+shape. Bare non-list progression still rejects; flat and structured lists keep
+their existing independent contracts and timing.
+
+The policy names `container_group_id`, ordered distinct `part_root_ids`, positive
+weighted `phases` in exactly that order, `expected_closure_state_versions` for all
+written objects, and `expected_read_state_versions` for every external dependency.
+The action targets exactly those roots, uses linear easing and hidden-to-visible
+states, and cannot also carry annotation, count or structured-list policy.
+
+A part is one real supported drawable or one real Group with its complete current
+recursive descendant closure. Root order equals the selected-root projection of
+the owner's current flattened hierarchy. Closures cannot overlap, nest, omit a
+descendant or include their owner. Captured current hierarchy and exact write/read
+versions include accepted completed Group history. Every written local object
+must start hidden, invisible, zero-reveal and positive-alpha. External reads must
+be complete, visible, positive-alpha, same-board and not removed. Internal family
+ownership stays wholly inside one part; an undisclosed sibling part cannot be
+borrowed as an external dependency.
+
+Normal composition/preflight remains the paint-family authority, including its
+existing geometry, typography, registry/asset, binding, hierarchy and pointer
+constraints. The progression does not add another paint-family table. Connector
+endpoints, callout references, bound list/technical/assembly/composition inventories,
+ancestors, apertures and explicit mask sources participate in exact dependency
+validation. Container part roots must be Groups. Nested clips retain normal composition constraints inside a complete Group part.
+A nested mask's dedicated same-parent static source would belong to that full
+write closure, so existing mask-source immutability and hidden-closure requirements
+reject that combination. Evidence treatment insertion also retains its separate
+write owner. External clip/mask ancestors and their sources remain authenticated
+reads.
+
+The existing weighted integer half-open windows determine phase ends; collapsed
+windows reject. Every object in a part's closure steps together from zero reveal
+and hidden visibility to complete visibility/reveal one at its phase end. Semantic
+hidden state and captured versions persist until the outer action end, where all
+written closure members commit visible and increment once. There is no draw,
+write, fade, clipped-reveal substitution, interpolation or per-frame mutation.
+Complete write closures and authenticated reads reserve the whole outer interval
+against existing write/read, Group, aperture and Split conflicts. The ordinary
+compositor paints disclosed objects unchanged; seeking order cannot change output.
+Plan/resolved equality and existing ProjectService persistence/duplicate authority
+bind the full policy. These semantics do not promote a ledger row or public gate.
+## P3-25 — finite sound-event score
+
+A complete optional `SoundAction.sound_policy` version `1.0.0` gives the existing
+`sound_cue`, `music_state`, and `purposeful_silence` verbs executable editorial
+control semantics. Absent/null policy retains the legacy canonical serialized
+shape and remains unsupported for chronological execution. `SoundIntent` stays
+descriptive and supplies no defaults. No public capability changes.
+
+`state` is active on the exact resolved half-open interval. `expected_state` is
+immediately before its start; `post_state` is immediately after its end. Cue is
+stopped/playing/stopped, uses one finite repetition, and retains no cursor.
+Silence is clear/silent/clear in a separate envelope domain. Music starts stopped;
+playing/paused post state is valid only when an immediately adjacent same-bus
+playing/paused interval consumes its exact pinned sequence and end/held cursor.
+Otherwise its post state is stopped, including exhaustion, gaps and project end.
+An adjacent stopped interval has no cursor to consume: the preceding interval
+therefore completes stopped and the stopped control expects stopped. The broad
+transport-state domain does not imply every pair of states is reachable.
+
+Playback explicitly declares a finite source range, repetition count and offset.
+Playing advances project milliseconds through that range; paused holds the exact
+cursor; stopped has no playback payload. The declared asset duration bounds the
+range. No decoder or measured-duration claim is implied. A positive unauthored
+gap clears continuation; a new sequence/offset is allowed only from stopped.
+
+The editorial key `(bus_role, bus_id)` has role effect or music, with one fixed
+role per bus ID. Transport intervals on one bus cannot overlap; silence intervals
+on one bus cannot overlap. Separate buses can overlap. Silence may overlap its
+bus's transport and applies attenuation without changing state or cursor.
+Narration is structurally outside this namespace, and wildcard/master/narration
+bus selectors are rejected. `preserve_narration` is control evidence only; it
+proves no audible priority, intelligibility, ducking, normalization or final mix.
+
+Gain must be explicit. Outer easing is linear. Each explicit fade owns an existing
+easing curve and the sum of its durations fits the interval. A playing envelope
+is `10 ** (gain_db / 20) * attack * release`; silence attenuation is
+`1 - attack * release`. Zero-duration fades are identity inside the interval.
+Paused/stopped amplitude is zero. At a boundary the new half-open interval wins;
+at final project end there is no active event. `SoundLedger.sample` returns
+independent immutable control rows, with same-bus silence attenuation applied to
+transport amplitude while retaining the silence row and advancing cursor. These
+are scalar control evaluations, never PCM summation or audible mixing.
+
+`derive_sound_ledger` freezes source action/instruction/board/coverage, trigger,
+resolved interval, exact policy/gain, asset pin and project/plan/layout/cleaned
+identities in stable resolved order. Its optional plan binds the exact authored
+sound inventory, payloads and asset pins. The ledger is derived, never persisted
+as a duplicate authority. ProjectService authenticates referenced owned asset
+revision/URI/checksum/MIME/byte count and actual bytes through existing asset IO
+before immutable storage and duplicate validation. Duplicate uses the existing
+URI rebinding. No visual object state version or mutation reservation changes.
+
+Full sound validation uses the full exact timeline even when a return receipt's
+visual chronology consumes a causal prefix, so a later exact adjacent cursor
+consumer does not become an invented gap. That prefix projection includes only
+complete sound policies; unsupported future legacy controls remain outside its
+execution claim. Legacy unsupported actions still fail
+at their existing causal operator boundary. Phase 7 retains audio decoding,
+measured duration, mixing/export and human audiovisual acceptance.
+
+## Bounded authored ink and applicable evidence tokens (P3-38 / P3-41)
+
+`StyleRefs.effect` admits exactly `ink_fine` and `ink_emphasis` on ordinary stroked
+freehand, line, rectangle, rounded_rectangle, ellipse, polygon and bracket marks,
+and already-supported semantic arrow/network relationships. They select pinned
+`fine_px * profile_scale` and `emphasis_px * profile_scale` respectively. Null
+retains the historical type default and serialization. Empty, unknown and unlisted
+references reject, including hidden carriers; highlight/underline, owned pointers,
+mask sources, text and media retain their own admission rules. No effect creates a
+stroke where the ordinary carrier has none.
+
+The shared ordinary/frozen paint and Split evidence consumers use that same
+selected width. Authored colors, fills, centerlines, endpoints, routes and action
+semantics stay authoritative; connector arrowheads use their existing weight-derived
+formula. Selected connector half-stroke and head must fit authored bounds. Selected
+mark geometry envelopes include half-stroke before sampled world transformation;
+remaining paint must fit the canvas after existing authored aperture envelopes.
+These envelope checks are conservative and do not infer a smaller path footprint.
+Draw/connect/reveal, transforms, opacity and hierarchy clip/mask order remain with
+the existing compositor. Timed attention remains separate.
+
+Evidence outside-focus fill consumes `evidence.mask_color_token`, retaining exact
+`intent.darkening`; focus and inline pointer consume `highlight_color_token` and
+`fine_px * profile_scale`. Source labels consume `source_label_color_token`. Outer
+borders retain authored/default color and use fine width. Crop/source bytes,
+permissions, read holds and timing remain unchanged. Applicability and deferred
+compiler/quality/caption responsibilities are recorded in
+[P3_38_INK_TOKEN_MAP.md](P3_38_INK_TOKEN_MAP.md). This adds no contract/schema fields,
+resources or public capability and grants no ledger or release acceptance.

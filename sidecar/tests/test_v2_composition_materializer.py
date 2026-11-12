@@ -231,7 +231,16 @@ def test_destination_graph_cannot_launder_a_coherently_changed_expansion(defect)
     elif defect == "wrong_board":
         raw["board_id"] = "outer-board"
     else:
+        unrelated = deepcopy(layout["objects"][1])
+        unrelated.update(object_id="unrelated-root", parent_id=None)
+        layout["objects"].append(unrelated)
+        layout["boards"][0]["object_ids"].append(unrelated["object_id"])
         layout["boards"][0]["density_limit"] = 2
+        materializer().validate_composition_expansion(raw, layout)
+        layout["boards"][0]["density_limit"] = 1
+        with pytest.raises(ValueError, match="exceeds density limit"):
+            materializer().validate_composition_expansion(raw, layout)
+        return
     with pytest.raises(ValueError):
         materializer().validate_composition_expansion(raw, layout)
 

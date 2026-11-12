@@ -26,6 +26,7 @@ from atme.store.contracts_v2 import (
     TargetAction,
     TextObject,
     _annotation_phase_windows,
+    _progressive_parts_phase_windows,
     _reject_parent_cycles,
     _structured_list_phase_windows,
     _validate_external_aperture_references,
@@ -263,7 +264,8 @@ def _history_boundaries(layout, timeline):
         action = row.action
         if isinstance(action, TargetAction):
             windows = (_annotation_phase_windows(row) if action.annotation_policy is not None
-                       else _structured_list_phase_windows(row) if action.structured_list_policy is not None else ())
+                       else _structured_list_phase_windows(row) if action.structured_list_policy is not None
+                       else _progressive_parts_phase_windows(row) if action.progressive_parts_policy is not None else ())
             for _phase, start, end in windows:
                 cuts.update((start, end))
         if isinstance(action, SplitAction) and action.split_policy is not None:

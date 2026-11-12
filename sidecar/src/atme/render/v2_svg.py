@@ -54,6 +54,7 @@ from atme.render.v2_image import (
     validate_image_placement,
     validate_placement_permissions,
 )
+from atme.render.v2_ink import INK_EFFECTS, ink_effect_eligible, primary_stroke_width
 from atme.render.v2_list import UnsupportedOrderedList, validate_ordered_list
 from atme.render.v2_mask import UnsupportedMask, mask_source_region
 from atme.render.v2_media_view import media_visual_view, validate_media_ranges
@@ -73,8 +74,13 @@ from atme.render.v2_registry import (
     validate_registry_binding,
     validate_registry_world_binding,
 )
-from atme.render.v2_state import FrameObject, FrameSnapshot, evaluate_frame
-from atme.render.v2_world import transform_svg
+from atme.render.v2_state import (
+    FrameObject,
+    FrameSnapshot,
+    _reject_public_bare_split,
+    evaluate_frame,
+)
+from atme.render.v2_world import transform_svg, world_bounds, world_matrix
 from atme.store.contracts_v2 import (
     MEDIA_OBJECT_TYPES,
     ConnectionAction,
@@ -524,7 +530,10 @@ def _evidence_markup(obj: VisualObject, state: FrameObject, style, root: Path,
                   if inline_annotation is not None else None)
     ink = style.colors["ink"]
     paper = style.colors["paper"]
-    accent = style.colors["attention"]
+    accent = style.colors[style.evidence.highlight_color_token]
+    mask = style.colors[style.evidence.mask_color_token]
+    label_color = style.colors[style.evidence.source_label_color_token]
+    fine = style.strokes.fine_px * scale
     border = _color(obj.style.stroke, style.colors, default=ink)
     backing = _color(obj.style.fill, style.colors, default=paper)
     family = _xml_escape(caption_font.family)
@@ -555,21 +564,21 @@ def _evidence_markup(obj: VisualObject, state: FrameObject, style, root: Path,
             if width > 0 and height > 0:
                 markup.append(
                     f'<rect data-evidence-darkening="outside-focus" x="{_n(x)}" y="{_n(y)}" '
-                    f'width="{_n(width)}" height="{_n(height)}" fill="{ink}" '
+                    f'width="{_n(width)}" height="{_n(height)}" fill="{mask}" '
                     f'opacity="{_n(intent.darkening)}"/>'
                 )
     markup.append(
         f'<rect data-evidence-focus="{_xml_escape(intent.claim_id)}" '
         f'x="{_n(focus_x)}" y="{_n(focus_y)}" width="{_n(focus_width)}" '
         f'height="{_n(focus_height)}" fill="none" stroke="{accent}" '
-        f'stroke-width="{_n(2 * scale)}"/>'
+        f'stroke-width="{_n(fine)}"/>'
     )
     if annotation is not None:
         annotation_y = bounds.y + image_height + gap
         markup.extend((
             (f'<path data-evidence-annotation="pointer" d="M {_n(focus_x + focus_width / 2)} '
              f'{_n(focus_y + focus_height)} L {_n(bounds.x + margin)} {_n(annotation_y + annotation_height / 2)}" '
-             f'fill="none" stroke="{accent}" stroke-width="{_n(2 * scale)}"/>'),
+             f'fill="none" stroke="{accent}" stroke-width="{_n(fine)}"/>'),
             (f'<text data-evidence-annotation="text" x="{_n(bounds.x + margin)}" '
              f'y="{_n(annotation_y + annotation_height * 0.72)}" fill="{ink}" '
              f'font-family="{family}" font-weight="{caption_font.weight}" '
@@ -581,12 +590,12 @@ def _evidence_markup(obj: VisualObject, state: FrameObject, style, root: Path,
          f'height="{_n(label_height)}" fill="{paper}"/>'),
         (f'<text data-evidence-source-label="{_xml_escape(intent.claim_id)}" '
          f'x="{_n(bounds.x + margin)}" y="{_n(label_y + label_height * 0.72)}" '
-         f'fill="{ink}" font-family="{family}" font-weight="{caption_font.weight}" '
+         f'fill="{label_color}" font-family="{family}" font-weight="{caption_font.weight}" '
          f'font-size="{_n(font_size)}">{label}</text>'),
         '</g>',
         (f'<rect x="{_n(bounds.x)}" y="{_n(bounds.y)}" width="{_n(bounds.width)}" '
          f'height="{_n(bounds.height)}" rx="{_n(radius)}" fill="none" stroke="{border}" '
-         f'stroke-width="{_n(2 * scale)}"/>'),
+         f'stroke-width="{_n(fine)}"/>'),
     ))
     return "".join(markup)
 
@@ -611,8 +620,7 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
             "accent" if obj.object_type == "underline" else "ink"
         ])
         fill = _color(obj.style.fill, style.colors, default="none")
-        weight = (style.strokes.emphasis_px if obj.object_type == "highlight"
-                  else style.strokes.regular_px) * scale
+        weight = primary_stroke_width(obj, style, scale)
         if state.morph_geometry is not None:
             inner = (f'<path data-geometry-action="morph" d="{state.morph_geometry.svg_d}" '
                      f'fill="{fill}" stroke="{stroke}" stroke-width="{_n(weight)}" '
@@ -641,7 +649,7 @@ def _object_markup(obj: MarkObject | TextObject | VisualObject | ConnectorObject
     elif isinstance(obj, ConnectorObject):
         stroke = _color(obj.style.stroke, style.colors, default=style.colors["ink"])
         inner = _connector_shape(obj, objects, states, stroke,
-                                 style.strokes.regular_px * scale,
+                                 primary_stroke_width(obj, style, scale),
                                  state.reveal_fraction if active_verb in {
                                      "draw", "connect", "disconnect"
                                  } else None, registry_inputs=registry_inputs, media_view=media_view)
@@ -725,7 +733,8 @@ def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObj
                       style, root: Path, scale: float, objects: dict, *, annotation_pointer: bool = False,
                       callout_pointer: bool = False, resources=None) -> None:
     _xml_escape(obj.object_id)
-    if (obj.style.effect
+    if (obj.style.effect is not None and (obj.style.effect not in INK_EFFECTS
+            or not ink_effect_eligible(obj) or annotation_pointer or callout_pointer)
             or obj.asset_id and not (isinstance(obj, VisualObject)
                                      and obj.object_type in {"image", "evidence", *MEDIA_OBJECT_TYPES})):
         raise UnsupportedVisualObject(
@@ -739,8 +748,7 @@ def _preflight_object(obj: MarkObject | TextObject | VisualObject | ConnectorObj
             "accent" if obj.object_type == "underline" else "ink"
         ])
         fill = _color(obj.style.fill, style.colors, default="none")
-        weight = (style.strokes.emphasis_px if obj.object_type == "highlight"
-                  else style.strokes.regular_px) * scale
+        weight = primary_stroke_width(obj, style, scale)
         _shape(obj, stroke, fill, weight)
     elif isinstance(obj, ConnectorObject):
         _color(obj.style.stroke, style.colors, default=style.colors["ink"])
@@ -852,17 +860,30 @@ def _annotation_paint_modes(bindings, at_ms):
 
 
 def compose_svg_frame(layout_document: dict, timeline_document: dict, at_ms: int,
-                      asset_bytes: dict[str, bytes | VerifiedEvidenceBytes] | None = None) -> SVGFrame:
+                      asset_bytes: dict[str, bytes | VerifiedEvidenceBytes] | None = None,
+                      *, split_inputs=None) -> SVGFrame:
     """Draw supported objects in deterministic z order; never substitute boxes."""
-    snapshot = evaluate_frame(layout_document, timeline_document, at_ms)
     layout = ExecutableLayoutV2.model_validate(layout_document)
     timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
+    _reject_public_bare_split(timeline.actions)
+    if any(isinstance(row.action, SplitAction) for row in timeline.actions):
+        from atme.render.v2_split_paint import _public_split_paint_inputs
+
+        split_inputs = _public_split_paint_inputs(layout, split_inputs, asset_bytes)
+        snapshot = evaluate_frame(layout_document, timeline_document, at_ms, split_inputs=split_inputs)
+    else:
+        if split_inputs is not None:
+            raise ValueError("Split authority requires a Split timeline")
+        snapshot = evaluate_frame(layout_document, timeline_document, at_ms)
     held_frames = {
-        key: evaluate_frame(layout_document, timeline_document, end)
+        key: (evaluate_frame(layout_document, timeline_document, end, split_inputs=split_inputs)
+              if split_inputs is not None else evaluate_frame(layout_document, timeline_document, end))
         for key, policy, _, end in _authored_annotation_bindings(timeline)
         if policy.leader_connector_id is not None
     }
-    return _compose_validated_svg_frame(layout, timeline, snapshot, held_frames, asset_bytes)
+    if split_inputs is None:
+        return _compose_validated_svg_frame(layout, timeline, snapshot, held_frames, asset_bytes)
+    return _compose_validated_svg_frame(layout, timeline, snapshot, held_frames, asset_bytes, split_inputs=split_inputs)
 
 
 def _prepare_project_rasters(layout, objects, states, actions, resolved_assets, asset_bytes, at_ms,
@@ -1013,6 +1034,7 @@ def _compose_validated_svg_frame(layout: ExecutableLayoutV2, timeline: ResolvedV
         action = resolved.action
         if (isinstance(action, TargetAction) and action.verb == "progressive_reveal"
                 and action.structured_list_policy is None
+                and action.progressive_parts_policy is None
                 and any(not isinstance(objects[target], TextObject)
                         or objects[target].object_type != "list" for target in action.target_ids)):
             raise UnsupportedVisualObject(
@@ -1101,7 +1123,8 @@ def _compose_validated_svg_frame(layout: ExecutableLayoutV2, timeline: ResolvedV
     raster_images.update(_prepare_evidence_rasters(objects, resolved_assets, asset_bytes, evidence_treatments))
     active_verbs = {
         target: ("reveal" if isinstance(resolved.action, TargetAction)
-                 and resolved.action.structured_list_policy is not None else resolved.action.verb)
+                 and (resolved.action.structured_list_policy is not None
+                      or resolved.action.progressive_parts_policy is not None) else resolved.action.verb)
         for resolved in timeline.actions
         if resolved.start_ms <= at_ms < resolved.end_ms
         for target in (
@@ -1122,7 +1145,7 @@ def _compose_validated_svg_frame(layout: ExecutableLayoutV2, timeline: ResolvedV
         {node.object_id: node.sibling_ordinal for node in snapshot.hierarchy.nodes},
         style, root, scale_x, active_verbs, raster_images, evidence_treatments,
         split_envelopes, resources, registry_inputs=registry_inputs, active_board_id=snapshot.active_board_id,
-        media_rasters=media_rasters, media_view=media_view)
+        media_rasters=media_rasters, media_view=media_view, paint_canvas=layout.canvas)
     paper = (f'<rect x="{_n(layout.canvas.x)}" y="{_n(layout.canvas.y)}" '
              f'width="{_n(layout.canvas.width)}" height="{_n(layout.canvas.height)}" '
              f'fill="{style.colors["paper"]}"/>')
@@ -1139,10 +1162,54 @@ def _compose_validated_svg_frame(layout: ExecutableLayoutV2, timeline: ResolvedV
     return SVGFrame(at_ms=at_ms, width=width, height=height, svg=svg)
 
 
+def _validate_ink_canvas(obj, objects, states, canvas, weight):
+    """Selected ink cannot depend on the unowned SVG viewport to contain paint."""
+    if obj.style.effect is None:
+        return
+    obj = geometry_object(obj, states[obj.object_id].morph_geometry)
+    transforms = {key: state.transform for key, state in states.items()}
+    matrix = world_matrix(obj, objects, transforms)
+    bounds = obj.geometry.bounds
+    # The authored geometry envelope is the admission authority, including
+    # freehand control points; retain it rather than inferring a smaller hull.
+    half = float(_n(weight)) / 2 if isinstance(obj, MarkObject) else 0
+    points = [matrix.point(x, y)
+              for x in (bounds.x - half, bounds.x + bounds.width + half)
+              for y in (bounds.y - half, bounds.y + bounds.height + half)]
+    x1, y1 = min(x for x, _ in points), min(y for _, y in points)
+    x2, y2 = max(x for x, _ in points), max(y for _, y in points)
+    # Existing authored apertures retain their order; their world envelopes
+    # bound any remaining paint without adding an implicit canvas clip.
+    def aperture_shape(owner):
+        if isinstance(owner, MaskContainer):
+            # Hierarchy masks paint their source in the owner's parent space,
+            # outside the owner's animated content transform.
+            return objects[owner.mask_source_object_id].model_copy(update={"parent_id": owner.parent_id})
+        return owner
+
+    apertures = []
+    current = obj
+    while current is not None:
+        if current.clip_id is not None:
+            apertures.append(aperture_shape(objects[current.clip_id]))
+        if isinstance(current, ContainerObject) and current.object_type in {"clip", "mask"}:
+            apertures.append(aperture_shape(current))
+        current = objects[current.parent_id] if current.parent_id is not None else None
+    for aperture in apertures:
+        ax1, ay1, ax2, ay2 = world_bounds(aperture, objects, transforms)
+        x1, y1, x2, y2 = max(x1, ax1), max(y1, ay1), min(x2, ax2), min(y2, ay2)
+    if x1 >= x2 or y1 >= y2:
+        return
+    if (x1 < canvas.x or y1 < canvas.y
+            or x2 > canvas.x + canvas.width or y2 > canvas.y + canvas.height):
+        raise UnsupportedVisualObject(f"ink effect {obj.object_id} paint footprint exceeds canvas bounds")
+
+
 def _compose_object_tree(objects, states, paint_ordinals, style, root, scale_x,
                          active_verbs, raster_images, evidence_treatments,
                          split_envelopes, resources, *, included_ids=None, registry_inputs=None,
-                         active_board_id=None, captured_aperture_subset=None, media_rasters=None, media_view=None):
+                         active_board_id=None, captured_aperture_subset=None, media_rasters=None, media_view=None,
+                         paint_canvas=None):
     """Shared native tree paint; callers own authentication and viewport framing.
 
     No backing paper is added here. An isolated proof can select one captured
@@ -1204,6 +1271,9 @@ def _compose_object_tree(objects, states, paint_ordinals, style, root, scale_x,
         return f'<g {attribute}="url(#{name})">{markup}</g>'
 
     for obj in tree_objects.values():
+        if paint_canvas is not None and obj.style.effect is not None:
+            _validate_ink_canvas(obj, objects, states, paint_canvas,
+                                 primary_stroke_width(obj, style, scale_x))
         if isinstance(obj, VisualObject) and obj.technical_frame is not None:
             from atme.render.v2_technical_frame_lifecycle import (
                 validate_technical_frame_sample,
@@ -1296,8 +1366,20 @@ def _compose_object_tree(objects, states, paint_ordinals, style, root, scale_x,
 
 
 def compose_png_frame(layout_document: dict, timeline_document: dict, at_ms: int,
-                      asset_bytes: dict[str, bytes | VerifiedEvidenceBytes] | None = None) -> PNGFrame:
+                      asset_bytes: dict[str, bytes | VerifiedEvidenceBytes] | None = None,
+                      *, split_inputs=None) -> PNGFrame:
     """Rasterize a supported frame with verified, pinned fonts and no system-font fallback."""
+    layout = ExecutableLayoutV2.model_validate(layout_document)
+    timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
+    _reject_public_bare_split(timeline.actions)
+    if any(isinstance(row.action, SplitAction) for row in timeline.actions):
+        from atme.render.v2_split_paint import _public_split_paint_inputs
+
+        split_inputs = _public_split_paint_inputs(layout, split_inputs, asset_bytes)
+        frame = compose_svg_frame(layout_document, timeline_document, at_ms, asset_bytes, split_inputs=split_inputs)
+        return _rasterize_svg_frame(layout, frame, split_inputs=split_inputs)
+    if split_inputs is not None:
+        raise ValueError("Split authority requires a Split timeline")
     frame = compose_svg_frame(layout_document, timeline_document, at_ms, asset_bytes)
     return _rasterize_svg_frame(ExecutableLayoutV2.model_validate(layout_document), frame)
 

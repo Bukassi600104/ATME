@@ -64,13 +64,14 @@ def _tables(payload):
     directory_end = 12 + count * 16
     if directory_end > len(payload):
         raise UnsupportedCode("code glyph font directory is truncated")
+    view = memoryview(payload)
     result, spans = {}, []
     for index in range(count):
         tag, _, offset, length = _unpack(payload, 12 + index * 16, "4sIII")
         if (tag in result or offset < directory_end or offset % 4
                 or length <= 0 or offset + length > len(payload)):
             raise UnsupportedCode("code glyph font has invalid/duplicate table bounds")
-        result[tag] = payload[offset:offset + length]
+        result[tag] = view[offset:offset + length]
         spans.append((offset, offset + length))
     ordered = sorted(spans)
     if any(end > next_start for (_, end), (next_start, _) in pairwise(ordered)):
@@ -263,7 +264,7 @@ def code_svg(obj: TextObject, style: PaperInkStyle, scale: float, bundle: Verifi
             or write_fraction is not None and (type(write_fraction) not in {int, float}
                 or not math.isfinite(write_fraction) or not 0 <= write_fraction <= 1)):
         raise UnsupportedCode("code scale/write fraction must be finite and within range")
-    if (obj.style.text != "text.code" or obj.style.stroke or obj.style.fill or obj.style.effect
+    if (obj.style.text != "text.code" or obj.style.stroke or obj.style.fill or obj.style.effect is not None
             or obj.geometry.points or obj.geometry.corner_radius is not None or obj.asset_id is not None):
         raise UnsupportedCode("code requires explicit code typography and unstyled authored bounds")
     style = PaperInkStyle.model_validate(style.model_dump(mode="json"))

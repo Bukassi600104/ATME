@@ -1599,15 +1599,41 @@ class StructuredListPolicy(StrictModel):
         return self
 
 
+class ProgressivePartsPolicy(StrictModel):
+    """Exact real part roots, complete write closure and authenticated read versions."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    version: Literal["1.0.0"]
+    container_group_id: str = Field(min_length=1, pattern=r"\S")
+    part_root_ids: list[str] = Field(min_length=1, max_length=256,
+                                    json_schema_extra={"uniqueItems": True})
+    phases: list[StructuredListPhase] = Field(min_length=1, max_length=256)
+    expected_closure_state_versions: dict[str, Annotated[int, Field(strict=True, ge=1)]]
+    expected_read_state_versions: dict[str, Annotated[int, Field(strict=True, ge=1)]]
+
+    @model_validator(mode="after")
+    def exact_part_inventory(self):
+        ids = self.part_root_ids
+        writes, reads = set(self.expected_closure_state_versions), set(self.expected_read_state_versions)
+        if (len(set(ids)) != len(ids) or any(not key.strip() for key in [*ids, *writes, *reads])
+                or self.container_group_id in writes or self.container_group_id not in reads
+                or not set(ids) <= writes or writes.intersection(reads)
+                or [phase.object_id for phase in self.phases] != ids):
+            raise ValueError("progressive parts require distinct ordered roots, exact phases and disjoint write/read authority")
+        return self
+
+
 class TargetAction(ActionBase):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False, json_schema_extra={
-        "allOf": [{"if": {"required": ["structured_list_policy"],
-                           "properties": {"structured_list_policy": {"type": "object"}}},
+        "allOf": [{"if": {"required": [name], "properties": {name: {"type": "object"}}},
                    "then": {"required": ["easing", "expected_state"],
                        "properties": {"verb": {"const": "progressive_reveal"},
                        "easing": {"const": "linear"}, "expected_state": {"const": "hidden"},
                        "post_state": {"const": "visible"}, "annotation": {"type": "null"},
-                       "annotation_policy": {"type": "null"}, "count_policy": {"type": "null"}}}}],
+                       "annotation_policy": {"type": "null"}, "count_policy": {"type": "null"},
+                       other: {"type": "null"}}}}
+                  for name, other in (("structured_list_policy", "progressive_parts_policy"),
+                                      ("progressive_parts_policy", "structured_list_policy"))],
     })
     verb: Literal[
         "reveal", "write", "draw", "enter", "exit", "highlight", "dim", "isolate",
@@ -1620,6 +1646,7 @@ class TargetAction(ActionBase):
     annotation_policy: AnnotationPolicy | None = None
     count_policy: CountPolicy | None = None
     structured_list_policy: StructuredListPolicy | None = None
+    progressive_parts_policy: ProgressivePartsPolicy | None = None
 
     @model_serializer(mode="wrap")
     def preserve_legacy_shape(self, handler):
@@ -1630,10 +1657,14 @@ class TargetAction(ActionBase):
             result.pop("count_policy", None)
         if self.structured_list_policy is None:
             result.pop("structured_list_policy", None)
+        if self.progressive_parts_policy is None:
+            result.pop("progressive_parts_policy", None)
         return result
 
     @model_validator(mode="after")
     def exit_is_permanent_removal(self):
+        if self.progressive_parts_policy is not None:
+            _require_progressive_parts_contract(self)
         if self.structured_list_policy is not None:
             _require_structured_list_contract(self)
         if self.annotation_policy is not None:
@@ -2369,11 +2400,84 @@ class CameraAction(ActionBase):
     movement_purpose: Literal["orient", "reveal", "compare", "follow", "emphasize", "return"]
 
 
+class SoundFade(StrictModel):
+    duration_ms: int = Field(ge=0, strict=True)
+    easing: Literal["linear", "ease_in", "ease_out", "ease_in_out", "step"]
+
+
+class SoundPlayback(StrictModel):
+    source_in_ms: int = Field(ge=0, strict=True)
+    source_out_ms: int = Field(gt=0, strict=True)
+    repeat_count: int = Field(ge=1, strict=True)
+    offset_ms: int = Field(ge=0, strict=True)
+
+    @model_validator(mode="after")
+    def finite_cursor(self):
+        if (self.source_out_ms <= self.source_in_ms
+                or self.offset_ms >= (self.source_out_ms - self.source_in_ms) * self.repeat_count):
+            raise ValueError("sound playback requires a finite range and cursor")
+        return self
+
+
+class SoundPolicy(StrictModel):
+    version: Literal["1.0.0"]
+    bus_id: str = Field(min_length=1)
+    bus_role: Literal["effect", "music"]
+    narration_priority: Literal["preserve_narration"]
+    fade_in: SoundFade
+    fade_out: SoundFade
+    playback: SoundPlayback | None = None
+
+
 class SoundAction(ActionBase):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, json_schema_extra={
+        "allOf": [{"if": {"required": ["sound_policy"],
+                          "properties": {"sound_policy": {"type": "object"}}},
+                   "then": {"required": ["gain_db", "easing", "expected_state"],
+                            "properties": {"easing": {"const": "linear"}},
+                            "allOf": [
+                       {"if": {"properties": {"verb": {"const": "sound_cue"}}}, "then": {
+                           "required": ["asset_id"], "properties": {
+                               "asset_id": {"type": "string", "minLength": 1},
+                               "state": {"const": "playing"}, "expected_state": {"const": "stopped"},
+                               "post_state": {"const": "stopped"}, "sound_policy": {
+                                   "required": ["playback"], "properties": {
+                                       "bus_role": {"const": "effect"}, "playback": {
+                                           "type": "object", "properties": {"repeat_count": {"const": 1}}}}}}}},
+                       {"if": {"properties": {"verb": {"const": "music_state"}}}, "then": {
+                           "required": ["asset_id"], "properties": {
+                               "asset_id": {"type": "string", "minLength": 1},
+                               **{key: {"enum": ["stopped", "playing", "paused"]}
+                                  for key in ("state", "expected_state", "post_state")},
+                               "sound_policy": {"properties": {"bus_role": {"const": "music"}}}}}},
+                       {"if": {"properties": {"state": {"enum": ["playing", "paused"]}}}, "then": {
+                           "properties": {"sound_policy": {"required": ["playback"],
+                               "properties": {"playback": {"type": "object"}}}}}},
+                       {"if": {"properties": {"state": {"const": "stopped"}}}, "then": {
+                           "properties": {"sound_policy": {"properties": {"playback": {"type": "null"}}}}}},
+                       {"if": {"properties": {"state": {"enum": ["stopped", "paused"]}}}, "then": {
+                           "properties": {"sound_policy": {"properties": {
+                               key: {"properties": {"duration_ms": {"const": 0}}}
+                               for key in ("fade_in", "fade_out")}}}}},
+                       {"if": {"properties": {"verb": {"const": "purposeful_silence"}}}, "then": {
+                           "properties": {"state": {"const": "silent"}, "expected_state": {"const": "clear"},
+                               "post_state": {"const": "clear"}, "asset_id": {"type": "null"},
+                               "gain_db": {"const": 0}, "sound_policy": {
+                                   "properties": {"playback": {"type": "null"}}}}}},
+                   ]}}],
+    })
     verb: Literal["sound_cue", "music_state", "purposeful_silence"]
     asset_id: str | None = None
     gain_db: float = Field(default=0, ge=-60, le=12)
     state: str
+    sound_policy: SoundPolicy | None = None
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_sound_shape(self, handler):
+        result = handler(self)
+        if self.sound_policy is None:
+            result.pop("sound_policy", None)
+        return result
 
     @model_validator(mode="after")
     def asset_matches_verb(self):
@@ -2381,6 +2485,31 @@ class SoundAction(ActionBase):
             raise ValueError(f"{self.verb} requires an asset")
         if self.verb == "purposeful_silence" and self.asset_id is not None:
             raise ValueError("purposeful silence cannot name an asset")
+        policy = self.sound_policy
+        if policy is not None:
+            if "gain_db" not in self.model_fields_set or self.easing != "linear":
+                raise ValueError("sound policy requires explicit gain and linear outer easing")
+            if self.verb == "purposeful_silence":
+                if (self.state, self.expected_state, self.post_state) != ("silent", "clear", "clear"):
+                    raise ValueError("sound silence requires clear/silent/clear envelope states")
+                if policy.playback is not None or self.gain_db != 0:
+                    raise ValueError("sound silence prohibits playback and nonzero gain")
+            else:
+                if policy.bus_role != ("effect" if self.verb == "sound_cue" else "music"):
+                    raise ValueError("sound verb and editorial bus role differ")
+                if self.state not in {"playing", "paused", "stopped"} or self.expected_state not in {
+                    "playing", "paused", "stopped"
+                } or self.post_state not in {"playing", "paused", "stopped"}:
+                    raise ValueError("unknown sound transport state")
+                if (policy.playback is not None) != (self.state != "stopped"):
+                    raise ValueError("sound playback must match active transport state")
+                if self.state != "playing" and (policy.fade_in.duration_ms or policy.fade_out.duration_ms):
+                    raise ValueError("paused/stopped sound requires zero fades")
+                if self.verb == "sound_cue" and (
+                    (self.expected_state, self.state, self.post_state) != ("stopped", "playing", "stopped")
+                    or policy.playback.repeat_count != 1
+                ):
+                    raise ValueError("sound cue requires stopped/playing/stopped and one repeat")
         return self
 
 
@@ -2972,7 +3101,7 @@ class VisualPlanV2(StrictModel):
             owned = {x.object_id for x in self.objects if x.board_id == board.board_id}
             if set(board.object_ids) != owned:
                 raise ValueError(f"board {board.board_id} inventory must match object ownership")
-            if len(board.object_ids) > board.density_limit:
+            if sum(semantic_parents[key] is None for key in board.object_ids) > board.density_limit:
                 raise ValueError(f"board {board.board_id} exceeds density limit")
         for obj in self.objects:
             if obj.board_id not in boards or obj.beat_id not in beats:
@@ -3256,7 +3385,7 @@ class ExecutableLayoutV2(StrictModel):
             owned = {x.object_id for x in self.objects if x.board_id == board.board_id}
             if set(board.object_ids) != owned:
                 raise ValueError(f"board {board.board_id} inventory must match object ownership")
-            if len(board.object_ids) > board.density_limit:
+            if sum(object_map[key].parent_id is None for key in board.object_ids) > board.density_limit:
                 raise ValueError(f"board {board.board_id} exceeds density limit")
         for obj in self.objects:
             if obj.board_id not in board_ids:
@@ -3392,6 +3521,8 @@ class ResolvedAction(StrictModel):
             raise ValueError("actions use non-empty half-open intervals")
         if isinstance(self.action, TargetAction) and self.action.structured_list_policy is not None:
             _structured_list_phase_windows(self)
+        if isinstance(self.action, TargetAction) and self.action.progressive_parts_policy is not None:
+            _progressive_parts_phase_windows(self)
         results = (self.action.split_policy.results
                    if isinstance(self.action, SplitAction) and self.action.split_policy is not None else [])
         evidence_ids = [result.object_id for result in results if result.evidence_activation is not None]
@@ -3683,6 +3814,8 @@ class ResolvedVisualTimelineV2(StrictModel):
                     states[key] = "visible"
             # A camera observes objects; it does not mutate their semantic state.
             state_targets = ([] if isinstance(action, CameraAction)
+                             else list(action.progressive_parts_policy.expected_closure_state_versions)
+                             if isinstance(action, TargetAction) and action.progressive_parts_policy is not None
                              else action.target_ids if isinstance(action, TargetAction)
                              and action.structured_list_policy is not None
                              else [action.connector_id] if isinstance(action, ConnectionAction)
@@ -4250,6 +4383,8 @@ def _validate_split_evidence_graph(action, result, beat, objects, assets, mask_s
 
 
 def _action_mutation_references(action):
+    if isinstance(action, TargetAction) and action.progressive_parts_policy is not None:
+        return list(action.progressive_parts_policy.expected_closure_state_versions)
     if isinstance(action, TargetAction) and action.structured_list_policy is not None:
         return list(action.target_ids)
     if isinstance(action, SplitAction) and action.split_policy is not None:
@@ -4267,6 +4402,25 @@ def _require_count_contract(action: TargetAction) -> None:
         raise ValueError("count cannot discard its declared quantization levels with step easing")
 
 
+def _require_progressive_parts_contract(action):
+    policy = action.progressive_parts_policy
+    if (action.verb != "progressive_reveal" or action.target_ids != policy.part_root_ids
+            or (action.expected_state, action.post_state) != ("hidden", "visible")
+            or action.easing != "linear" or action.annotation is not None
+            or action.annotation_policy is not None or action.count_policy is not None
+            or action.structured_list_policy is not None):
+        raise ValueError("progressive parts require exact roots, linear hidden-to-visible timing and one policy")
+
+
+def _validate_progressive_parts_references(action, objects):
+    policy = action.progressive_parts_policy
+    refs = _action_object_references(action)
+    if any(key not in objects or objects[key].board_id != action.board_id for key in refs):
+        raise ValueError("progressive parts reference unknown or cross-board authority")
+    if objects[policy.container_group_id].object_type != "group":
+        raise ValueError("progressive parts owner must be a real Group")
+
+
 def _require_structured_list_contract(action):
     policy = action.structured_list_policy
     if (action.verb != "progressive_reveal" or action.target_ids != policy.item_object_ids
@@ -4278,6 +4432,9 @@ def _require_structured_list_contract(action):
 
 def _validate_structured_progression_objects(action, objects, *, normal_write=False):
     if not isinstance(action, TargetAction) or action.verb != "progressive_reveal":
+        return
+    if action.progressive_parts_policy is not None:
+        _validate_progressive_parts_references(action, objects)
         return
     policy = action.structured_list_policy
     if policy is None:
@@ -4311,6 +4468,13 @@ def validate_resolved_structure(plan: VisualPlanV2, layout: ExecutableLayoutV2,
                                 resolved: ResolvedVisualTimelineV2,
                                 cleaned_duration_ms: int) -> None:
     """Compiler output must initialize the complete layout and authoritative timing."""
+    authored_parts = {action.action_id: action for action in plan.actions
+        if isinstance(action, TargetAction) and action.progressive_parts_policy is not None}
+    resolved_parts = {item.action.action_id: item.action for item in resolved.actions
+        if isinstance(item.action, TargetAction) and item.action.progressive_parts_policy is not None}
+    if (authored_parts.keys() != resolved_parts.keys()
+            or any(action != resolved_parts[key] for key, action in authored_parts.items())):
+        raise ValueError("resolved progressive parts inventory or policy differs from the authoritative plan")
     authored_lists = {action.action_id: action for action in plan.actions
         if isinstance(action, TargetAction) and action.structured_list_policy is not None}
     resolved_lists = {item.action.action_id: item.action for item in resolved.actions
@@ -5330,6 +5494,11 @@ def _annotation_policy_phase_windows(policy, start_ms, end_ms):
     return _weighted_phase_windows(policy.phases, start_ms, end_ms, "annotation")
 
 
+def _progressive_parts_phase_windows(resolved):
+    return _weighted_phase_windows(resolved.action.progressive_parts_policy.phases,
+                                   resolved.start_ms, resolved.end_ms, "progressive parts")
+
+
 def _structured_list_phase_windows(resolved):
     return _weighted_phase_windows(resolved.action.structured_list_policy.phases,
         resolved.start_ms, resolved.end_ms, "structured list")
@@ -5505,6 +5674,10 @@ def _action_object_references(action):
     refs: list[str] = []
     if isinstance(action, (TargetAction, TransformAction, GroupAction, SplitAction, CameraAction)):
         refs.extend(action.target_ids)
+        if isinstance(action, TargetAction) and action.progressive_parts_policy is not None:
+            policy = action.progressive_parts_policy
+            refs.extend(key for key in policy.expected_closure_state_versions if key not in refs)
+            refs.extend(key for key in policy.expected_read_state_versions if key not in refs)
         if isinstance(action, TargetAction) and action.structured_list_policy is not None:
             refs.extend((action.structured_list_policy.list_object_id,
                          action.structured_list_policy.container_group_id))

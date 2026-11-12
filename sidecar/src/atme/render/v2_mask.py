@@ -27,7 +27,7 @@ def mask_source_region(source: MarkObject, transform) -> tuple[float, float, flo
     if source.object_type not in MASK_SOURCE_TYPES:
         raise UnsupportedMask(f"mask source {source.object_id} needs supported filled geometry")
     if (source.path_data is not None or source.anchors or source.style.stroke
-            or source.style.fill or source.style.text or source.style.effect):
+            or source.style.fill or source.style.text or source.style.effect is not None):
         raise UnsupportedMask(f"mask source {source.object_id} cannot carry painted style or path data")
     bounds = source.geometry.bounds
     x, y, width, height = map(_q, (bounds.x, bounds.y, bounds.width, bounds.height))

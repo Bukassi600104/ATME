@@ -552,8 +552,67 @@ def retained_frames_case(output_dir: Path) -> dict:
             "current proof preserves the original private consumer, ordered rows and exact pixels, not that assertion."}
 
 
+def required_native_cases() -> dict[str, str]:
+    """Exact existing generators, with measurements and test nodes kept separate."""
+    from test_v2_split_project_flows import PROJECT_FLOW_CASE_IDS
+
+    required = {}
+    families = (
+        ("geometry", "geometry", GEOMETRY_KINDS, ("draw", "reveal", "enter")),
+        ("text-list", "text", TEXT_KINDS, ("write", "reveal", "enter")),
+        ("code", "code-callout", CODE_KINDS, ("write", "reveal", "enter")),
+        ("callout", "code-callout", CALLOUT_KINDS, ("write", "reveal", "enter")),
+        ("chart", "chart", CHART_KINDS, ("draw", "reveal", "enter")),
+        ("media", "media", MEDIA_KINDS, ("reveal", "enter")),
+        ("container", "container", CONTAINER_KINDS, ("reveal", "draw", "enter", "write")),
+        ("evidence", "evidence", EVIDENCE_KINDS, ("reveal", "enter")),
+    )
+    for profile in ("landscape", "portrait"):
+        for family, proof, kinds, modes in families:
+            for kind in kinds:
+                for mode in modes:
+                    required[f"{family}-{kind}-{mode}-{profile}"] = proof
+        for kind in VISUAL_KINDS:
+            for mode in (("reveal", "enter", "draw") if kind == "character" else ("reveal", "enter")):
+                required[f"visual-{kind}-{mode}-{profile}"] = "visual"
+        for family, kind, state in STATE_CASES:
+            for owner in ("source", "part-1", "part-2"):
+                for mode in (("reveal",) if owner == "source" else
+                             ("reveal", "enter", "draw") if family == "character" else ("reveal", "enter")):
+                    required[f"visual-state-{family}-{str(state).lower()}-{owner}-{kind}-{mode}-{profile}"] = "visual-state"
+        for family in VISUAL_KINDS:
+            for kind in APERTURE_KINDS:
+                required[f"aperture-{family}-{kind}-reveal-{profile}"] = "visual-boundary"
+        for owner, mode in REGISTRY_ROLES:
+            required[f"registry-{owner}-{mode}-{profile}"] = "visual-boundary"
+        for kind in HISTORY_KINDS:
+            for order in ("authored", "reversed"):
+                required[f"history-{order}-{kind}-authored-{profile}"] = "history"
+        for kind in CONNECTOR_KINDS:
+            for mode in ("reveal", "draw"):
+                for routing in CONNECTOR_ROUTES:
+                    required[f"connector-{routing}-{kind}-{mode}-{profile}"] = "connector"
+    required.update(dict.fromkeys(PROJECT_FLOW_CASE_IDS, "project"))
+    return required
+
+
+def _evidence_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("split_evidence", ROOT / "bench/split_evidence.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def reconcile_report(output_dir: Path) -> int:
+    return _evidence_module().reconcile(output_dir, ROOT, required_native_cases(), ROOT / "bench/split_evidence_allowlist.json")
+
+
 def write_report(output_dir: Path, cases: list[dict], *, diagnostic: str | None = None) -> int:
     """Retain measured evidence without silently upgrading a partial proof."""
+    if diagnostic is None:
+        return reconcile_report(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     report = {"scope": "private source compositor; not public/installed/creative acceptance",
         "status": "DIAGNOSTIC ONLY" if diagnostic else "INCOMPLETE", "final_acceptance": False,

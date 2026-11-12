@@ -629,6 +629,9 @@ def _reservation_footprint(action) -> tuple[set[str], set[str]]:
     if isinstance(action, TargetAction):
         if action.annotation_policy is not None:
             return set(_annotation_object_ids(action)), set(action.target_ids)
+        if action.progressive_parts_policy is not None:
+            return (set(action.progressive_parts_policy.expected_closure_state_versions),
+                    set(action.progressive_parts_policy.expected_read_state_versions))
         if action.structured_list_policy is not None:
             return set(action.target_ids), {action.structured_list_policy.list_object_id,
                                            action.structured_list_policy.container_group_id}

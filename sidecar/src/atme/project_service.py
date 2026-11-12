@@ -380,7 +380,9 @@ class ProjectService:
         for stored in rows:
             original = json.loads(stored["document"])
             if (stored["kind"] != "resolved_timeline" or original.get("contract_version") != "2.0.0"
-                    or not any(item["action"]["verb"] == "split" for item in original["actions"])):
+                    or not any(item["action"]["verb"] == "split"
+                               or item["action"].get("sound_policy") is not None
+                               for item in original["actions"])):
                 continue
             timing_row = conn.execute(
                 "SELECT document FROM project_source_timeline_versions WHERE job_id=? AND timeline_revision=?",
@@ -534,7 +536,9 @@ class ProjectService:
             document["compilation_fingerprint"] = _resolved_compilation_fingerprint(document)
             from atme.store.contracts_v2 import ResolvedVisualTimelineV2
             ResolvedVisualTimelineV2.model_validate(document)
-            if any(item["action"]["verb"] == "split" for item in document["actions"]):
+            if any(item["action"]["verb"] == "split"
+                   or item["action"].get("sound_policy") is not None
+                   for item in document["actions"]):
                 timing_row = conn.execute(
                     "SELECT document FROM project_source_timeline_versions WHERE job_id=? AND timeline_revision=?",
                     (copy_id, document["cleaned_timeline_revision"])).fetchone()
@@ -715,6 +719,7 @@ class ProjectService:
             EvidenceAction,
             ExecutableLayoutV2,
             ResolvedVisualTimelineV2,
+            SoundAction,
             VisualPlanV2,
             validate_plan_layout,
             validate_resolved_structure,
@@ -814,6 +819,34 @@ class ProjectService:
                 # Recompute against the active owned original before an atomic
                 # resolved write or stored preview; never repair authored pins.
                 self.render_media_bytes(project_id, asset, layout=layout)
+        if any(isinstance(item.action, SoundAction) and item.action.sound_policy is not None
+               for item in resolved.actions):
+            from atme.render.v2_sound_events import derive_sound_ledger
+
+            try:
+                derive_sound_ledger(resolved, plan)
+            except ValueError as exc:
+                raise ProjectError("invalid_artifact", str(exc)) from exc
+            sound_asset_ids = {item.action.asset_id for item in resolved.actions
+                               if isinstance(item.action, SoundAction) and item.action.asset_id}
+            owned = {asset["asset_id"]: asset for asset in self.list_assets(project_id)}
+            for asset in resolved.resolved_assets:
+                if asset.asset_id not in sound_asset_ids:
+                    continue
+                declared = plan_assets[asset.asset_id]
+                stored = owned.get(asset.asset_id)
+                if (stored is None or stored["revision"] != asset.revision
+                        or stored["resource_uri"] != asset.managed_ref
+                        or stored["sha256"] != asset.checksum_sha256
+                        or stored["bytes"] != asset.byte_length
+                        or stored["media_type"] != asset.media_type
+                        or declared.duration_ms != asset.duration_ms):
+                    raise ProjectError("invalid_artifact", "Sound asset differs from its owned immutable pins")
+                path, metadata = self.asset(project_id, asset.asset_id)
+                if (path.stat().st_size != asset.byte_length
+                        or metadata["revision"] != asset.revision
+                        or metadata["sha256"] != asset.checksum_sha256):
+                    raise ProjectError("invalid_artifact", "Sound asset differs from its owned immutable bytes")
         if require_return_receipts:
             from atme.render.v2_state import validate_resolved_return_history
 

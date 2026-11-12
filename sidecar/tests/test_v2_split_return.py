@@ -136,7 +136,7 @@ def geometry_history(portrait=False):
 
 @pytest.mark.parametrize("portrait", [False, True])
 def test_stored_split_requires_verified_inputs_and_preserves_public_gate(portrait):
-    from atme.render.v2_state import UnsupportedVisualAction, evaluate_frame
+    from atme.render.v2_state import evaluate_frame
     from atme.render.v2_timeline_replay import supports_operator
 
     layout, _, split, timeline = geometry_history(portrait)
@@ -145,9 +145,8 @@ def test_stored_split_requires_verified_inputs_and_preserves_public_gate(portrai
     validate_resolved_return_history(layout, timeline, layout_sha256=timeline.layout_sha256,
                                      split_inputs=inputs)
     assert original == (layout.model_dump(mode="json"), timeline.model_dump(mode="json"))
-    assert not supports_operator(split.action)
-    with pytest.raises(UnsupportedVisualAction, match="split"):
-        evaluate_frame(*original, 20)
+    assert supports_operator(split.action)
+    assert evaluate_frame(*original, 20, split_inputs=inputs).at_ms == 20
     with pytest.raises(ValueError, match="Split.*verified"):
         validate_resolved_return_history(layout, timeline, layout_sha256=timeline.layout_sha256)
 

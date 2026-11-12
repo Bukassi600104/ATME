@@ -37,7 +37,7 @@ def callout_body_svg(obj: TextObject, style: PaperInkStyle, scale: float, font_s
             or write_fraction is not None and (type(write_fraction) not in {int, float}
                 or not math.isfinite(write_fraction) or not 0 <= write_fraction <= 1)):
         raise UnsupportedVisualObject("Callout scale/write fraction must be finite and within range")
-    if obj.asset_id is not None or obj.style.effect or obj.geometry.points or obj.items:
+    if obj.asset_id is not None or obj.style.effect is not None or obj.geometry.points or obj.items:
         raise UnsupportedVisualObject("Callout has unsupported asset, effect, points or list content")
     role = _text_role(obj, style)
     font = next(font for font in style.fonts if font.id == role.font_id)

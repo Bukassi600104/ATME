@@ -6,6 +6,7 @@ import math
 from dataclasses import dataclass
 from itertools import pairwise
 
+from atme.render.v2_ink import INK_EFFECTS, ink_effect_eligible
 from atme.render.v2_media_view import require_media_readiness
 from atme.render.v2_registry import (
     UnsupportedRegistryPlacement,
@@ -112,6 +113,11 @@ def connector_geometry(obj: ConnectorObject, start: tuple, end: tuple, weight: f
              (1 - t) ** 2 * start[1] + 2 * (1 - t) * t * bend[1] + t ** 2 * end[1])
             for t in (step / 64 for step in range(65))
         ))
+    half_stroke = float(f"{weight:.4f}") / 2
+    if obj.style.effect is not None and any(
+            not inside((x + dx, y + dy)) for x, y in route
+            for dx in (-half_stroke, half_stroke) for dy in (-half_stroke, half_stroke)):
+        raise UnsupportedConnector(f"v2 arrow {obj.object_id} stroke footprint exceeds authored bounds")
     if not all(inside(point) for point in route):
         raise UnsupportedConnector(f"v2 arrow {obj.object_id} route exceeds authored bounds")
     if not math.isfinite(length) or not 0.0001 <= length <= 10_000_000:
@@ -198,7 +204,8 @@ def _validate_arrow_payload(obj: ConnectorObject, objects: dict, *, allow_pointe
     if any(isinstance(endpoint, ConnectorObject) or endpoint.board_id != obj.board_id
            for endpoint, _ in endpoints):
         raise UnsupportedConnector(f"v2 arrow {obj.object_id} endpoints must be non-connectors on its board")
-    if (obj.clip_id or obj.asset_id or obj.style.effect
+    if (obj.clip_id or obj.asset_id or (obj.style.effect is not None
+            and (obj.style.effect not in INK_EFFECTS or not ink_effect_eligible(obj)))
             or obj.geometry.points or obj.geometry.corner_radius is not None or obj.anchors
             or obj.style.fill or obj.style.text or obj.allow_self_loop):
         raise UnsupportedConnector(f"v2 arrow {obj.object_id} has ignored geometry or styling")

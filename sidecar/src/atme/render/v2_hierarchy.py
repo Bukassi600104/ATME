@@ -272,7 +272,8 @@ def validate_authored_hierarchy(action: GroupAction, objects: dict) -> tuple[Hie
     if (shell.object_type != "group" or not shell.visible or shell.opacity != 1
             or shell.asset_id is not None or shell.anchors or shell.geometry.points
             or shell.geometry.corner_radius is not None or shell.clip_id is not None
-            or any((shell.style.stroke, shell.style.fill, shell.style.text, shell.style.effect))):
+            or any((shell.style.stroke, shell.style.fill, shell.style.text))
+            or shell.style.effect is not None):
         raise UnsupportedHierarchy("hierarchy shell must be a visible opaque nonpainting group")
     mask_sources = {obj.mask_source_object_id for obj in objects.values() if isinstance(obj, MaskContainer)}
     affected = set()

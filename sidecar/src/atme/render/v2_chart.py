@@ -181,7 +181,7 @@ def chart_svg(obj: VisualObject, style: PaperInkStyle, scale: float, font_source
     obj = VisualObject.model_validate(_known_tree(obj), strict=True)
     style = PaperInkStyle.model_validate(style.model_dump(mode="json"))
     _number(scale, low=0.0001, high=100.)
-    if obj.geometry.points or obj.geometry.corner_radius is not None or obj.style.effect:
+    if obj.geometry.points or obj.geometry.corner_radius is not None or obj.style.effect is not None:
         raise ValueError("chart cannot discard authored points, radius or effect")
     payload, bounds = obj.chart_payload, obj.geometry.bounds
     clocks = _clock(payload, draw_fraction)

@@ -1,4 +1,4 @@
-"""Private Split paint consumers; no public action or family admission here."""
+"""Verified Split paint consumers shared by public frames and owning proofs."""
 
 import io
 import json
@@ -22,6 +22,7 @@ from atme.render.style_bundle import (
     load_bundle,
 )
 from atme.render.style_contracts import AssetRegistry, PaperInkStyle
+from atme.render.v2_ink import primary_stroke_width
 from atme.render.v2_raster import canonical_png
 from atme.render.v2_split import (
     SplitCapture,
@@ -99,7 +100,7 @@ def _split_path_evidence(obj, layout, resources):
     stroke = _color(obj.style.stroke, style.colors, default=style.colors[
         "attention" if obj.object_type == "highlight" else "accent" if obj.object_type == "underline" else "ink"])
     fill = _color(obj.style.fill, style.colors, default="none")
-    weight = (style.strokes.emphasis_px if obj.object_type == "highlight" else style.strokes.regular_px) * scale
+    weight = primary_stroke_width(obj, style, scale)
     # The native construction adapter proves positive rendered path length,
     # including rounded/curved/freehand geometry. A nonempty bounds box cannot.
     partial = _shape(obj, stroke, fill, weight, draw_fraction=.5)
@@ -402,7 +403,7 @@ def _split_captured_connector_evidence(obj, capture, basis, layout, resources):
     assets = {row.asset_id: ResolvedAsset.model_validate_json(row.resolved_json) for row in resources[3].rows}
     _, _, media_view = _prepare_project_rasters(layout, objects, frames, (), assets, resources[3], capture.start_ms)
     stroke = _color(obj.style.stroke, style.colors, default=style.colors["ink"])
-    weight = style.strokes.regular_px * scale
+    weight = primary_stroke_width(obj, style, scale)
     full = _connector_shape(obj, objects, frames, stroke, weight, None,
                             registry_inputs=registry, media_view=media_view)
     partial = _connector_shape(obj, objects, frames, stroke, weight, .5,
@@ -1013,7 +1014,7 @@ def prove_split_coverage(capture: SplitCapture, layout: ExecutableLayoutV2,
                 definitions, body = _compose_object_tree(objects, states, ordinals, style, None, scale,
                     modes, raster_images, treatments, constructions, resources, included_ids=included[root],
                     active_board_id=objects[root].board_id, captured_aperture_subset=aperture_subset,
-                    media_rasters=media_rasters, media_view=media_view)
+                    media_rasters=media_rasters, media_view=media_view, paint_canvas=layout.canvas)
                 svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
                     f'viewBox="{_n(canvas.x)} {_n(canvas.y)} {_n(canvas.width)} {_n(canvas.height)}">'
                     f'<defs>{definitions}</defs>{body}</svg>')
@@ -1166,7 +1167,7 @@ def _split_focus_bounds(capture, layout, timeline, replay, inputs, camera_action
         {row.object_id: row.sibling_ordinal for row in sample.hierarchy.nodes}, style, None, scale,
         active_modes, rasters, evidence, modes, resources,
         included_ids=frozenset(selected), registry_inputs=registry, active_board_id=activation.board_id,
-        media_rasters=media, media_view=media_view)
+        media_rasters=media, media_view=media_view, paint_canvas=layout.canvas)
     width, height, canvas = layout.output_profile.width, layout.output_profile.height, layout.canvas
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
            f'viewBox="{canvas.x} {canvas.y} {canvas.width} {canvas.height}">'
@@ -1180,14 +1181,12 @@ def _split_focus_bounds(capture, layout, timeline, replay, inputs, camera_action
             canvas.x + painted[2] * canvas.width / width, canvas.y + painted[3] * canvas.height / height)
 
 
-def _split_active_paint_modes(snapshot, timeline, objects):
-    """Bind renderer modes to the exact replay envelope, never infer draw/write.
+def _validate_split_paint_modes(timeline, objects):
+    """Share exact construction admission before replay and native paint.
 
     This private primitive consumer is not a family/continuous-coverage proof.
     Compound modes bind every leaf; incompatible closures remain fail-closed.
     """
-    expected = []
-    by_object = {}
     for resolved in timeline.actions:
         action = resolved.action
         if not isinstance(action, SplitAction):
@@ -1228,6 +1227,19 @@ def _split_active_paint_modes(snapshot, timeline, objects):
                         raise ValueError("Split native evidence needs its exact result, treatment and construction")
                 else:
                     _split_primitive_paint(obj, result.construction.mode)
+
+
+def _split_active_paint_modes(snapshot, timeline, objects):
+    """Bind renderer modes to the exact replay envelope, never infer draw/write."""
+    _validate_split_paint_modes(timeline, objects)
+    expected = []
+    by_object = {}
+    for resolved in timeline.actions:
+        action = resolved.action
+        if not isinstance(action, SplitAction):
+            continue
+        policy = action.split_policy
+        for result, closure in zip(policy.results, policy.source_basis.result_closures, strict=True):
             if resolved.start_ms <= snapshot.at_ms < resolved.end_ms:
                 envelope = SplitPaintEnvelope(result.object_id, action.action_id,
                     result.construction.mode, split_phase_progress(resolved.start_ms, resolved.end_ms,
@@ -1546,6 +1558,17 @@ def verify_split_paint_inputs(layout: ExecutableLayoutV2,
                              asset_bytes: Mapping[str, bytes | VerifiedEvidenceBytes]) -> VerifiedSplitPaintInputs:
     """Freeze actual byte evidence; this alone does not admit any Split family."""
     return _assemble_split_paint_inputs(layout, asset_bytes, _verified_split_bundle(layout))
+
+
+def _public_split_paint_inputs(layout, inputs, asset_bytes=None):
+    # Only omitted authority may cold-freeze; malformed supplied carriers never fall back.
+    if inputs is None:
+        inputs = verify_split_paint_inputs(layout, {} if asset_bytes is None else asset_bytes)
+    _checked_split_resources(layout, inputs)
+    if asset_bytes is not None and (type(asset_bytes) is not _VerifiedSplitAssetBytes
+                                    or asset_bytes.rows != inputs.project_assets):
+        raise ValueError("Split public paint requires exact trusted typed asset rows")
+    return inputs
 
 
 def _assemble_split_paint_inputs(layout, asset_bytes, bundle):

@@ -3,8 +3,9 @@
 This is the shared clock/state kernel, not a replacement production gate. Callers
 must retain plan/layout/asset/geometry validation. The kernel can replay paired
 Group/annotation actions; temporal consumer, stored-project and public admission
-are separate proofs. Public frames admit only policy-bearing Group/ungroup
-through those same proofs. Group/return requires an exact retained-board receipt.
+are separate proofs. Public Group/ungroup and Split use those same proofs;
+Split additionally requires exact paired documents and frozen paint authority.
+Group/return requires an exact retained-board receipt.
 
 At a timestamp: ordinary completions, structural completions in resolved order,
 then starts. An active operator always samples its captured start pose. A Group
@@ -18,6 +19,7 @@ import json
 from bisect import bisect_right
 from dataclasses import asdict, dataclass, fields, replace
 from fractions import Fraction
+from hashlib import sha256
 from typing import TYPE_CHECKING
 
 from pydantic import TypeAdapter
@@ -45,6 +47,10 @@ from atme.render.v2_illustration_assembly import (
 from atme.render.v2_isolation import UnsupportedIsolation, isolation_context_roots
 from atme.render.v2_list import validate_structured_list_capture
 from atme.render.v2_morph import interpolate_geometry
+from atme.render.v2_progressive_parts import (
+    progressive_parts_inventory,
+    validate_progressive_parts_capture,
+)
 from atme.render.v2_return import UnsupportedReturn, validate_return_sample
 from atme.store.contracts_v2 import (
     CameraAction,
@@ -66,6 +72,7 @@ from atme.store.contracts_v2 import (
     _annotation_phase_windows,
     _annotation_policy_object_ids,
     _annotation_policy_phase_windows,
+    _progressive_parts_phase_windows,
     _split_logical_write_owners,
     _structured_list_phase_windows,
     _validate_evidence_annotation_objects,
@@ -92,6 +99,11 @@ class CapturedAction:
     def resolved(self) -> ResolvedAction:
         # Contracts are mutable models; never expose a stored mutable instance.
         return ResolvedAction.model_validate_json(self.resolved_json)
+
+
+@dataclass(frozen=True)
+class CapturedProgressiveParts(CapturedAction):
+    part_hierarchy: HierarchySnapshot | None = None
 
 
 @dataclass(frozen=True)
@@ -185,7 +197,7 @@ def _split_causal_timeline(timeline, actions, structural_timeline=None):
 
 def _replay_split_chronology(layout, initial, actions, duration_ms, asset_bytes, *, timeline=None, split_inputs=None,
                              layout_sha256=None, structural_timeline=None, registry_inputs=None):
-    """Private pre-admission route through the same scheduler, never a second clock."""
+    """Owning Split adapter through the same scheduler, never a second clock."""
     from atme.render.v2_split_identity import _stored_value
     from atme.store.contracts_v2 import ExecutableLayoutV2, ResolvedVisualTimelineV2
 
@@ -310,6 +322,8 @@ def version_targets(action, evidence_treatment=None) -> tuple[str, ...]:
         return (action.connector_id,)
     if isinstance(action, TargetAction) and action.annotation_policy is not None:
         return tuple(_annotation_object_ids(action))
+    if isinstance(action, TargetAction) and action.progressive_parts_policy is not None:
+        return tuple(action.progressive_parts_policy.expected_closure_state_versions)
     if isinstance(action, TargetAction) and action.structured_list_policy is not None:
         return tuple(action.target_ids)
     if (isinstance(action, EvidenceAction) and action.verb == "insert_evidence"
@@ -333,6 +347,8 @@ def _sample_operator(capture: CapturedAction, at_ms: int, objects: dict, *, evid
 
     resolved = capture.resolved
     action = resolved.action
+    if isinstance(action, SoundAction):
+        return {}  # Sound ledger validation owns controls; visual frames never change.
     annotation_treatment = _require_evidence_capture_authority(capture, evidence_treatments, evidence_reads)
     if isinstance(action, SplitAction):
         from atme.render.v2_split import CapturedSplitAction, sample_split
@@ -346,6 +362,17 @@ def _sample_operator(capture: CapturedAction, at_ms: int, objects: dict, *, evid
     completed = at_ms >= resolved.end_ms
     progress = _ease((at_ms - resolved.start_ms) / (resolved.end_ms - resolved.start_ms), action.easing)
     result = {}
+    if isinstance(action, TargetAction) and action.progressive_parts_policy is not None:
+        if type(capture) is not CapturedProgressiveParts or type(capture.part_hierarchy) is not HierarchySnapshot:
+            raise ReplayError("progressive parts require their exact captured current hierarchy")
+        closures, _ = progressive_parts_inventory(action, objects, capture.part_hierarchy)
+        for phase, _, end in _progressive_parts_phase_windows(resolved):
+            for key in closures[phase.object_id]:
+                before = baseline[key]
+                visible = at_ms >= end
+                result[key] = replace(before, state=action.post_state if completed else before.state,
+                                      visible=visible, reveal_fraction=float(visible))
+        return result
     if isinstance(action, TargetAction) and action.structured_list_policy is not None:
         for phase, _, end in _structured_list_phase_windows(resolved):
             before = baseline[phase.object_id]
@@ -489,7 +516,9 @@ def _sample_active_with_envelopes(committed, active, at_ms, objects, *, evidence
 
 
 def supports_operator(action) -> bool:
-    return (isinstance(action, (TransformAction, ConnectionAction, CameraAction, ReplaceAction))
+    return (isinstance(action, SoundAction) and action.sound_policy is not None
+                     or isinstance(action, (TransformAction, ConnectionAction, CameraAction, ReplaceAction))
+                     or isinstance(action, SplitAction) and action.split_policy is not None
                      or isinstance(action, EvidenceAction) and action.verb in {"insert_evidence", "return_board"}
                      or isinstance(action, GroupAction) and action.hierarchy_policy is not None
                      and action.verb in {"group", "ungroup"}
@@ -499,11 +528,26 @@ def supports_operator(action) -> bool:
                          "highlight", "cross_out", "dim", "isolate"}))
 
 
-def _validate_operators(actions: tuple, split_context=None) -> None:
+def _validate_operators(actions: tuple, split_context=None, sound_actions=None) -> None:
+    from atme.render.v2_sound_events import validate_sound_intervals
+
     for item in actions:
         action = item.action
         if not supports_operator(action) and not (type(split_context) is _SplitReplayContext and isinstance(action, SplitAction)):
             raise ReplayError(f"action {action.action_id} has no chronological operator for {action.verb}")
+    try:
+        if any(isinstance(item.action, SoundAction) for item in actions):
+            if sound_actions is not None:
+                full = {item.action.action_id: item for item in sound_actions}
+                if any(full.get(item.action.action_id) != item for item in actions
+                       if isinstance(item.action, SoundAction)):
+                    raise ValueError("sound chronology differs from its complete score")
+            score = actions if sound_actions is None else tuple(
+                item for item in sound_actions
+                if not isinstance(item.action, SoundAction) or item.action.sound_policy is not None)
+            validate_sound_intervals(score)
+    except ValueError as exc:
+        raise ReplayError(str(exc)) from exc
     if any(isinstance(item.action, GroupAction) for item in actions) and any(
         isinstance(item.action, EvidenceAction) and item.action.verb == "return_board"
         and item.return_hierarchy_receipt is None for item in actions
@@ -544,6 +588,19 @@ def _assert_start_state(resolved, sample: dict, versions: dict, hierarchy, objec
         visibility_closure = group_visibility_closure(action, objects, hierarchy)
     except (UnsupportedHierarchy, ValueError) as exc:
         raise ReplayError(str(exc)) from exc
+    if (isinstance(action, TargetAction) and action.verb == "progressive_reveal"
+            and action.progressive_parts_policy is None and action.structured_list_policy is None):
+        from atme.render.v2_list import validate_ordered_list
+
+        if any(not isinstance(objects[key], TextObject) for key in action.target_ids):
+            raise ReplayError("policy-less progression requires an authored ordered-child list")
+        for key in action.target_ids:
+            validate_ordered_list(objects[key])
+    if isinstance(action, TargetAction) and action.progressive_parts_policy is not None:
+        try:
+            return validate_progressive_parts_capture(resolved, objects, hierarchy, sample, versions)
+        except ValueError as exc:
+            raise ReplayError(str(exc)) from exc
     if isinstance(action, TargetAction) and action.structured_list_policy is not None:
         try:
             return validate_structured_list_capture(resolved, objects, hierarchy, sample, versions)
@@ -621,6 +678,8 @@ def _reserve_group_visibility(resolved, reserved, objects, hierarchy, actions) -
         if isinstance(other.action, TargetAction):
             if other.action.verb == "isolate" and other.action.board_id == resolved.action.board_id:
                 writes.update(reserved)
+            if other.action.progressive_parts_policy is not None:
+                reads.update(progressive_parts_inventory(other.action, objects, hierarchy)[1])
             if other.action.structured_list_policy is not None:
                 from atme.render.v2_list import structured_list_reads
 
@@ -671,7 +730,8 @@ def _hierarchy_conflicts(objects: dict, actions: tuple) -> None:
 def replay_chronology(objects: dict, hierarchy: HierarchySnapshot, frames: dict,
                       state_versions: dict[str, int], actions: tuple[ResolvedAction, ...],
                       activations: tuple[tuple[str, int, int], ...], duration_ms: int, *,
-                      _split_context=None, evidence_treatments=()) -> ChronologicalReplay:
+                      _split_context=None, evidence_treatments=(), layout_document=None,
+                      timeline_document=None, split_inputs=None, _sound_actions=None) -> ChronologicalReplay:
     """Build every boundary from exact local initial state, independent of seek order.
 
     Input actions are already resolved contracts. This kernel deliberately does
@@ -692,11 +752,43 @@ def replay_chronology(objects: dict, hierarchy: HierarchySnapshot, frames: dict,
         raise ReplayError(str(exc)) from exc
     if objects.keys() != frames.keys():
         raise ReplayError("replay requires the exact local frame inventory")
+    if _split_context is not None and any(value is not None for value in (layout_document, timeline_document, split_inputs)):
+        raise ReplayError("Split private context cannot override public authority keywords")
+    if _split_context is None and any(isinstance(item.action, SplitAction) for item in actions):
+        _validate_operators(tuple(item for item in actions if isinstance(item.action, SplitAction)))
+        from atme.render.v2_split_paint import (
+            _public_split_paint_inputs,
+        )
+        from atme.render.v2_state import _validate_pair
+        from atme.store.contracts_v2 import ExecutableLayoutV2, ResolvedVisualTimelineV2
+
+        if not isinstance(layout_document, dict) or not isinstance(timeline_document, dict):
+            raise ReplayError("Split chronology requires exact paired layout and timeline documents")
+        layout = ExecutableLayoutV2.model_validate(layout_document)
+        timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
+        ordinary_ids = {row.action.action_id for row in actions if isinstance(row.action, EvidenceAction)
+                        and row.action.verb == "insert_evidence"}
+        if (objects != {obj.object_id: obj for obj in layout.objects}
+                or tuple(actions) != tuple(timeline.actions) or timeline.duration_ms != duration_ms
+                or activations != tuple((row.board_id, row.start_ms, row.end_ms) for row in layout.activations)
+                or tuple(evidence_treatments) != tuple(row for row in layout.evidence_treatments
+                                                       if row.action_id in ordinary_ids)):
+            raise ReplayError("Split paired documents differ from actual chronology inputs")
+        inputs = _public_split_paint_inputs(layout, split_inputs)
+        initial = ReplaySample(0, _ordered(frames), tuple(sorted(state_versions.items())), hierarchy)
+        _require_split_initial(layout, initial)
+        if state_versions != {row.object_id: row.state_version for row in timeline.initial_object_states}:
+            raise ReplayError("Split chronology differs from paired initial versions")
+        layout_sha256 = sha256(json.dumps(layout_document, sort_keys=True, separators=(",", ":"),
+                                          allow_nan=False).encode()).hexdigest()
+        return _validate_pair(layout, timeline, layout_sha256, hierarchy, split_inputs=inputs)[0]
+    if _split_context is None and any(value is not None for value in (layout_document, timeline_document, split_inputs)):
+        raise ReplayError("Split authority keywords require a Split chronology")
     from atme.render.v2_split_identity import _stored_value
 
     action_json = tuple(json.dumps(
         _stored_value(item) if isinstance(item.action, TargetAction)
-        and item.action.structured_list_policy is not None else item.model_dump(mode="json"), sort_keys=True,
+        and (item.action.structured_list_policy is not None or item.action.progressive_parts_policy is not None) else item.model_dump(mode="json"), sort_keys=True,
                                   separators=(",", ":"), allow_nan=False) for item in actions)
     # Detach all mutable caller-owned contract data before creating any checkpoints.
     actions = tuple(ResolvedAction.model_validate_json(value) for value in action_json)
@@ -767,11 +859,17 @@ def replay_chronology(objects: dict, hierarchy: HierarchySnapshot, frames: dict,
                 split_inputs=_split_context.split_inputs)
             if {key: row.state_version for key, row in paired.initial.items()} != state_versions:
                 raise ReplayError("Split lifecycle timeline differs from the actual initial versions")
-    _validate_operators(actions, _split_context)
+    sound_actions = _sound_actions
+    if type(_split_context) is _SplitReplayContext:
+        sound_doc = (_split_context.structural_timeline_json or _split_context.timeline_json)
+        if sound_doc is not None:
+            sound_actions = ResolvedVisualTimelineV2.model_validate_json(sound_doc).actions
+    _validate_operators(actions, _split_context, sound_actions)
     for item in actions:
         if not set(_action_object_references(item.action)) <= frames.keys():
             raise ReplayError("an action references a missing local frame")
-        if (isinstance(item.action, TargetAction) and item.action.structured_list_policy is not None
+        if (isinstance(item.action, TargetAction)
+                and (item.action.structured_list_policy is not None or item.action.progressive_parts_policy is not None)
                 and not any(board == item.action.board_id and start <= item.start_ms and item.end_ms <= end
                             for board, start, end in activations)):
             raise ReplayError("structured list progression requires one active board interval")
@@ -826,10 +924,12 @@ def replay_chronology(objects: dict, hierarchy: HierarchySnapshot, frames: dict,
             reads = _assert_start_state(resolved, sample, versions, hierarchy, objects)
             if reads and isinstance(action, TargetAction) and action.verb in {"enter", "exit"}:
                 _reserve_group_visibility(resolved, reads, objects, hierarchy, actions)
-            if isinstance(action, TargetAction) and action.structured_list_policy is not None:
+            if (isinstance(action, TargetAction)
+                    and (action.structured_list_policy is not None or action.progressive_parts_policy is not None)):
                 from atme.render.v2_split import _reservation_footprint
 
-                reserved = set(action.target_ids) | set(reads)
+                owned = set(version_targets(action))
+                reserved = owned | set(reads)
                 for other in actions:
                     if (other is resolved or other.start_ms >= resolved.end_ms
                             or resolved.start_ms >= other.end_ms):
@@ -843,8 +943,18 @@ def replay_chronology(objects: dict, hierarchy: HierarchySnapshot, frames: dict,
                         from atme.render.v2_list import structured_list_reads
 
                         peer_reads.update(structured_list_reads(other.action, objects, hierarchy))
-                    if reserved.intersection(writes) or set(action.target_ids).intersection(peer_reads):
-                        raise ReplayError("structured list overlaps reserved item or ancestor dependency writes")
+                    if isinstance(other.action, TargetAction) and other.action.progressive_parts_policy is not None:
+                        peer_reads.update(progressive_parts_inventory(other.action, objects, hierarchy)[1])
+                    if action.progressive_parts_policy is not None:
+                        writes.update(group_visibility_closure(other.action, objects, hierarchy))
+                        for key in tuple(writes | peer_reads):
+                            obj = objects[key]
+                            if isinstance(obj, ConnectorObject):
+                                peer_reads.update(ref for ref in (obj.source_object_id, obj.destination_object_id) if ref is not None)
+                        peer_reads.update(parent for key in tuple(peer_reads) for parent in hierarchy.ancestors(key))
+                    if reserved.intersection(writes) or owned.intersection(peer_reads):
+                        label = "progressive parts" if action.progressive_parts_policy is not None else "structured list"
+                        raise ReplayError(f"{label} overlaps reserved item or ancestor dependency writes")
             context_roots = ()
             if isinstance(action, TargetAction) and action.verb == "isolate":
                 try:
@@ -865,6 +975,8 @@ def replay_chronology(objects: dict, hierarchy: HierarchySnapshot, frames: dict,
                 read_json[action.action_id] = _evidence_read_json(read)
                 active[index] = CapturedEvidenceAction(index, action_json[index], _ordered(sample), context_roots,
                                                        treatment_json[action.action_id], read)
+            elif isinstance(action, TargetAction) and action.progressive_parts_policy is not None:
+                active[index] = CapturedProgressiveParts(index, action_json[index], _ordered(sample), context_roots, hierarchy)
             else:
                 active[index] = CapturedAction(index, action_json[index], _ordered(sample), context_roots)
         elif phase == 0:
