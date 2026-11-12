@@ -36,12 +36,12 @@ def validate_plan(plan):
 def freeze_sources(service, project_id, timeline, plan, inputs):
     if not any(action["verb"] in SOUND_VERBS for action in plan["actions"]):
         return
-    for pin in _source_pins(derive_sound_ledger(timeline, plan)).values():
+    for index, pin in enumerate(_source_pins(derive_sound_ledger(timeline, plan)).values()):
         source, metadata = service.asset(project_id, pin["asset_id"])
         if (metadata["revision"] != pin["revision"] or metadata["sha256"] != pin["checksum_sha256"]
                 or metadata["bytes"] != pin["byte_length"] or source.suffix.lower() not in AUDIO_FORMATS):
             raise ValueError("The original editorial sound differs from its resolved asset")
-        target = inputs / ("sound-" + pin["checksum_sha256"])
+        target = inputs / f"sound-{index}.bin"
         shutil.copyfile(source, target)
         if _sha256(target) != pin["checksum_sha256"]:
             raise ValueError("An editorial sound changed while compiling")
@@ -105,7 +105,7 @@ def mix_master(inputs, work, plan, timeline, audio):
         rate = voice.samplerate
         tracks = {}
         for index, (key, pin) in enumerate(_source_pins(ledger).items()):
-            source = inputs / ("sound-" + pin["checksum_sha256"])
+            source = inputs / f"sound-{index}.bin"
             if source.stat().st_size != pin["byte_length"] or _sha256(source) != pin["checksum_sha256"]:
                 raise ValueError("The frozen editorial sound failed its integrity check")
             decoded = Path(temporary) / f"{index}.wav"

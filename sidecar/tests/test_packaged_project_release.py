@@ -15,6 +15,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+import wave
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -61,6 +62,7 @@ def packaged_server(data, log_file):
     env.pop("ATME_PARENT_PID", None)
     env.pop("ATME_FFMPEG", None)
     with log_file.open("wb") as log:
+        started = time.monotonic()
         proc = subprocess.Popen([EXE], stdout=log, stderr=log, env=env, cwd=data.parent)
         try:
             deadline = time.monotonic() + 150
@@ -74,7 +76,12 @@ def packaged_server(data, log_file):
                 if base:
                     try:
                         with urllib.request.urlopen(base + "/healthz", timeout=2) as response:
-                            assert json.load(response)["status"] == "ok"
+                            health = json.load(response)
+                            assert health["status"] == "ok" and health["version"] == "0.1.3"
+                        log_file.with_suffix(".startup.json").write_text(json.dumps({
+                            "seconds_to_health": round(time.monotonic() - started, 3),
+                            "sidecar_version": health["version"],
+                        }), encoding="utf-8")
                         break
                     except urllib.error.URLError:
                         pass
@@ -82,12 +89,12 @@ def packaged_server(data, log_file):
             else:
                 pytest.fail(f"Packaged sidecar did not start. See {log_file}")
 
-            def api(path, method="GET", content=None):
+            def api(path, method="GET", content=None, media_type=None):
                 binary = isinstance(content, bytes)
                 payload = content if binary or content is None else json.dumps(content).encode()
                 request = urllib.request.Request(base + path, method=method, data=payload,
                     headers={"Authorization": "Bearer " + token,
-                             "Content-Type": "audio/wav" if binary else "application/json"})
+                             "Content-Type": media_type or ("audio/wav" if binary else "application/json")})
                 try:
                     with urllib.request.urlopen(request, timeout=120) as response:
                         if response.headers.get_content_type() == "application/json":
@@ -181,9 +188,54 @@ def test_packaged_spoken_project_in_both_profiles_and_after_restart(tmp_path):
         params = StdioServerParameters(command=EXE, args=["mcp"], env={"ATME_DATA_DIR": str(data)})
         async with Client(params, read_timeout_seconds=60) as client:
             names = {tool.name for tool in (await client.list_tools()).tools}
-            assert {"atme.preview_project", "atme.render_project", "atme.get_project_state"} <= names
+            assert {"atme.preview_project", "atme.render_project", "atme.get_project_state",
+                    "atme.get_visual_compilation_context"} <= names
             for item in results:
                 state = await client.call_tool("atme.get_project_state", {"project_id": item["project_id"]})
                 assert not state.is_error and state.structured_content["result"]["revision"] == 5
     asyncio.run(verify_mcp())
     (tmp_path / "release-evidence.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+
+
+def test_packaged_talking_head_keeps_every_mastered_packet(tmp_path):
+    sentences, _ = speech_recording(tmp_path)
+    ffmpeg = str(Path(EXE).parent / "_internal" / "ffmpeg" / "ffmpeg.exe")
+    camera = tmp_path / "camera.mp4"
+    subprocess.run([ffmpeg, "-v", "error", "-f", "lavfi", "-i", "color=blue:s=320x180:r=25",
+                    "-i", str(tmp_path / "qa-narration.wav"), "-shortest", "-c:v", "libx264",
+                    "-pix_fmt", "yuv420p", "-c:a", "aac", str(camera)], check=True, timeout=90)
+    script = external_payload()["script"]
+    for scene, words in zip(script["scenes"], sentences, strict=True):
+        scene["spoken_text"] = words
+    data = tmp_path / "data"
+    with packaged_server(data, tmp_path / "camera.log") as api:
+        state = api("/projects", "POST", {"title": "QA captioned camera", "profile": "LONG_FORM_16_9",
+                                         "input_kind": "script+video"})
+        pid = state["project_id"]
+        path = f"/projects/{pid}"
+        api(path + "/artifacts/script", "PUT", {"document": script, "expected_revision": 0})
+        api(path + "/script-approval", "POST", {"expected_revision": 1, "script_revision": 1, "approved": True})
+        added = api(path + "/media/video?expected_revision=2", "POST", camera.read_bytes(), "video/mp4")
+        api(path + "/source-timeline/commands", "POST", {"operation": "insert",
+            "arguments": {"media_id": added["media"]["media_id"], "at_ms": 0},
+            "expected_revision": 3, "expected_timeline_revision": 0})
+        api(path + "/artifacts/storyboard", "PUT", {"document": storyboard(script), "expected_revision": 4})
+        api(path + "/artifacts/layout", "PUT", {"document": compact_layout(), "expected_revision": 5})
+        result = finished(api, path + "/renders", expected_revision=6, confirmed=True)
+        output = tmp_path / "camera-export.mp4"
+        output.write_bytes(api(path + f'/renders/{result["run_id"]}/output'))
+        assert hashlib.sha256(output.read_bytes()).hexdigest() == result["manifest"]["video"]["sha256"]
+        master, = data.rglob("project-runs/*/*/work/audio/final.wav")
+        with wave.open(str(master)) as source:
+            samples, rate = source.getnframes(), source.getframerate()
+        frames = int(subprocess.check_output([shutil.which("ffprobe"), "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=nb_frames", "-of", "csv=p=0", str(output)]))
+        assert frames == (samples * 30 + rate - 1) // rate
+        def packets(file, codec):
+            return subprocess.check_output([ffmpeg, "-v", "error", "-i", str(file), "-map", "0:a:0",
+                                            "-c:a", *codec, "-f", "adts", "pipe:1"])
+        assert packets(output, ["copy"]) == packets(master, ["aac", "-b:a", "160k"])
+        (tmp_path / "talking-head-evidence.json").write_text(json.dumps({
+            "frames": frames, "mastered_samples": samples, "sample_rate": rate,
+            "video": result["manifest"]["video"], "mastered_aac_packets_identical": True,
+        }, indent=2), encoding="utf-8")

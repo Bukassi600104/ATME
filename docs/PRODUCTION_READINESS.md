@@ -44,3 +44,7 @@ The first independent GitHub restore matched the integrated source, lockfiles, c
 3. Ask the connected AI to read the project state and capabilities, submit the script or recording-derived scene structure, prepare timing, and author the storyboard and layout for the selected profile. For a script-led project, read the displayed script and approve that revision in Studio.
 4. Review the storyboard and seek the preview. Open **Export Check**, resolve any listed issues, then select **Render**. A successful run appears under **Renders**. Open it and choose **Save MP4**. Manual timeline export is available for a video edit that has no authored animation.
 5. Play the saved file in an independent player and check intelligibility, timing, framing and artwork. Close and reopen the same project and retrieve the same completed run. Test a second orientation with a layout authored for its canvas.
+
+## Backing up an actual production project
+
+GitHub holds the software. Studio project records, recordings, assets and rendered movies live in the configured ATME data directory. To take a consistent offline copy, close Studio and its connected MCP clients after running jobs finish, then copy the entire directory. Restore that directory to a separate location and launch the candidate with its absolute path in `ATME_DATA_DIR`. Keeping the database together with its media and SQLite journal files preserves references and recently committed changes.

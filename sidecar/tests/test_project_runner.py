@@ -23,8 +23,8 @@ def test_talking_head_export_uses_mastered_audio_and_final_manifest(tmp_path, mo
     from atme.render.animator import find_ffmpeg
 
     ffmpeg = find_ffmpeg()
-    source, overlay, master, reference, frame = (tmp_path / name for name in
-        ("source.mp4", "overlay.mp4", "master.wav", "reference.mp4", "frame.png"))
+    source, overlay, master, frame = (tmp_path / name for name in
+        ("source.mp4", "overlay.mp4", "master.wav", "frame.png"))
     subprocess.run([ffmpeg, "-y", "-hide_banner", "-v", "error", "-f", "lavfi",
                     "-i", "color=c=blue:s=320x180:d=7", "-f", "lavfi", "-i", "sine=frequency=220:duration=7",
                     "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(source)], check=True)
@@ -32,15 +32,15 @@ def test_talking_head_export_uses_mastered_audio_and_final_manifest(tmp_path, mo
                     "-i", "color=c=0xFAF9F5:s=320x180:d=7",
                     "-vf", "drawbox=x=130:y=60:w=60:h=60:color=red:t=fill",
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", str(overlay)], check=True)
-    subprocess.run([ffmpeg, "-v", "error", "-f", "lavfi", "-i", "sine=frequency=880:duration=7",
+    subprocess.run([ffmpeg, "-v", "error", "-f", "lavfi", "-i", "sine=frequency=880:duration=7.011",
                     "-c:a", "pcm_s16le", str(master)], check=True)
-    pipeline._mux(overlay, master, reference)
 
     def audio_packets(video):
         return subprocess.check_output([ffmpeg, "-v", "error", "-i", str(video), "-map", "0:a:0",
                                         "-c:a", "copy", "-f", "adts", "pipe:1"])
 
-    expected_audio = audio_packets(reference)
+    expected_audio = subprocess.check_output([ffmpeg, "-v", "error", "-i", str(master), "-map", "0:a:0",
+                                              "-c:a", "aac", "-b:a", "160k", "-f", "adts", "pipe:1"])
     assert expected_audio and audio_packets(source) != expected_audio
     core, state = ready_project(tmp_path, source_video=source)
     pid = state["project_id"]
@@ -48,7 +48,7 @@ def test_talking_head_export_uses_mastered_audio_and_final_manifest(tmp_path, mo
     def polish(work, **_):
         wav = work / "audio" / "final.wav"
         shutil.copyfile(master, wav)
-        return {"final_wav": str(wav), "duration_ms": 7000, "edl": [],
+        return {"final_wav": str(wav), "duration_ms": 7011, "edl": [],
                 "sha256": hashlib.sha256(wav.read_bytes()).hexdigest()}
 
     def render(work, aligned, **_):
@@ -66,6 +66,9 @@ def test_talking_head_export_uses_mastered_audio_and_final_manifest(tmp_path, mo
     assert finished["status"] == "done", finished.get("error")
     output = core.runner.output_path(pid, run_id)
     assert audio_packets(output) == expected_audio
+    frame_hashes = subprocess.check_output([ffmpeg, "-v", "error", "-i", str(output), "-map", "0:v:0",
+                                            "-c:v", "copy", "-f", "framehash", "pipe:1"])
+    assert sum(not line.startswith(b"#") for line in frame_hashes.splitlines()) == 211
     stored = json.loads((output.parents[1] / "manifest.json").read_text(encoding="utf-8"))
     actual_video = {"sha256": hashlib.sha256(output.read_bytes()).hexdigest(), "bytes": output.stat().st_size}
     assert finished["manifest"]["video"] == actual_video
@@ -78,6 +81,39 @@ def test_talking_head_export_uses_mastered_audio_and_final_manifest(tmp_path, mo
     assert corner[2] > corner[0] * 2  # talking-head/base picture remains visible
     assert centre[0] > centre[2] * 2  # Caleb overlay remains visible
     core.store.close()
+
+
+def test_ordinary_mux_and_long_ink_preserve_partial_final_frame(tmp_path):
+    import av
+    from atme import pipeline
+    from atme.project_runner import _compose_talking_head
+    from atme.render.animator import find_ffmpeg
+
+    ffmpeg = find_ffmpeg()
+    master, camera, ink = (tmp_path / name for name in ("master.wav", "camera.mp4", "ink.mp4"))
+    subprocess.run([ffmpeg, "-v", "error", "-f", "lavfi", "-i", "sine=frequency=880:duration=0.217",
+                    "-c:a", "pcm_s16le", str(master)], check=True)
+    for path, duration in [(camera, "0.16"), (ink, "0.4")]:
+        subprocess.run([ffmpeg, "-v", "error", "-f", "lavfi", "-i", f"color=blue:s=160x90:r=30:d={duration}",
+                        "-c:v", "libx264", str(path)], check=True)
+    expected = subprocess.check_output([ffmpeg, "-v", "error", "-i", str(master), "-c:a", "aac",
+                                        "-b:a", "160k", "-f", "adts", "pipe:1"])
+    outputs = [tmp_path / name for name in ("short.mp4", "long.mp4", "camera-ink.mp4", "copy.mp4")]
+    pipeline._mux(camera, master, outputs[0])
+    pipeline._mux(ink, master, outputs[1])
+    _compose_talking_head(camera, ink, master, outputs[2], {"fps": 30, "width": 160, "height": 90})
+    pipeline._mux(outputs[0], master, outputs[3])
+    for output in outputs:
+        with av.open(str(output)) as movie:
+            video = movie.streams.video[0]
+            assert video.frames == 7 and video.duration * video.time_base == 7 / video.average_rate
+        actual = subprocess.check_output([ffmpeg, "-v", "error", "-i", str(output), "-map", "0:a:0",
+                                          "-c:a", "copy", "-f", "adts", "pipe:1"])
+        assert actual == expected
+    def compressed_frames(output):
+        with av.open(str(output)) as movie:
+            return [bytes(packet) for packet in movie.demux(video=0) if packet.size]
+    assert compressed_frames(outputs[0]) == compressed_frames(outputs[3])
 
 
 def wav_bytes(seconds=7, rate=8000):

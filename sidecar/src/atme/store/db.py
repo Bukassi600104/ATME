@@ -4,13 +4,14 @@ Resume semantics: a stage is DONE only when its artifact row exists AND status='
 The orchestrator resumes at the first non-done stage; render checkpoints subdivide further.
 
 Threading: constructed on the host thread, driven from API + worker threads -> connection uses
-check_same_thread=False and EVERY access serializes through one re-entrant lock. WAL stays OFF:
-on this HDD our small-write pattern loses more to -wal churn than it gains.
+check_same_thread=False and each connection serializes access through one re-entrant lock.
+Local Windows databases use WAL so Studio can read while a worker commits its result.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 import time
@@ -79,22 +80,36 @@ STAGE_ORDER = [
 ]
 
 
+def database_busy(exc):
+    return ((getattr(exc, "sqlite_errorcode", 0) or 0) & 255) in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)
+
+
 class JobStore:
     def __init__(self, db_path: str | Path):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
-        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        self.conn = sqlite3.connect(str(self.db_path), timeout=30, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+        if os.name == "nt":
+            from ctypes import windll
+            drive = self.db_path.resolve().anchor
+            # SQLite WAL requires local shared memory. Network drives keep rollback journals.
+            if windll.kernel32.GetDriveTypeW(drive) in (2, 3, 6):
+                if self.conn.execute("PRAGMA journal_mode").fetchone()[0] != "wal":
+                    try:
+                        self.conn.execute("PRAGMA journal_mode=WAL").fetchone()
+                    except sqlite3.OperationalError as exc:
+                        if not database_busy(exc):
+                            raise
         with self._tx() as conn:
             conn.executescript(SCHEMA_V1)
             conn.execute("INSERT OR IGNORE INTO meta(key,value) VALUES('schema_version','1')")
 
     @contextmanager
     def _tx(self) -> Iterator[sqlite3.Connection]:
-        with self._lock:
+        with self._lock, self.conn:
             yield self.conn
-            self.conn.commit()
 
     def close(self) -> None:
         with self._lock:

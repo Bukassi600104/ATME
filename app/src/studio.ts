@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-interface SidecarInfo { port: number; token: string; ready: boolean }
+interface SidecarInfo { port: number; token: string; ready: boolean; error?: string }
 interface NarrativeSource { mode: "script_authority" | "recording_authority"; ready_for_timing: boolean; ready_for_planning: boolean; semantic_structure: { ready: boolean } }
 interface ProjectState { project_id: number; title: string; revision: number; profile: "LONG_FORM_16_9" | "SHORT_FORM_9_16"; input_kind: string; status: string; approved_script_revision: number | null; artifacts: Record<string, number>; authoritative_narrative_source: NarrativeSource; render_ready: boolean }
 interface MediaItem { media_id: string; name?: string; kind: "audio" | "video"; format: string; bytes: number; duration_ms: number; revision: number; sample_rate?: number; channels?: number }
@@ -58,9 +58,10 @@ const objectUrls = new Set<string>();
 let sidecarReady: Promise<SidecarInfo> | null = null;
 async function sidecar(): Promise<SidecarInfo> {
   if (!sidecarReady) sidecarReady = (async () => {
-    const deadline = Date.now() + 65_000;
+    const deadline = Date.now() + 185_000;
     while (Date.now() < deadline) {
       const info = await invoke<SidecarInfo>("sidecar_info");
+      if (info.error) throw new Error(info.error);
       if (info.ready) return info;
       await new Promise((resolve) => window.setTimeout(resolve, 350));
     }
@@ -81,7 +82,12 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const info = await sidecar();
   const headers = new Headers(init?.headers);
   headers.set("Authorization", `Bearer ${info.token}`);
-  const response = await fetch(`http://127.0.0.1:${info.port}${path}`, { ...init, headers });
+  const request = () => fetch(`http://127.0.0.1:${info.port}${path}`, { ...init, headers });
+  let response = await request();
+  if ((init?.method || "GET") === "GET" && response.status === 503 && response.headers.get("Retry-After") === "1") {
+    await new Promise(resolve => window.setTimeout(resolve, 1000));
+    response = await request();
+  }
   const value = await response.json().catch(() => null) as T | null;
   if (!response.ok) throw new Error(apiError(value, `Request failed (${response.status}).`));
   if (value === null) throw new Error("ATME returned an empty response.");

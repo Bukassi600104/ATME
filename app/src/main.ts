@@ -2,15 +2,16 @@
 import { invoke } from "@tauri-apps/api/core";
 import { mountBoardEditor } from "./board-editor";
 
-interface SidecarInfo { port: number; token: string; ready: boolean; }
+interface SidecarInfo { port: number; token: string; ready: boolean; error?: string; }
 
 let sidecarReady: Promise<SidecarInfo> | null = null;
 async function sidecar(): Promise<SidecarInfo> {
   if (sidecarReady === null) {
     sidecarReady = (async () => {
-      const deadline = Date.now() + 65_000;
+      const deadline = Date.now() + 185_000;
       while (Date.now() < deadline) {
         const info = await invoke<SidecarInfo>("sidecar_info");
+        if (info.error) throw new Error(info.error);
         if (info.ready) {
           if ($("job-status").textContent === "starting") $("job-status").textContent = "idle";
           return info;
@@ -18,7 +19,7 @@ async function sidecar(): Promise<SidecarInfo> {
         $("job-status").textContent = "starting";
         await new Promise((resolve) => window.setTimeout(resolve, 400));
       }
-      throw new Error("The local media engine did not start within 60 seconds.");
+      throw new Error("The local media engine did not start within three minutes.");
     })().catch((error) => {
       sidecarReady = null;
       throw error;

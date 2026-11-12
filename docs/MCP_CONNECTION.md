@@ -59,6 +59,7 @@ for scripts, semantic transcription, storyboard and layout authorship.
 - atme.create_project
 - atme.get_project_state
 - atme.get_project_artifact
+- atme.get_visual_compilation_context (read-only v2 production basis and draft fingerprint)
 - atme.write_artifact
 - atme.approve_script (only after explicit user approval of that exact revision)
 - atme.list_source_media
@@ -161,6 +162,16 @@ with contract version `2.0.0`. The authoring client supplies the compiled action
 measured timing against the stored plan, layout and edited recording. ATME verifies
 their revisions, canonical SHA-256 fingerprints, owned asset references and action
 coverage when it stores that result. A subsequent edit requires a new matching timeline.
+
+Use `atme.get_visual_compilation_context(project_id, expected_revision)` after
+each write. Copy its `project` and `narrative_authority` fields into the storyboard.
+Copy `layout_basis` into the authored layout. After storing the layout, copy
+`resolved_basis` into the resolved timeline. Call the same read-only operation with
+that timeline as `resolved_draft` to receive its exact `compilation_fingerprint`.
+Set that field and submit the document with `atme.write_artifact`. A missing basis
+indicates a missing or stale prerequisite. ATME computes these hashes locally.
+The connected producer supplies authored actions,
+measured triggers and the action-specific evidence or continuity required by its plan.
 
 Call `atme.validate_project`, request a frame with `atme.preview_project`, then request
 the confirmed render. Both output profiles use 30 fps. Placed camera footage supplies

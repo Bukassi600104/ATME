@@ -10,9 +10,11 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import subprocess
 import time
 from collections.abc import Callable
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -39,15 +41,35 @@ def _sha256(path: Path) -> str:
 
 
 def _mux(video: Path, wav: Path, out: Path) -> None:
+    import av
+
+    with av.open(str(video)) as source:
+        track = source.streams.video[0]
+        fps = track.average_rate
+        if not fps or fps <= 0:
+            raise ValueError("The rendered video has no usable frame rate")
+        frames = master_frame_count(wav, fps)
+        if track.frames == frames and track.duration is not None and track.duration * track.time_base == frames / fps:
+            video_args = ["-c:v", "copy"]
+        else:
+            # Correct short or overlong visuals from older render checkpoints.
+            filters = f"fps={fps},tpad=stop_mode=clone:stop={frames},trim=end_frame={frames}"
+            video_args = ["-vf", filters, "-c:v", "libx264", "-preset", "veryfast", "-crf", "18"]
     ffmpeg = find_ffmpeg()
     cmd = [ffmpeg, "-y", "-hide_banner", "-v", "error",
-           "-i", str(video), "-i", str(wav),
-           "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
-           "-shortest", "-movflags", "+faststart", str(out)]
+           "-i", str(video), "-i", str(wav), "-map", "0:v:0", "-map", "1:a:0",
+           *video_args, "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(out)]
     proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
                           check=False)
     if proc.returncode != 0:
         raise RuntimeError(f"mux failed: {proc.stderr[-400:]}")
+
+
+def master_frame_count(wav, fps):
+    info = sf.info(str(wav))
+    if info.frames <= 0:
+        raise ValueError("The mastered narration is empty")
+    return math.ceil(Fraction(info.frames, info.samplerate) * fps)
 
 
 def load_voice(job_dir: Path, mode: str = "segments") -> tuple[np.ndarray, int, list[int]]:
@@ -218,9 +240,11 @@ def render_stage(job_dir: Path, align_state: dict, width: int, height: int, fps:
     out_dir = job_dir / "out"
     segments_dir = out_dir / "segments"
     segments_dir.mkdir(parents=True, exist_ok=True)
-    total_ms = int(align_state["duration_ms"]) + 400
+    total_ms = int(align_state["duration_ms"])
     if min(width, height, fps, segment_ms, total_ms) <= 0:
         raise ValueError("render dimensions, rate and durations must be positive")
+    master = job_dir / "audio" / "final.wav"
+    total_frames = master_frame_count(master, fps) if master.is_file() else (total_ms * fps + 999) // 1000
     render_digest = hashlib.sha256(json.dumps({
         "version": RENDER_CHECKPOINT_VERSION, "layout": doc,
         "width": width, "height": height, "fps": fps,
@@ -231,9 +255,16 @@ def render_stage(job_dir: Path, align_state: dict, width: int, height: int, fps:
         if control_cb:
             control_cb()
         duration = min(segment_ms, total_ms - start)
+        first_frame = (start * fps + 999) // 1000
+        end = start + duration
+        last_frame = total_frames if end == total_ms else (end * fps + 999) // 1000
+        frame_count = last_frame - first_frame
+        if frame_count <= 0:
+            continue
         path = segments_dir / f"seg_{index:04d}.mp4"
         checkpoint = path.with_suffix(".json")
-        identity = {"render_digest": render_digest, "start_ms": start, "duration_ms": duration}
+        identity = {"render_digest": render_digest, "start_ms": start, "duration_ms": duration,
+                    "frames": frame_count}
         saved = None
         try:
             record = json.loads(checkpoint.read_text(encoding="utf-8"))
@@ -251,7 +282,7 @@ def render_stage(job_dir: Path, align_state: dict, width: int, height: int, fps:
         else:
             pending_video = path.with_name(path.stem + ".pending.mp4")
             stats = render_video(doc, pending_video, fps=fps, width=width, height=height,
-                                 duration_ms=duration, start_ms=start)
+                                 duration_ms=duration, start_ms=start, frame_count=frame_count)
             pending_video.replace(path)
             pending_record = checkpoint.with_suffix(".pending.json")
             pending_record.write_text(json.dumps({

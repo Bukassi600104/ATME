@@ -82,7 +82,7 @@ class ProjectTiming:
                 raise ProjectError("timing_failed", "Timing storage escaped project data")
             manifest = root / "source.json"
             if not manifest.exists():
-                pending = root.parent / ("." + fingerprint + "." + uuid4().hex + ".pending")
+                pending = root.parent / ("." + uuid4().hex + ".pending")
                 try:
                     inputs = pending / "inputs"
                     inputs.mkdir(parents=True, exist_ok=False)
@@ -103,20 +103,18 @@ class ProjectTiming:
                     "semantic_role": source["semantic_structure"]["role"]}
 
     def request(self, project_id, expected_revision):
-        snapshot = self._snapshot(project_id, expected_revision)
-        from atme.project_workers import submit
-        return submit(self, "timing", project_id, expected_revision, snapshot,
-                      lambda: _background_prepare(self.service.store.db_path, project_id, expected_revision, snapshot),
-                      True)
+        return self._start(project_id, expected_revision, background=True)
 
     def prepare(self, project_id, expected_revision):
+        return self._start(project_id, expected_revision, background=False)
+
+    def _start(self, project_id, expected_revision, *, background):
         from atme.project_workers import submit
         snapshot = self._snapshot(project_id, expected_revision)
-        run_id = snapshot["source_fingerprint"][:24]
         return submit(self, "timing", project_id, expected_revision, snapshot,
-                      lambda: self._execute(snapshot, project_id, expected_revision, run_id), False)
+                      lambda: self._execute(snapshot, project_id, expected_revision), background)
 
-    def _execute(self, snapshot, project_id, expected_revision, run_id):
+    def _execute(self, snapshot, project_id, expected_revision):
         root = Path(snapshot["runtime_dir"])
         work = root / "work"
         (work / "audio").mkdir(parents=True, exist_ok=True)
@@ -164,20 +162,10 @@ class ProjectTiming:
             if units is not None:
                 document["speech_units"] = units
             _write_json(root / "timing.json", document)
-            self._finish(project_id, run_id, "done", document, None)
+            return document
         except Exception as exc:
-            self._finish(project_id, run_id, "failed", None, str(exc)[:2000])
             raise ProjectError("timing_failed", "Technical speech timing failed",
                                [{"message": str(exc)[:500]}]) from exc
-        return self.status(project_id, run_id)
-
-    def _finish(self, project_id, run_id, status, document, error):
-        with self.service.store._lock:
-            self.service.store.conn.execute(
-                "UPDATE project_timing_runs SET status=?,document=?,error=?,updated_at=? "
-                "WHERE job_id=? AND run_id=?",
-                (status, json.dumps(document) if document else None, error, time.time(), project_id, run_id))
-            self.service.store.conn.commit()
 
     def status(self, project_id, run_id):
         if not isinstance(run_id, str) or len(run_id) != 24 or any(c not in "0123456789abcdef" for c in run_id):
@@ -208,24 +196,6 @@ class ProjectTiming:
 def _acoustic_words(samples, sample_rate, scene_starts_ms):
     from atme.audio.align import align_words
     return align_words(samples, sample_rate, scene_starts_ms)
-
-
-def _background_prepare(database, project_id, expected_revision, snapshot):
-    from atme.store.db import JobStore
-
-    store = JobStore(database)
-    try:
-        from atme.project_service import ProjectService
-
-        timing = ProjectService(store).timing
-        run_id = snapshot["source_fingerprint"][:24]
-        with store._lock:
-            store.conn.execute("UPDATE project_timing_runs SET status='running',updated_at=? "
-                               "WHERE job_id=? AND run_id=?", (time.time(), project_id, run_id))
-            store.conn.commit()
-        timing._execute(snapshot, project_id, expected_revision, run_id)
-    finally:
-        store.close()
 
 
 def _sha256(path):

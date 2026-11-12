@@ -1399,26 +1399,36 @@ def _evaluate_frame_with_registry_inputs(layout_document: dict, timeline_documen
     """Internal frozen-byte route with the same public action admission checks."""
     if not isinstance(layout_document, dict) or not isinstance(timeline_document, dict):
         raise V2FrameError("frame evaluation requires the exact stored JSON documents")
-    try:
-        layout_bytes = json.dumps(
-            layout_document, sort_keys=True, separators=(",", ":"), allow_nan=False
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
-        raise V2FrameError("layout is not finite, canonical JSON") from exc
-    layout_sha256 = hashlib.sha256(layout_bytes).hexdigest()
+    layout_sha256 = _frame_layout_sha256(layout_document, timeline_document)
     layout = ExecutableLayoutV2.model_validate(layout_document)
     timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
+    replay, camera_plan = _prepare_frame_replay(layout_sha256, layout, timeline,
+                                               registry_inputs=registry_inputs, split_inputs=split_inputs)
+    return _sample_validated_frame(layout, timeline, replay, camera_plan, at_ms)
+
+
+def _frame_layout_sha256(layout_document, timeline_document):
+    try:
+        payload = json.dumps(layout_document, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise V2FrameError("layout is not finite, canonical JSON") from exc
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    if not payload.isascii() and digest != timeline_document.get("layout_sha256"):
+        # Earlier standalone compiler results pinned the same JSON with escaped Unicode.
+        escaped = json.dumps(layout_document, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        return hashlib.sha256(escaped.encode("utf-8")).hexdigest()
+    return digest
+
+
+def _prepare_frame_replay(layout_sha256, layout, timeline, *, registry_inputs=None, split_inputs=None):
     try:
         hierarchy = HierarchySnapshot.from_objects({obj.object_id: obj for obj in layout.objects})
     except UnsupportedHierarchy as exc:
         raise V2FrameError(str(exc)) from exc
     if split_inputs is None:
-        replay, camera_plan = _validate_pair(layout, timeline, layout_sha256, hierarchy,
-                                           registry_inputs=registry_inputs)
-    else:
-        replay, camera_plan = _validate_pair(layout, timeline, layout_sha256, hierarchy,
-                                           registry_inputs=registry_inputs, split_inputs=split_inputs)
-    return _sample_validated_frame(layout, timeline, replay, camera_plan, at_ms)
+        return _validate_pair(layout, timeline, layout_sha256, hierarchy, registry_inputs=registry_inputs)
+    return _validate_pair(layout, timeline, layout_sha256, hierarchy, registry_inputs=registry_inputs,
+                          split_inputs=split_inputs)
 
 
 def _sample_validated_frame(layout: ExecutableLayoutV2, timeline: ResolvedVisualTimelineV2,

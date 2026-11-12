@@ -78,6 +78,9 @@ from atme.render.v2_state import (
     FrameObject,
     FrameSnapshot,
     _reject_public_bare_split,
+    _frame_layout_sha256,
+    _prepare_frame_replay,
+    _sample_validated_frame,
     evaluate_frame,
 )
 from atme.render.v2_world import transform_svg, world_bounds, world_matrix
@@ -1365,6 +1368,32 @@ def _compose_object_tree(objects, states, paint_ordinals, style, root, scale_x,
                               media_rasters, media_view))
 
     return "".join(definitions), "".join(render_object(obj) for obj in children.get(None, ()))
+
+
+def prepare_png_sequence(layout_document, timeline_document, asset_bytes, *, paper_background=True):
+    """Prepare one immutable stored export. Each sample uses the normal evaluator, paint and raster path."""
+    layout = ExecutableLayoutV2.model_validate(layout_document)
+    timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
+    _reject_public_bare_split(timeline.actions)
+    split_inputs = None
+    if any(isinstance(row.action, SplitAction) for row in timeline.actions):
+        from atme.render.v2_split_paint import _public_split_paint_inputs
+        split_inputs = _public_split_paint_inputs(layout, None, asset_bytes)
+    digest = _frame_layout_sha256(layout_document, timeline_document)
+    replay, camera = _prepare_frame_replay(digest, layout, timeline, split_inputs=split_inputs)
+    held_frames = {
+        key: _sample_validated_frame(layout, timeline, replay, camera, end)
+        for key, policy, _, end in _authored_annotation_bindings(timeline)
+        if policy.leader_connector_id is not None
+    }
+
+    def compose(at_ms):
+        frame = _sample_validated_frame(layout, timeline, replay, camera, at_ms)
+        svg = _compose_validated_svg_frame(layout, timeline, frame, held_frames, asset_bytes,
+                                           split_inputs=split_inputs, paper_background=paper_background)
+        return _rasterize_svg_frame(layout, svg, split_inputs=split_inputs)
+
+    return compose
 
 
 def compose_png_frame(layout_document: dict, timeline_document: dict, at_ms: int,

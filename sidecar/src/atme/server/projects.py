@@ -1,5 +1,6 @@
 """Bounded HTTP adapter; project rules live in ProjectService, not transport code."""
 import json
+import sqlite3
 from uuid import uuid4
 
 from fastapi import Depends, Header, HTTPException, Request, Response
@@ -9,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from atme.mcp_activity import McpActivity
 from atme.media_delivery import render_ticket, ticket_response, timeline_export
 from atme.project_service import ProjectError, ProjectService
+from atme.store.db import database_busy
 
 
 def register_projects(app, store, auth):
@@ -18,6 +20,11 @@ def register_projects(app, store, auth):
     def call(operation, *args):
         try:
             return operation(*args)
+        except sqlite3.OperationalError as exc:
+            if not database_busy(exc):
+                raise
+            raise HTTPException(503, {"code": "database_busy", "message": "Project storage is busy. Try again shortly."},
+                                headers={"Retry-After": "1"}) from exc
         except ProjectError as exc:
             status = {"not_found": 404, "revision_conflict": 409, "too_large": 413}.get(exc.code, 400)
             raise HTTPException(status, exc.detail()) from exc

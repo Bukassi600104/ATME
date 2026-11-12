@@ -99,7 +99,7 @@ def render(work, inputs, compiled, layout, audio):
     from atme.render.animator import find_ffmpeg
     from atme.render.v2_split_paint import _SplitAssetBytes, _VerifiedSplitAssetBytes
     from atme.render.v2_sound_mix import mix_master
-    from atme.render.v2_svg import compose_png_frame
+    from atme.render.v2_svg import prepare_png_sequence
 
     started = time.monotonic()
     timeline_file = inputs / "resolved_timeline.json"
@@ -137,12 +137,13 @@ def render(work, inputs, compiled, layout, audio):
             raise ValueError("The frozen camera video failed its integrity check")
     command = [find_ffmpeg(), "-y", "-v", "error", *_video_inputs(fps, camera), "-an", "-c:v", "libx264", "-preset", "veryfast",
                "-pix_fmt", "yuv420p", "-crf", "18", str(pending)]
+    compose = prepare_png_sequence(layout, timeline, assets, paper_background=camera is None)
     try:
         with tempfile.TemporaryFile() as errors, subprocess.Popen(command, stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL, stderr=errors) as proc:
             try:
                 for n in range(frames):
-                    frame = compose_png_frame(layout, timeline, n * 1000 // fps, assets, paper_background=camera is None)
+                    frame = compose(n * 1000 // fps)
                     proc.stdin.write(frame.png)
                 proc.stdin.close()
                 if proc.wait() != 0:

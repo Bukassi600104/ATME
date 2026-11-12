@@ -205,6 +205,7 @@ def render_video(
     duration_ms: int | None = None,
     start_ms: int = 0,
     progress_cb=None,
+    frame_count: int | None = None,
 ) -> dict:
     """Render one continuous take; returns stats {frames, wall_s, bake_fps, layer_builds}."""
     ffmpeg = find_ffmpeg()
@@ -220,7 +221,10 @@ def render_video(
     duration = duration_ms if duration_ms is not None else authored_end - start_ms
     if duration <= 0:
         raise ValueError("render duration must be positive")
-    total_frames = max(1, int(duration / 1000 * fps))
+    total_frames = frame_count if frame_count is not None else max(1, int(duration / 1000 * fps))
+    time_origin = start_ms * fps
+    if frame_count is not None:
+        time_origin = ((time_origin + 999) // 1000) * 1000
 
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -237,7 +241,7 @@ def render_video(
     t_start = time.perf_counter()
     try:
         for f in range(total_frames):
-            img = renderer.frame(start_ms + int(f * 1000 / fps))
+            img = renderer.frame((time_origin + f * 1000) // fps)
             proc.stdin.write(img.tobytes())
             if progress_cb and f % fps == 0:
                 progress_cb(f + 1, total_frames)

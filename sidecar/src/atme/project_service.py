@@ -36,6 +36,18 @@ def _resolved_compilation_fingerprint(document):
     return _visual_digest(payload)
 
 
+def _visual_narrative_authority(source, timeline):
+    media = source["timing_authority"].get("media")
+    if media is None:
+        return None
+    scripted = source["mode"] == "script_authority"
+    return {"mode": "approved_script_plus_recording" if scripted else "recording_only",
+            "authority_id": f"script-revision-{source['semantic_structure']['revision']}" if scripted else media["media_id"],
+            "timing_media_id": media["media_id"], "timing_media_sha256": media["sha256"],
+            "cleaned_timeline_revision": timeline["timeline_revision"],
+            "cleaned_timeline_fingerprint": _visual_digest(timeline["document"])}
+
+
 class ProjectError(ValueError):
     def __init__(self, code, message, errors=None):
         super().__init__(message)
@@ -154,7 +166,7 @@ class ProjectService:
                 "artifact_kinds": ["brief", "script", "storyboard", "layout", "resolved_timeline"],
                 "output_profiles": list(PROFILES),
                 "operations": ["create_project", "open_project", "list_projects", "duplicate_project", "archive_project",
-                               "get_schema", "write_artifact", "get_artifact", "approve_script",
+                               "get_schema", "get_visual_compilation_context", "write_artifact", "get_artifact", "approve_script",
                                "migrate_visual_contracts_v1",
                                "list_media", "get_narrative_source", "validate_project", "preview_project",
                                "prepare_timing", "get_timing_status", "create_revision_request",
@@ -635,11 +647,8 @@ class ProjectService:
                     raise ProjectError("stale_contract_basis", "V2 artifact output profile is stale")
                 from atme.narrative_source import describe
                 source = describe(self, project_id)
-                media_info = source["timing_authority"].get("media")
                 timeline = self.source_timeline.get(project_id)
-                timeline_fingerprint = hashlib.sha256(json.dumps(
-                    timeline["document"], sort_keys=True, separators=(",", ":"),
-                    ensure_ascii=False).encode()).hexdigest()
+                expected = _visual_narrative_authority(source, timeline)
                 authority = (document["narrative_authority"] if kind == "storyboard"
                              else self.artifact(project_id, "storyboard")["document"]["narrative_authority"])
                 script_authority = source["mode"] == "script_authority"
@@ -647,16 +656,10 @@ class ProjectService:
                     script = self.artifact(project_id, "script")
                     if row["approved_script_revision"] != script["revision"]:
                         raise ProjectError("stale_contract_basis", "V2 artifacts require the current approved script")
-                expected_mode = "approved_script_plus_recording" if script_authority else "recording_only"
-                expected_authority = (f"script-revision-{source['semantic_structure']['revision']}"
-                                      if script_authority else media_info["media_id"] if media_info else None)
-                if authority["mode"] != expected_mode or authority["authority_id"] != expected_authority:
+                if expected and any(authority[key] != expected[key] for key in ("mode", "authority_id")):
                     raise ProjectError("stale_contract_basis",
                                        "V2 artifact must reference the current canonical narrative authority")
-                if (not media_info or authority["timing_media_id"] != media_info["media_id"]
-                        or authority["timing_media_sha256"] != media_info["sha256"]
-                        or authority["cleaned_timeline_revision"] != timeline["timeline_revision"]
-                        or authority["cleaned_timeline_fingerprint"] != timeline_fingerprint):
+                if authority != expected:
                     raise ProjectError("stale_contract_basis",
                                        "V2 artifact must reference the current cleaned authoritative timing source")
                 if kind == "layout":
@@ -667,8 +670,7 @@ class ProjectService:
                             or document["plan_revision"] != storyboard["revision"]):
                         raise ProjectError("stale_contract_basis",
                                            "Executable layout must reference the current v2 visual plan")
-                    digest = hashlib.sha256(json.dumps(plan, sort_keys=True,
-                        separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+                    digest = _visual_digest(plan)
                     if document["plan_sha256"] != digest:
                         raise ProjectError("stale_contract_basis", "Executable layout plan hash is stale")
                     if (document["output_profile"] != plan["output_profile"]
@@ -912,18 +914,7 @@ class ProjectService:
                                        "A cleaned authoritative timing source is required before migration")
                 profile = {"LONG_FORM_16_9": (1280, 720), "SHORT_FORM_9_16": (720, 1280)}[row["profile"]]
                 timeline = self.source_timeline.get(project_id)
-                timeline_fingerprint = hashlib.sha256(json.dumps(
-                    timeline["document"], sort_keys=True, separators=(",", ":"),
-                    ensure_ascii=False).encode()).hexdigest()
-                authority = {
-                    "mode": "approved_script_plus_recording" if source["mode"] == "script_authority" else "recording_only",
-                    "authority_id": (f"script-revision-{source['semantic_structure']['revision']}"
-                                     if source["mode"] == "script_authority" else media_info["media_id"]),
-                    "timing_media_id": media_info["media_id"],
-                    "timing_media_sha256": media_info["sha256"],
-                    "cleaned_timeline_revision": timeline["timeline_revision"],
-                    "cleaned_timeline_fingerprint": timeline_fingerprint,
-                }
+                authority = _visual_narrative_authority(source, timeline)
                 from atme.store.migrate_visual_v1 import migrate_visual_bundle_v1
                 migrated = migrate_visual_bundle_v1(
                     visual["document"], layout["document"], project_id=project_id,
@@ -1183,6 +1174,55 @@ class ProjectService:
 
     def validate_project(self, project_id):
         return self.runner.validate(project_id)
+
+    def visual_compilation_context(self, project_id, expected_revision, resolved_draft=None):
+        """Expose the exact currently stored v2 pins without authoring or changing the project."""
+        from atme.narrative_source import describe
+        from atme.project_runner import PROFILE_SETTINGS
+
+        with self.store._lock:
+            row = self._row(project_id)
+            self._expected(row, expected_revision)
+            timing = self.source_timeline.get(project_id)
+            source = describe(self, project_id)
+            authority = _visual_narrative_authority(source, timing) if source["ready_for_timing"] else None
+            profile = {"profile_id": row["profile"], **PROFILE_SETTINGS[row["profile"]]}
+            base = {"project_id": project_id, "project_revision": expected_revision, "output_profile": profile}
+            basis = dict(base)
+            result = {"project": base, "narrative_authority": authority, "layout_basis": None, "resolved_basis": None}
+            for kind, prefix, destination in (("storyboard", "plan", "layout_basis"),
+                                               ("layout", "layout", "resolved_basis")):
+                try:
+                    artifact = self.artifact(project_id, kind)
+                except ProjectError as exc:
+                    if exc.code == "not_found":
+                        break
+                    raise
+                doc = artifact["document"]
+                if artifact.get("stale") or doc.get("contract_version") != "2.0.0":
+                    break
+                basis.update({prefix + "_id": doc[prefix + "_id"], prefix + "_revision": artifact["revision"],
+                              prefix + "_sha256": _visual_digest(doc), "style_system_version": doc["style_system_version"],
+                              "asset_registry_version": doc["asset_registry_version"]})
+                if kind == "layout":
+                    if authority is None:
+                        break
+                    basis.update(cleaned_timeline_revision=timing["timeline_revision"],
+                                 cleaned_timeline_fingerprint=authority["cleaned_timeline_fingerprint"],
+                                 duration_ms=timing["document"]["duration_ms"])
+                result[destination] = dict(basis)
+            if resolved_draft is not None:
+                if result["resolved_basis"] is None or any(resolved_draft.get(k) != v for k, v in basis.items()):
+                    raise ProjectError("stale_contract_basis", "The submitted draft must match the current resolved basis")
+                try:
+                    encoded = json.dumps(resolved_draft, ensure_ascii=False, allow_nan=False)
+                except (ValueError, TypeError) as exc:
+                    raise ProjectError("invalid_artifact", "The submission must be finite JSON") from exc
+                if len(encoded.encode("utf-8")) > 1024 * 1024:
+                    raise ProjectError("too_large", "The resolved submission exceeds 1 MiB")
+                result["compilation_fingerprint"] = _resolved_compilation_fingerprint(resolved_draft)
+            self._expected(self._row(project_id), expected_revision)
+            return result
 
     def set_profile(self, project_id, profile, expected_revision):
         if profile not in PROFILES:

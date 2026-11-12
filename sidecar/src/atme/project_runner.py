@@ -160,6 +160,7 @@ class ProjectRunner:
                      "source_timeline_fingerprint": timing_metadata["timeline_fingerprint"],
                      "semantic_role": state["authoritative_narrative_source"]["semantic_structure"]["role"]}
         timing = self.service.source_timeline.get(project_id)
+        selection["audio_mux_version"] = 2
         timeline_document = timing["document"]
         resolved = None
         if layout["document"].get("contract_version") == "2.0.0":
@@ -180,7 +181,7 @@ class ProjectRunner:
         if any(clip["kind"] == "video" for clip in timeline_document["clips"]):
             source_video, source_video_metadata, _ = materialize_video(self.service, project_id, export_profile=True)
             selection["source_video_sha256"] = source_video_metadata["sha256"]
-            selection["video_composition_version"] = 2  # Final video carries mastered narration.
+            selection["video_composition_version"] = 3 if layout["document"]["contract_version"] == "1" else 2
         # Project revisions are monotonic across desktop and MCP database connections.
         with self.service.store._lock:
             self.service._expected(self.service._row(project_id), expected_revision)
@@ -195,7 +196,7 @@ class ProjectRunner:
             saved = json.loads(manifest_file.read_text(encoding="utf-8"))
             if saved.get("fingerprint") == fingerprint:
                 return {**saved, "runtime_dir": str(destination), "resumed": True}
-        pending = runtime_root / ("." + fingerprint + "." + uuid4().hex + ".pending")
+        pending = runtime_root / ("." + uuid4().hex + ".pending")
         try:
             inputs = pending / "inputs"
             inputs.mkdir(parents=True, exist_ok=False)
@@ -229,13 +230,19 @@ class ProjectRunner:
             raise
 
     def render(self, project_id, expected_revision, confirmed):
+        return self._start_render(project_id, expected_revision, confirmed, background=False)
+
+    def request_render(self, project_id, expected_revision, confirmed):
+        return self._start_render(project_id, expected_revision, confirmed, background=True)
+
+    def _start_render(self, project_id, expected_revision, confirmed, *, background):
+        from atme.project_workers import submit
         if confirmed is not True:
             raise ProjectError("render_confirmation_required", "Rendering must be explicitly requested")
         compiled = self.compile(project_id, expected_revision)
         run_id = compiled["fingerprint"][:24]
-        from atme.project_workers import submit
         return submit(self, "render", project_id, expected_revision, compiled,
-                      lambda: self._execute_render(compiled, project_id, expected_revision, run_id), False)
+                      lambda: self._execute_render(compiled, project_id, expected_revision, run_id), background)
 
     def _execute_render(self, compiled, project_id, expected_revision, run_id):
         snapshot = Path(compiled["runtime_dir"])
@@ -273,21 +280,9 @@ class ProjectRunner:
                                "duration_ms": manifest["duration_ms"],
                                "video": {"sha256": manifest["artifacts"]["video"]["sha256"],
                                          "bytes": manifest["artifacts"]["video"]["bytes"]}}
-            self._finish(project_id, run_id, "done", public_manifest, None)
+            return public_manifest
         except Exception as exc:
-            self._finish(project_id, run_id, "failed", None, str(exc)[:2000])
             raise ProjectError("render_failed", "Rendering failed", [{"message": str(exc)[:500]}]) from exc
-        return self.status(project_id, run_id)
-
-    def request_render(self, project_id, expected_revision, confirmed):
-        """Queue a fixed render so MCP/HTTP calls never wait for video encoding."""
-        if confirmed is not True:
-            raise ProjectError("render_confirmation_required", "Rendering must be explicitly requested")
-        compiled = self.compile(project_id, expected_revision)
-        from atme.project_workers import submit
-        return submit(self, "render", project_id, expected_revision, compiled,
-                      lambda: _background_render(self.service.store.db_path, project_id, expected_revision, compiled),
-                      True)
 
     def preview(self, project_id, expected_revision, at_ms):
         if type(at_ms) is not int or at_ms < 0:
@@ -408,13 +403,6 @@ class ProjectRunner:
                 "This preview requires a v1 layout. Preview a stored v2 layout with its resolved timeline.",
             )
 
-    def _finish(self, project_id, run_id, status, manifest, error):
-        with self.service.store._lock:
-            self.service.store.conn.execute(
-                "UPDATE project_render_runs SET status=?,manifest=?,error=?,updated_at=? WHERE job_id=? AND run_id=?",
-                (status, json.dumps(manifest) if manifest else None, error, time.time(), project_id, run_id))
-            self.service.store.conn.commit()
-
     def status(self, project_id, run_id):
         if not isinstance(run_id, str) or len(run_id) != 24 or any(c not in "0123456789abcdef" for c in run_id):
             raise ProjectError("invalid_request", "run_id must be a 24-character hexadecimal ID")
@@ -488,43 +476,27 @@ def _compose_talking_head(source_video, caleb_video, final_audio, destination, p
     """
     import subprocess
 
+    from atme.pipeline import master_frame_count
     from atme.render.animator import find_ffmpeg
 
     pending = Path(destination).with_name(Path(destination).stem + ".composite.pending.mp4")
+    # Retain every narration sample, including the tail between two camera frames.
+    frame_count = master_frame_count(final_audio, profile["fps"])
     filter_graph = (
         f"[0:v]scale={profile['width']}:{profile['height']}:force_original_aspect_ratio=decrease,"
-        f"pad={profile['width']}:{profile['height']}:(ow-iw)/2:(oh-ih)/2[base];"
+        f"pad={profile['width']}:{profile['height']}:(ow-iw)/2:(oh-ih)/2,fps={profile['fps']},"
+        f"tpad=stop_mode=clone:stop={frame_count}[base];"
         f"[1:v]scale={profile['width']}:{profile['height']},"
-        "colorkey=0xFAF9F5:0.16:0.08[ink];[base][ink]overlay=shortest=1[v]"
+        f"colorkey=0xFAF9F5:0.16:0.08[ink];[base][ink]overlay=eof_action=repeat,trim=end_frame={frame_count}[v]"
     )
     command = [find_ffmpeg(), "-y", "-hide_banner", "-v", "error",
                "-i", str(source_video), "-i", str(caleb_video), "-i", str(final_audio),
                "-filter_complex", filter_graph, "-map", "[v]", "-map", "2:a:0",
                "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
-               "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", str(pending)]
+               "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(pending)]
     result = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                             text=True, check=False)
     if result.returncode or not pending.is_file():
         pending.unlink(missing_ok=True)
         raise RuntimeError("talking-head composition failed: " + result.stderr[-500:])
     os.replace(pending, destination)
-
-
-def _background_render(database, project_id, expected_revision, compiled):
-    """Own its database connection so a disconnected MCP client cannot corrupt the run."""
-    from atme.store.db import JobStore
-
-    store = JobStore(database)
-    try:
-        from atme.project_service import ProjectService
-
-        runner = ProjectService(store).runner
-        run_id = compiled["fingerprint"][:24]
-        with store._lock:
-            store.conn.execute(
-                "UPDATE project_render_runs SET status='running',updated_at=? WHERE job_id=? AND run_id=?",
-                (time.time(), project_id, run_id))
-            store.conn.commit()
-        runner._execute_render(compiled, project_id, expected_revision, run_id)
-    finally:
-        store.close()

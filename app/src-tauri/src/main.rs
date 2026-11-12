@@ -38,6 +38,7 @@ fn sidecar_info(state: tauri::State<SidecarState>) -> serde_json::Value {
         "port": state.port,
         "token": state.token,
         "ready": state.ready.load(Ordering::Acquire),
+        "error": state.error.lock().ok().and_then(|error| error.clone()),
     })
 }
 
@@ -180,6 +181,7 @@ struct SidecarState {
     data_dir: PathBuf,
     sidecar_path: PathBuf,
     ready: Arc<AtomicBool>,
+    error: Arc<Mutex<Option<String>>>,
     runtime_file: PathBuf,
 }
 
@@ -265,6 +267,10 @@ fn main() {
 
             let child_handle = Arc::new(Mutex::new(Some(child)));
             let ready = Arc::new(AtomicBool::new(false));
+            let error = Arc::new(Mutex::new(None));
+            let exit_error = error.clone();
+            let exit_ready = ready.clone();
+            let exit_child = child_handle.clone();
             tauri::async_runtime::spawn(async move {
                 use tauri_plugin_shell::process::CommandEvent;
                 while let Some(event) = rx.recv().await {
@@ -277,6 +283,11 @@ fn main() {
                         }
                         CommandEvent::Terminated(status) => {
                             eprintln!("[sidecar] terminated: {:?}", status.code);
+                            if let Ok(mut slot) = exit_child.lock() { slot.take(); }
+                            exit_ready.store(false, Ordering::Release);
+                            if let Ok(mut message) = exit_error.lock() {
+                                message.get_or_insert_with(|| format!("Local media engine stopped (exit {:?}). Restart ATME.", status.code));
+                            }
                             break;
                         }
                         _ => {}
@@ -287,22 +298,24 @@ fn main() {
             let health_token = token.clone();
             let health_child = child_handle.clone();
             let health_ready = ready.clone();
-            let health_app = app.handle().clone();
+            let health_error = error.clone();
             std::thread::spawn(move || {
-                if wait_healthz(port, &health_token, 60) {
+                if wait_healthz(port, &health_token, 180) {
                     health_ready.store(true, Ordering::Release);
                 } else {
                     eprintln!("sidecar healthz timeout");
+                    if let Ok(mut message) = health_error.lock() {
+                        message.get_or_insert_with(|| "Local media engine did not start within three minutes. Restart ATME.".into());
+                    }
                     if let Ok(mut slot) = health_child.lock() {
                         if let Some(child) = slot.take() {
                             kill_sidecar(child);
                         }
                     }
-                    health_app.exit(1);
                 }
             });
 
-            app.manage(SidecarState { port, token, child: child_handle, data_dir, sidecar_path, ready, runtime_file });
+            app.manage(SidecarState { port, token, child: child_handle, data_dir, sidecar_path, ready, error, runtime_file });
             Ok(())
         })
         .on_window_event(|window, event| {
