@@ -303,7 +303,7 @@ class ProjectRunner:
             if doc.get("contract_version") == "2.0.0":
                 return self._preview_v2_project(project_id, row, expected_revision, doc, at_ms)
             self._require_v1_renderer(doc)
-            timeline_duration = self.service.source_timeline.get(project_id)["document"]["duration_ms"]
+            timeline_duration = self.service.narrative_source(project_id)["timing_authority"]["duration_ms"]
             layout_duration = max(
                 (item["end_ms"] for item in doc.get("board_timeline", {}).get("activations", [])),
                 default=0,

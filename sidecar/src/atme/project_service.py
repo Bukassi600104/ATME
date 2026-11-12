@@ -1199,7 +1199,13 @@ class ProjectService:
                         break
                     raise
                 doc = artifact["document"]
-                if artifact.get("stale") or doc.get("contract_version") != "2.0.0":
+                if (artifact.get("stale") or doc.get("contract_version") != "2.0.0"
+                        or doc["output_profile"] != profile):
+                    break
+                if kind == "storyboard" and doc["narrative_authority"] != authority:
+                    break
+                if kind == "layout" and any(doc[key] != basis[key]
+                                            for key in ("plan_id", "plan_revision", "plan_sha256")):
                     break
                 basis.update({prefix + "_id": doc[prefix + "_id"], prefix + "_revision": artifact["revision"],
                               prefix + "_sha256": _visual_digest(doc), "style_system_version": doc["style_system_version"],

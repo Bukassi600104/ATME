@@ -9,7 +9,7 @@ const compiled = ts.transpileModule(source, { compilerOptions: {
   module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022,
 } }).outputText;
 
-function studio(fetch) {
+function studio(fetch, setTimeout = () => {}) {
   const nodes = new Map();
   const element = () => ({
     children: [], isConnected: true, classList: { add() {}, remove() {}, contains() { return true; } },
@@ -26,10 +26,10 @@ function studio(fetch) {
     },
   };
   const context = { exports: {}, fetch, document, Headers, window: {
-    addEventListener() {}, setTimeout() {},
+    addEventListener() {}, setTimeout,
   }, require: () => ({ invoke: async () => ({ ready: true, port: 1234, token: "test" }) }),
   URL: { createObjectURL: (value) => "blob:" + value, revokeObjectURL() {} } };
-  vm.runInNewContext(compiled + "\nglobalThis.driver = {state, optionalArtifact, showScript, showStoryboard, refreshPreview, showSpeechModel};", context);
+  vm.runInNewContext(compiled + "\nglobalThis.driver = {state, api, optionalArtifact, showScript, showStoryboard, refreshPreview, showSpeechModel, deriveLayoutDuration};", context);
   return { ...context.driver, nodes };
 }
 
@@ -59,6 +59,20 @@ test("a stored storyboard can be reviewed while its layout is pending", () => {
   ui.showStoryboard();
   const card = ui.nodes.get("workspace-dialog-content").children[0].children[0];
   assert.deepEqual(card.children.map(node => node.textContent), ["opening", "Trace the relay."]);
+});
+
+test("Studio reads board times and navigation from both stored layout formats", () => {
+  const activations = [{board_id: "diagram", start_ms: 100, end_ms: 2800}];
+  for (const layout of [{activations}, {board_timeline: {activations}}]) {
+    const ui = studio();
+    ui.state.project = project;
+    ui.state.layout = layout;
+    ui.showStoryboard();
+    const board = ui.nodes.get("workspace-dialog-content").children[0].children[0];
+    assert.equal(board.children[0].textContent, "diagram");
+    assert.equal(typeof board.onclick, "function");
+    assert.equal(ui.deriveLayoutDuration(layout), 2800);
+  }
 });
 
 test("seeking twice cannot paint a delayed frame over the newer frame", async () => {
@@ -97,4 +111,18 @@ test("first-run speech setup shows the local model status and prepares on demand
   assert.deepEqual(methods, ["GET", "POST"]);
   assert.match(status.textContent, /ready for local timing/i);
   assert.equal(prepare.disabled, true);
+});
+
+test("a transient busy response retries one read and never submits a mutation twice", async () => {
+  const methods = [];
+  const ui = studio(async (_url, init) => {
+    const method = init.method || "GET";
+    methods.push(method);
+    if (methods.length === 2) return {ok: true, status: 200, json: async () => ({ready: true})};
+    return {ok: false, status: 503, headers: new Headers({"Retry-After": "1"}),
+      json: async () => ({detail: {message: "Project storage is busy"}})};
+  }, callback => callback());
+  assert.equal((await ui.api("/projects")).ready, true);
+  await assert.rejects(ui.api("/projects", {method: "POST"}), /storage is busy/);
+  assert.deepEqual(methods, ["GET", "GET", "POST"]);
 });

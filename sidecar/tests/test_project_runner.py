@@ -160,6 +160,20 @@ def ready_project(tmp_path, profile="LONG_FORM_16_9", *, source_video=None):
     return core, state
 
 
+def test_preview_includes_narration_after_last_board(tmp_path):
+    from test_project_offline_render import compact_layout
+
+    core, state = ready_project(tmp_path)
+    pid = state["project_id"]
+    layout = compact_layout()
+    assert max(board["end_ms"] for board in layout["board_timeline"]["activations"]) < 5500
+    saved = core.write(pid, "layout", layout, state["revision"])
+    assert core.preview_project(pid, saved["revision"], 5500)["png"].startswith(b"\x89PNG")
+    with pytest.raises(ProjectError, match="Preview time"):
+        core.preview_project(pid, saved["revision"], 7000)
+    core.store.close()
+
+
 def test_validation_and_immutable_compilation(tmp_path):
     core, state = ready_project(tmp_path)
     pid = state["project_id"]

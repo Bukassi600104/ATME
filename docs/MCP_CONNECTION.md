@@ -164,7 +164,10 @@ their revisions, canonical SHA-256 fingerprints, owned asset references and acti
 coverage when it stores that result. A subsequent edit requires a new matching timeline.
 
 Use `atme.get_visual_compilation_context(project_id, expected_revision)` after
-each write. Copy its `project` and `narrative_authority` fields into the storyboard.
+each write. A null `layout_basis` means the plan needs to be written for the
+current recording and profile. A null `resolved_basis` means the layout needs
+to be written against the current plan. Copy the context's `project` and
+`narrative_authority` fields into the storyboard.
 Copy `layout_basis` into the authored layout. After storing the layout, copy
 `resolved_basis` into the resolved timeline. Call the same read-only operation with
 that timeline as `resolved_draft` to receive its exact `compilation_fingerprint`.

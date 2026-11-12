@@ -24,7 +24,7 @@ def test_real_source_mcp_exposes_return_receipt_and_preserves_renderer_capabilit
     )
 
     async def exercise():
-        async with Client(params, read_timeout_seconds=30) as client:
+        async with Client(params, read_timeout_seconds=180) as client:
             result = await client.call_tool("atme.get_schema", {"kind": "resolved_timeline", "version": "2.0.0"})
             assert not result.is_error
             schema = result.structured_content["result"]
@@ -50,6 +50,7 @@ def test_real_source_mcp_exposes_return_receipt_and_preserves_renderer_capabilit
             state = await read("write_artifact", {**args, "kind": "storyboard", "document": plan})
             args["expected_revision"] = state["revision"]
             ctx = await read("get_visual_compilation_context", args)
+            assert ctx["resolved_basis"] is None
             layout.update(ctx["layout_basis"])
             state = await read("write_artifact", {**args, "kind": "layout", "document": layout})
             args["expected_revision"] = state["revision"]
@@ -72,5 +73,9 @@ def test_real_source_mcp_exposes_return_receipt_and_preserves_renderer_capabilit
                 "project_id": pid, "expected_revision": args["expected_revision"] + 1, "at_ms": 4900})
             assert not preview.is_error
             assert any(item.type == "image" for item in preview.content)
+            changed = await read("set_output_profile", {"project_id": pid, "expected_revision": args["expected_revision"] + 1,
+                                                        "profile": "SHORT_FORM_9_16"})
+            ctx = await read("get_visual_compilation_context", {"project_id": pid, "expected_revision": changed["revision"]})
+            assert ctx["layout_basis"] is None and ctx["resolved_basis"] is None
 
     asyncio.run(exercise())

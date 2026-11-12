@@ -3,6 +3,7 @@
 # Build:  cd sidecar && ..\.sidecar\.venv\Scripts\pyinstaller.exe --noconfirm atme-sidecar.spec
 
 import sys
+from importlib.metadata import distribution
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_data_files
 
@@ -20,6 +21,9 @@ if ffmpeg_dir.name.lower() == "bin":
     ffmpeg_dir = ffmpeg_dir.parent
 notices = [(str(ffmpeg_dir / name), "ffmpeg") for name in ("LICENSE", "README.txt")
            if (ffmpeg_dir / name).is_file()]
+regex_dist = distribution("regex")
+notices += [(str(regex_dist.locate_file(file)), "regex") for file in regex_dist.files or ()
+            if file.name.lower().startswith(("license", "copying"))]
 
 a = Analysis(
     [str(ROOT / "sidecar" / "launcher.py")],

@@ -61,6 +61,20 @@ def test_public_svg_png_use_the_same_frozen_split_painter(public_geometry):
         v2_svg._rasterize_svg_frame(layout, expected, split_inputs=inputs).png)
 
 
+def test_prepared_split_preserves_policy_authority_and_boundary_pixels(public_geometry):
+    from atme.render.v2_split_paint import _VerifiedSplitAssetBytes
+
+    layout, _, _, timeline, _, _, _ = public_geometry
+    plan = layout.model_dump(mode="json")
+    resolved = timeline.model_dump(mode="json")
+    assets = _VerifiedSplitAssetBytes(())
+    prepared = v2_svg.prepare_png_sequence(plan, resolved, assets)
+    for at in (0, 12, 20, 32, 40):
+        assert prepared(at).png == v2_svg.compose_png_frame(plan, resolved, at, assets).png
+    with pytest.raises(ValueError, match="trusted typed asset rows"):
+        v2_svg.prepare_png_sequence(plan, resolved, {})
+
+
 def public_clock(layout, initial, timeline, inputs, **changes):
     ordinary = {row.action.action_id for row in timeline.actions if row.action.verb == "insert_evidence"}
     values = {"objects": {obj.object_id: obj for obj in layout.objects}, "hierarchy": initial.hierarchy,

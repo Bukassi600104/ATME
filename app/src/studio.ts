@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface SidecarInfo { port: number; token: string; ready: boolean; error?: string }
-interface NarrativeSource { mode: "script_authority" | "recording_authority"; ready_for_timing: boolean; ready_for_planning: boolean; semantic_structure: { ready: boolean } }
+interface NarrativeSource { mode: "script_authority" | "recording_authority"; ready_for_timing: boolean; ready_for_planning: boolean; semantic_structure: { ready: boolean }; timing_authority?: {duration_ms: number} }
 interface ProjectState { project_id: number; title: string; revision: number; profile: "LONG_FORM_16_9" | "SHORT_FORM_9_16"; input_kind: string; status: string; approved_script_revision: number | null; artifacts: Record<string, number>; authoritative_narrative_source: NarrativeSource; render_ready: boolean }
 interface MediaItem { media_id: string; name?: string; kind: "audio" | "video"; format: string; bytes: number; duration_ms: number; revision: number; sample_rate?: number; channels?: number }
 interface TimelineClip { clip_id: string; media_id: string; kind: "audio" | "video"; stream?: "audio" | "video" | "linked_av"; track_index?: number; audio_enabled?: boolean; source_start_ms: number; source_end_ms: number; timeline_start_ms: number; link_group_id: string; crossfade_ms: number }
@@ -16,7 +16,8 @@ interface ScriptScene { scene_id: number; phase: string; spoken_text: string; vi
 interface ScriptDoc { topic?: string; title?: string; scenes: ScriptScene[] }
 interface StoryboardDoc { beats: Array<{ beat_id: string; narration?: string; narration_summary?: string; purpose?: string; visual_purpose?: string }> }
 interface LayoutElement { id: string; scene_id: number; board_id: string; appear_at_ms: number; kind?: string; layer?: number; visibility_intervals?: Array<{ start_ms: number; end_ms: number }> }
-interface LayoutDoc { elements: LayoutElement[]; board_timeline?: { activations: Array<{ board_id: string; start_ms: number; end_ms: number }> } }
+interface BoardActivation { board_id: string; start_ms: number; end_ms: number }
+interface LayoutDoc { elements?: LayoutElement[]; board_timeline?: { activations: BoardActivation[] }; activations?: BoardActivation[] }
 interface RevisionRequest { request_id: string; project_revision: number; selection: { kind: string; id: string; start_ms: number; end_ms: number }; instruction: string; status: string; proposal?: { artifact_kind: string; document: object; summary: string } }
 interface McpSession { session_id: string; active: boolean; client_identity: string | null; started_at: number; last_seen_at: number; last_activity_at: number | null; last_tool: string | null; last_project_id: number | null; call_count: number }
 interface McpActivity { active: boolean; active_session_count: number; client_identities: string[]; identity_available: boolean; last_activity_at: number | null; last_tool: string | null; last_project_id: number | null; recent_project_ids: number[]; sessions: McpSession[]; version?: number; connection_evidence?: string }
@@ -273,7 +274,8 @@ async function openProject(id: number, hideDrawer = true, preservePosition = fal
   state.media = Array.isArray(media) ? media : media.media || [];
   state.assets = assets.assets;
   state.script = script; state.storyboard = storyboard; state.layout = layout; state.sourceTimeline = sourceTimeline; state.editHistory = sourceTimeline.history; state.validation = null; state.selected = null;
-  state.durationMs = Math.max(1000, sourceTimeline.document.duration_ms || deriveLayoutDuration(layout) || 60_000);
+  state.durationMs = Math.max(1000, sourceTimeline.document.duration_ms ||
+    project.authoritative_narrative_source.timing_authority?.duration_ms || deriveLayoutDuration(layout) || 60_000);
   state.playheadMs = Math.min(previousPlayhead, Math.max(0, state.durationMs - 1));
   $("project-name").textContent = state.project.title;
   $("save-state").textContent = `Saved locally · revision ${state.project.revision}`;
@@ -294,8 +296,12 @@ async function openProject(id: number, hideDrawer = true, preservePosition = fal
   else if (workspaceDialog.open && $("workspace-dialog-title").textContent === "Storyboard") showStoryboard();
 }
 
+function boardActivations(layout: LayoutDoc | null): BoardActivation[] {
+  return layout?.activations || layout?.board_timeline?.activations || [];
+}
+
 function deriveLayoutDuration(layout: LayoutDoc | null): number {
-  return Math.max(0, ...(layout?.board_timeline?.activations || []).map((item) => item.end_ms));
+  return boardActivations(layout).reduce((end, item) => Math.max(end, item.end_ms), 0);
 }
 
 function applyViewerProfile(profile: ProjectState["profile"]): void {
@@ -490,7 +496,7 @@ function renderTimeline(): void {
     const media=state.media.find(value=>value.media_id===item.media_id); add(item.kind === "video" ? "video" : "audio", item.timeline_start_ms, end, media?.name || (item.kind === "video" ? "Source video" : "Narration"), item.kind, item.clip_id, false, item.track_index||0);
     // Linked source audio stays inside its video clip until explicit detachment.
   }
-  for (const activation of state.layout?.board_timeline?.activations || []) add("illustrations", activation.start_ms, activation.end_ms, activation.board_id, "illustration", activation.board_id);
+  for (const activation of boardActivations(state.layout)) add("illustrations", activation.start_ms, activation.end_ms, activation.board_id, "illustration", activation.board_id);
   const scenes = state.script?.scenes || [];
   const totalWeight = scenes.reduce((sum, scene) => sum + Math.max(1, scene.est_seconds || scene.spoken_text.split(/\s+/).length), 0);
   let cursor = 0;
@@ -710,7 +716,7 @@ function renderInspector(): void {
   const time = document.createElement("div"); time.className = "inspector-row"; time.innerHTML = `<span>Timing</span><strong>${formatTime(state.selected.startMs)} – ${formatTime(state.selected.endMs)}</strong>`;
   section.append(heading, title, time); root.append(section);
   if (state.selected.kind === "caption" && state.script) appendCaptionEditor(root);
-  if (state.selected.kind === "illustration" && state.layout) appendTimingOverride(root);
+  if (state.selected.kind === "illustration" && state.layout?.board_timeline?.activations.some(item => item.board_id === state.selected?.id)) appendTimingOverride(root);
   if ((state.selected.kind === "video" || state.selected.kind.startsWith("audio")) && state.sourceTimeline) appendSourceClipEditor(root);
   updateEditCommands();
 }
@@ -912,7 +918,7 @@ async function saveBoardTiming(startMs: number, endMs: number): Promise<void> {
   const document = structuredClone(state.layout); const activation = document.board_timeline?.activations.find((item) => item.board_id === state.selected?.id);
   if (!activation) return;
   const delta = startMs - activation.start_ms; activation.start_ms = startMs; activation.end_ms = endMs;
-  for (const element of document.elements.filter((item) => item.board_id === activation.board_id)) {
+  for (const element of (document.elements || []).filter((item) => item.board_id === activation.board_id)) {
     element.appear_at_ms = Math.max(startMs, Math.min(endMs - 1, element.appear_at_ms + delta));
     element.visibility_intervals = element.visibility_intervals?.map((interval) => ({ start_ms: Math.max(startMs, interval.start_ms + delta), end_ms: Math.min(endMs, interval.end_ms + delta) }));
   }
@@ -1087,7 +1093,7 @@ async function saveScriptOverride(project: ProjectState, raw: string): Promise<v
 }
 
 function showStoryboard(): void {
-  const wrap = document.createElement("div"); const activations = state.layout?.board_timeline?.activations || [];
+  const wrap = document.createElement("div"); const activations = boardActivations(state.layout);
   const beats = state.storyboard?.beats || [];
   if (!beats.length && !activations.length) wrap.innerHTML = "<div class='workspace-card'><h3>No storyboard yet</h3><p>Your connected AI can add the storyboard through MCP.</p></div>";
   for (const beat of beats) {

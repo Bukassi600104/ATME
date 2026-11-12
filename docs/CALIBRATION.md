@@ -127,3 +127,24 @@ online LLM time on top. Comfortably within the revised budgets.
 | warm | 240 | 10.16 | 23.6 | PASS |
 
 Verdict: **PASS** (22.5 fps worst-case)
+
+## Stored v2 frame preparation, 2026-11-12
+
+Two ten-second, 30 fps fixtures exercised the stored renderer on a shared Windows build host.
+The original complete render stage took 273.00 seconds for a scored 1280×720 board and
+280.84 seconds for a 720×1280 camera composition. Their subsequent mux stages took 3.25
+and 2.89 seconds respectively.
+
+After the export began reusing the validated layout, action history and held annotation
+endpoints, a paired check painted the same 16 action-boundary samples by both paths.
+The timers include sequence preparation and painting, with native imports warm.
+
+| Fixture | Standalone frame calls | Prepared sequence | Identical PNG hashes |
+|---|---:|---:|---:|
+| Scored board | 7.046 s | 9.296 s | 16 of 16 |
+| Transparent camera overlay | 22.437 s | 9.656 s | 16 of 16 |
+
+All three additional comparisons after camera composition also matched. Their FFmpeg
+composition time was outside the timers. A call-count regression checks that a five-frame
+export validates the fixed pair once. These short measurements varied by workload and
+host contention. Full-length export throughput needs a dedicated measurement.
