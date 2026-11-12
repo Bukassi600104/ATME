@@ -115,6 +115,9 @@ def stored_v2_basis(tmp_path, *, real_evidence=False, real_image=False,
     layout = executable_layout_v2(plan)
     layout["output_profile"] = deepcopy(plan["output_profile"])
     layout["canvas"].update(width=plan["output_profile"]["width"], height=plan["output_profile"]["height"])
+    if profile == "SHORT_FORM_9_16":
+        proof = next(obj for obj in layout["objects"] if obj["object_type"] == "evidence")
+        proof["geometry"]["bounds"].update(x=110, y=650)
     if asset is not None:
         layout["objects"][2]["asset_id"] = asset["asset_id"]
     if image_asset is not None:
@@ -377,6 +380,12 @@ def test_public_v2_export_preserves_preview_frames_and_mastered_audio(tmp_path, 
                                                         profile=profile, narration=wav.getvalue(), camera=camera)
     pid = project["project_id"]
     try:
+        if not camera:
+            from test_v2_sound_events_project import stored_sound
+
+            basis = (service, project, service.artifact(pid, "storyboard")["document"],
+                     service.artifact(pid, "layout")["document"], timeline)
+            service, project, _, _, timeline = stored_sound(tmp_path, persist=False, basis=basis)
         project = service.write(pid, "resolved_timeline", timeline, project["revision"])
         revision = project["revision"]
         assert service.validate_project(pid)["ready"]
@@ -405,7 +414,17 @@ def test_public_v2_export_preserves_preview_frames_and_mastered_audio(tmp_path, 
             assert max(ImageStat.Stat(ImageChops.difference(frame, expected)).mean) < 4
         packets = subprocess.check_output([ffmpeg, "-v", "error", "-i", str(output),
                                            "-map", "0:a:0", "-c:a", "copy", "-f", "adts", "-"])
-        expected = subprocess.check_output([ffmpeg, "-v", "error", "-i", str(work / "audio" / "final.wav"),
+        soundtrack = work / "audio" / ("final.wav" if camera else "editorial.wav")
+        if not camera:
+            import soundfile as sf
+
+            voice, rate = sf.read(work / "audio" / "final.wav")
+            mix, mix_rate = sf.read(soundtrack)
+            assert mix_rate == rate and len(voice) == len(mix)
+            addition = mix - voice
+            assert np.allclose(addition[rate // 2:3 * rate // 4], .125 * 10 ** (-12 / 20), atol=.001)
+            assert np.max(np.abs(addition[rate:2 * rate])) < .0001
+        expected = subprocess.check_output([ffmpeg, "-v", "error", "-i", str(soundtrack),
                                             "-c:a", "aac", "-b:a", "160k", "-f", "adts", "-"])
         assert packets and packets == expected
     finally:

@@ -1143,7 +1143,21 @@ async function renderProject(): Promise<void> {
   } catch (error) { toast(error instanceof Error ? error.message : "Render could not start."); }
 }
 
-async function exportManualTimeline():Promise<void>{const project=state.project;if(!project)return;if(!window.confirm("Export the current manually edited timeline as an MP4?"))return;try{const info=await sidecar(),response=await fetch(`http://127.0.0.1:${info.port}/projects/${project.project_id}/timeline-export?expected_revision=${project.revision}`,{headers:{Authorization:`Bearer ${info.token}`}});if(!response.ok)throw new Error("Timeline export could not be created.");const url=URL.createObjectURL(await response.blob()),link=document.createElement("a");link.href=url;link.download=`ATME-${project.title.replace(/[^a-z0-9]+/gi,"-")}-timeline.mp4`;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);toast("Manual timeline export ready.");}catch(error){toast(error instanceof Error?error.message:"Timeline export failed.");}}
+async function exportManualTimeline(): Promise<void> {
+  const project = state.project;
+  if (!project || !window.confirm("Export the current manually edited timeline as an MP4?")) return;
+  try {
+    const info = await sidecar();
+    const ticket = await api<{path: string}>(`/projects/${project.project_id}/timeline-export?expected_revision=${project.revision}`, {method: "POST"});
+    if (state.project !== project) return;
+    downloadMovie(`http://127.0.0.1:${info.port}${ticket.path}`);
+    toast("Manual timeline export ready.");
+  } catch (error) { toast(error instanceof Error ? error.message : "Timeline export failed."); }
+}
+
+function downloadMovie(url: string): void {
+  const link = document.createElement("a"); link.href = url + "?download=1"; link.download = ""; link.click();
+}
 
 async function pollRender(projectId: number, runId: string): Promise<void> {
   for (let count = 0; count < 720; count++) {
@@ -1174,7 +1188,7 @@ async function showRenderedVideo(projectId: number, runId: string): Promise<void
       try {
         const url = await ticketUrl();
         if (state.project !== project) return;
-        const link = document.createElement("a"); link.href = url + "?download=1"; link.download = ""; link.click();
+        downloadMovie(url);
       } catch (error) { toast(error instanceof Error ? error.message : "Could not save the MP4."); }
     };
     $("preview-image").classList.add("hidden"); $("viewer-message").classList.add("hidden");
@@ -1256,7 +1270,36 @@ function setZoom(value: number, anchorClientX?: number): void {
 
 function fitTimeline(): void { const viewport = Math.max(120, $("timeline-tracks").clientWidth - 145); setZoom(viewport / Math.max(120, state.durationMs / 1000 * 80)); $("timeline-tracks").scrollLeft = 0; updateRulerScroll(); }
 
+function showSpeechModel(): void {
+  const card = document.createElement("div"); card.className = "workspace-card";
+  const explanation = document.createElement("p");
+  explanation.textContent = "ATME uses a local English speech model to time narration. First-time setup may download the model.";
+  const status = document.createElement("p"); status.setAttribute("role", "status");
+  const button = document.createElement("button"); button.className = "small-primary";
+  card.append(explanation, status, button);
+  showDialog("Speech timing model", "Local audio processing", card);
+  const refresh = async (prepare = false) => {
+    button.disabled = true;
+    try {
+      const model = await api<{status: string; error?: string}>("/models/alignment", { method: prepare ? "POST" : "GET" });
+      if (!card.isConnected || !$<HTMLDialogElement>("workspace-dialog").open) return;
+      const working = model.status === "preparing", ready = model.status === "ready";
+      status.textContent = ready ? "Ready for local timing." : working ? "Preparing the speech model…" :
+        model.error || "Prepare the model before timing your first recording.";
+      button.textContent = ready ? "Ready" : working ? "Preparing…" : "Prepare speech model";
+      button.disabled = ready || working;
+      if (working) window.setTimeout(() => { if (card.isConnected && $<HTMLDialogElement>("workspace-dialog").open) void refresh(); }, 2000);
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : "Model setup unavailable.";
+      button.disabled = false; button.textContent = "Prepare speech model";
+    }
+  };
+  button.textContent = "Checking…"; button.onclick = () => void refresh(true);
+  void refresh();
+}
+
 function runMenuAction(action:string):void{
+  if (action === "speech-model") { showSpeechModel(); return; }
   const click=(id:string)=>$<HTMLButtonElement>(id).click();
   if(action==="projects")showProjectBrowser(true);else if(action==="new-project")openNewProject();else if(action==="import")click("add-source");else if(action==="render")click("render-project");
   else if(action==="undo")click("undo-edit");else if(action==="redo")click("redo-edit");else if(action==="cut")click("cut-edit");else if(action==="delete")click("delete-edit");else if(action==="ripple")click("ripple-delete");

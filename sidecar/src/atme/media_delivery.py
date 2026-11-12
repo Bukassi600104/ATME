@@ -43,6 +43,18 @@ def render_ticket(service, project_id, run_id):
     return _ticket(path, project_id, run["project_revision"], None, f"ATME-{project_id}-{run_id}.mp4")
 
 
+def timeline_export(service, project_id, expected_revision, ticket=False):
+    with service.store._lock:
+        service._expected(service._row(project_id), expected_revision)
+    path, _, timeline = materialize_video(service, project_id, True)
+    with service.store._lock:
+        service._expected(service._row(project_id), expected_revision)
+    if ticket:
+        return _ticket(path, project_id, expected_revision, timeline["timeline_revision"],
+                       f"ATME-project-{project_id}-timeline.mp4")
+    return path
+
+
 def _ticket(path, project_id, expected_revision, timeline_revision, download_name=None):
     token = secrets.token_urlsafe(32)
     expires = time.time() + TICKET_TTL_SECONDS

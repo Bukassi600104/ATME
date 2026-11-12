@@ -344,8 +344,8 @@ def test_schema_registry_dispatch_is_explicit_and_renderer_capability_truthful()
     assert ProjectService.capabilities()["visual_contracts"] == {
         "authoring_versions": ["1", "2.0.0"], "renderer_versions": ["1", "2.0.0"],
         "active_renderer_version": "1", "v2_render_status": "stored_resolved_timeline",
-        "v2_export_audio": "mastered_narration", "v2_export_profiles_fps": 30,
-        "v2_export_limits": ["authored_sound_mix"]}
+        "v2_export_audio": "mastered_narration_and_resolved_editorial_buses", "v2_export_profiles_fps": 30,
+        "v2_export_limits": ["sound_actions_require_explicit_bus_and_playback_policy"]}
     with pytest.raises(ProjectError, match="No 'layout' contract"):
         ProjectService.schema("layout", "9")
 

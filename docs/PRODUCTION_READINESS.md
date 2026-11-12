@@ -4,6 +4,8 @@
 
 ## Where the production path broke
 
+The apparent loop had multiple causes. Historical verification repeatedly exercised renderer internals while the public project dispatcher still rejected v2 layouts. The interrupted full run produced no terminal result. Independently, a worker that terminated after recording a running status could leave the Studio waiting forever. Only the last of these requires recovering an individual project job. Render progress and software-development progress should be measured separately.
+
 | Area | What exists | Finding and work required |
 | --- | --- | --- |
 | Project and authoring | Local projects, revisioned script/storyboard/layout, undo, scoped media, authenticated HTTP and stdio MCP | Keep the existing project service. Script-led projects require approval of the displayed script. Recording-led projects retain the recording as authority and let the connected AI supply structure. A stale Studio dialog could act on a different revision. Bind review, preview and edits to the project and revision displayed. |
@@ -25,3 +27,20 @@
 6. **Decide launch scope from evidence.** Exercise an operator-selected original recording with the intended connected AI. Review the exported movie in a player. Resolve each outstanding delivery or creative-quality failure against that saved revision. An installer tested on a second Windows machine establishes fresh-install behavior beyond the development host.
 
 No project-wide rewrite is needed. The work to start afresh is the release artifact, its reproducible verification and a current release record. Keep the stored projects, original media, renderer/compiler, asset catalog, editor and project APIs. Historical phase documents remain development history.
+
+## Audit coverage and source recovery
+
+The inventory at engineering checkpoint `e2d46e85` contains 116 tracked files under the Python runtime, 262 under its tests, seven under the desktop source directories, 24 under schemas, 28 production asset files, six prompts and 26 benchmark files. A syntax pass parsed 400 Python files and 23 JSON contracts/examples. Type checking and behavioral Studio tests complement that pass. An older benchmark script emitted a nonfatal Python escape-sequence warning. This inventory describes coverage of the review. A passing file count is insufficient evidence for an audiovisual feature.
+
+The first independent GitHub restore matched the integrated source, lockfiles, contracts, artwork, fonts and tests. The separately verified November production checkpoint contains the first 51 engineering changes in this audit. The public branch omits generated binaries, build caches, source research documents, customer project data and local diagnostics. Eligible internal engineering history and earlier reports have an owner-only backup. The private crash dump stays on the workstation.
+
+- [Public production source branch](https://github.com/Bukassi600104/ATME/tree/backup/production-source-20261112)
+- [Verified 51-file checkpoint](https://github.com/Bukassi600104/ATME/commit/ec36c1fd9142aaa1800c0e9200127a083d670c63)
+
+## Live operator test
+
+1. Start the candidate with a separate project directory for the first run. Open a project and choose **Help → Speech timing model**. Prepare the English model. On a new machine the first preparation needs access to the model weights. Subsequent timing can use the local copy.
+2. Open **AI Connection** and copy the configuration for the intended client. After connecting, confirm the Studio indicates an active session. Create a project and upload the recording. Place the intended media on the timeline.
+3. Ask the connected AI to read the project state and capabilities, submit the script or recording-derived scene structure, prepare timing, and author the storyboard and layout for the selected profile. For a script-led project, read the displayed script and approve that revision in Studio.
+4. Review the storyboard and seek the preview. Open **Export Check**, resolve any listed issues, then select **Render**. A successful run appears under **Renders**. Open it and choose **Save MP4**. Manual timeline export is available for a video edit that has no authored animation.
+5. Play the saved file in an independent player and check intelligibility, timing, framing and artwork. Close and reopen the same project and retrieve the same completed run. Test a second orientation with a layout authored for its canvas.

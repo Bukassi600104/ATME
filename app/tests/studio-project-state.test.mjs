@@ -12,7 +12,8 @@ const compiled = ts.transpileModule(source, { compilerOptions: {
 function studio(fetch) {
   const nodes = new Map();
   const element = () => ({
-    children: [], classList: { add() {}, remove() {}, contains() { return true; } },
+    children: [], isConnected: true, classList: { add() {}, remove() {}, contains() { return true; } },
+    setAttribute() {},
     append(...children) { this.children.push(...children); },
     replaceChildren(...children) { this.children = children; },
     showModal() { this.open = true; },
@@ -28,7 +29,7 @@ function studio(fetch) {
     addEventListener() {}, setTimeout() {},
   }, require: () => ({ invoke: async () => ({ ready: true, port: 1234, token: "test" }) }),
   URL: { createObjectURL: (value) => "blob:" + value, revokeObjectURL() {} } };
-  vm.runInNewContext(compiled + "\nglobalThis.driver = {state, optionalArtifact, showScript, showStoryboard, refreshPreview};", context);
+  vm.runInNewContext(compiled + "\nglobalThis.driver = {state, optionalArtifact, showScript, showStoryboard, refreshPreview, showSpeechModel};", context);
   return { ...context.driver, nodes };
 }
 
@@ -79,4 +80,21 @@ test("seeking twice cannot paint a delayed frame over the newer frame", async ()
   await ui.refreshPreview();
   finishOld("old"); await old;
   assert.equal(ui.nodes.get("preview-image").src, "blob:next");
+});
+
+test("first-run speech setup shows the local model status and prepares on demand", async () => {
+  const methods = [];
+  const ui = studio(async (_url, init) => {
+    methods.push(init.method);
+    return {ok: true, json: async () => ({status: init.method === "POST" ? "ready" : "not_ready"})};
+  });
+  ui.showSpeechModel();
+  await new Promise(resolve => setImmediate(resolve));
+  const [, status, prepare] = ui.nodes.get("workspace-dialog-content").children[0].children;
+  assert.equal(prepare.textContent, "Prepare speech model");
+  prepare.onclick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(methods, ["GET", "POST"]);
+  assert.match(status.textContent, /ready for local timing/i);
+  assert.equal(prepare.disabled, true);
 });

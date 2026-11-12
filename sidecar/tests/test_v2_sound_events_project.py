@@ -1,5 +1,6 @@
-"""Sound persistence binds declarations to owned bytes without decoding audio."""
+"""Sound persistence binds declarations to owned audio bytes and measured duration."""
 from copy import deepcopy
+import wave
 
 import pytest
 from atme.project_service import (
@@ -16,12 +17,13 @@ from v2_fixtures import common_action, digest
 pytestmark = pytest.mark.usefixtures(no_media_execution.__name__)
 
 
-def stored_sound(tmp_path, *, persist=True, change=None):
-    service, project, plan, layout, timeline = stored_v2_basis(tmp_path)
+def stored_sound(tmp_path, *, persist=True, change=None, basis=None):
+    service, project, plan, layout, timeline = basis if basis is not None else stored_v2_basis(tmp_path)
     pid = project["project_id"]
-    # Declared duration is authored metadata; these opaque bytes exercise no decoder.
     upload = tmp_path / "score.wav"
-    upload.write_bytes(b"owned sound declaration; no measured-duration claim")
+    with wave.open(str(upload), "wb") as stream:
+        stream.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+        stream.writeframes(b"\x00\x10" * 64000)
     attached = service.attach_asset_file(pid, upload, upload.name, project["revision"])
     project, owned = attached["project"], attached["asset"]
     asset_id = owned["asset_id"]

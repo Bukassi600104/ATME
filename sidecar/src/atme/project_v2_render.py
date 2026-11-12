@@ -131,6 +131,10 @@ def render(work, inputs, compiled, layout, audio):
     target = out / "video.mp4"
     pending = out / "video.pending.mp4"
     camera = inputs / "source-video.mp4" if "source_video_sha256" in compiled else None
+    if camera is not None:
+        from atme.project_assets import _sha256
+        if _sha256(camera) != compiled["source_video_sha256"]:
+            raise ValueError("The frozen camera video failed its integrity check")
     command = [find_ffmpeg(), "-y", "-v", "error", *_video_inputs(fps, camera), "-an", "-c:v", "libx264", "-preset", "veryfast",
                "-pix_fmt", "yuv420p", "-crf", "18", str(pending)]
     try:

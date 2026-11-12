@@ -68,7 +68,7 @@ def test_supporting_import_does_not_replace_placed_recording(tmp_path):
         source = core.narrative_source(pid)
         assert source["ready_for_timing"]
         assert source["timing_authority"]["media"]["media_id"] == video["media"]["media_id"]
-        assert core.validate_project(pid)["selected_revisions"]["media"] == video["media"]["revision"]
+        assert core.validate_project(pid)["selected_revisions"]["media"] == video["project"]["revision"]
     finally:
         core.store.close()
 

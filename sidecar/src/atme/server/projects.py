@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
 from atme.mcp_activity import McpActivity
-from atme.media_delivery import render_ticket, ticket_response
+from atme.media_delivery import render_ticket, ticket_response, timeline_export
 from atme.project_service import ProjectError, ProjectService
 
 
@@ -337,15 +337,13 @@ def register_projects(app, store, auth):
                             filename=f"ATME-{project_id}.mp4")
 
     @app.get("/projects/{project_id}/timeline-export", dependencies=[Depends(auth)])
-    def timeline_export(project_id: int, expected_revision: int):
-        state = call(service.open, project_id)
-        if state["revision"] != expected_revision:
-            raise HTTPException(409, {"code": "revision_conflict", "message": "Project changed; reload before exporting"})
-        from atme.timeline_media import materialize_video
-        path, _metadata, _timeline = call(materialize_video, service, project_id, True)
-        with service.store._lock:
-            call(service._expected, service._row(project_id), expected_revision)
+    def timeline_output(project_id: int, expected_revision: int):
+        path = call(timeline_export, service, project_id, expected_revision)
         return FileResponse(path, media_type="video/mp4", filename=f"ATME-project-{project_id}-timeline.mp4")
+
+    @app.post("/projects/{project_id}/timeline-export", dependencies=[Depends(auth)])
+    def timeline_download_ticket(project_id: int, expected_revision: int):
+        return call(timeline_export, service, project_id, expected_revision, True)
 
     @app.post("/projects/{project_id}/media/wav", dependencies=[Depends(auth)])
     async def attach_wav(project_id: int, expected_revision: int, request: Request,

@@ -151,4 +151,23 @@ use an installed-engine double and its narration is synthetic. A live external-A
 original human narration/local-model quality, desktop connection UX, native packaging and
 full media-format acceptance remain separate gates.
 
+## Authoring a stored v2 production
+
+Read the current project, its narrative authority, the selected output profile and the
+schema for each artifact. Submit the approved script or recording-derived scene index,
+then write the v2 storyboard and executable layout with `atme.write_artifact`. Use each
+returned project revision for the next write. The same tool accepts `resolved_timeline`
+with contract version `2.0.0`. The authoring client supplies the compiled actions and
+measured timing against the stored plan, layout and edited recording. ATME verifies
+their revisions, canonical SHA-256 fingerprints, owned asset references and action
+coverage when it stores that result. A subsequent edit requires a new matching timeline.
+
+Call `atme.validate_project`, request a frame with `atme.preview_project`, then request
+the confirmed render. Both output profiles use 30 fps. Placed camera footage supplies
+the video base under the authored ink. For a sound cue or music, upload the sound as
+a project asset, use its measured duration, and author explicit bus, playback and fade
+policies. The export mixes these cues with mastered narration. Standalone storyboard
+sound descriptions need executable actions to be audible. Fetch the MP4 through the
+authenticated output endpoint or use **Save MP4** in Studio.
+
 SDK reference: https://github.com/modelcontextprotocol/python-sdk

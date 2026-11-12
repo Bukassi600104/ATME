@@ -62,6 +62,14 @@ def test_manual_export_converts_original_and_separates_profile_caches(tmp_path):
             frame = subprocess.check_output([ffmpeg, "-v", "error", "-i", str(path), "-frames:v", "1",
                                             "-c:v", "png", "-f", "image2pipe", "-"], timeout=60)
             assert Image.open(io.BytesIO(frame)).size == dimensions
+        from atme.media_delivery import timeline_export
+        current = core.open(pid)["revision"]
+        ticket = timeline_export(core, pid, current, ticket=True)
+        assert ticket["path"].startswith("/media-playback/")
+        assert ticket["project_revision"] == current
+        with pytest.raises(ProjectError) as error:
+            timeline_export(core, pid, revision, ticket=True)
+        assert error.value.code == "revision_conflict"
     finally:
         core.store.close()
 
