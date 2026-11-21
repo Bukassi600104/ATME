@@ -1691,6 +1691,15 @@ class TransformAction(ActionBase):
         return self
 
 
+def validate_new_transform(action):
+    """Reject ignored channels on new submissions while historical replay remains readable."""
+    if isinstance(action, TransformAction):
+        if action.verb != "fade" and action.opacity is not None:
+            raise ValueError(f"action {action.action_id}: {action.verb} cannot set opacity; use fade")
+        if action.verb == "fade" and action.destination is not None:
+            raise ValueError(f"action {action.action_id}: fade cannot set a spatial destination")
+
+
 class ConnectionAction(ActionBase):
     verb: Literal["connect", "disconnect"]
     connector_id: str
@@ -4234,6 +4243,7 @@ def validate_plan_evidence_completeness(plan_document: dict) -> None:
     for action in plan.actions:
         _validate_structured_progression_objects(action, {obj.object_id: obj for obj in plan.objects},
                                                  normal_write=True)
+        validate_new_transform(action)
         if isinstance(action, SplitAction):
             _require_split_contract(action)
         if isinstance(action, GroupAction) and action.verb in {"group", "ungroup"}:

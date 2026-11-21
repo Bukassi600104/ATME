@@ -147,6 +147,13 @@ def create_mcp(service: ProjectService, activity: McpActivity | None = None):
         return invoke(service.visual_compilation_context, project_id, expected_revision, resolved_draft,
                       tool="atme.get_visual_compilation_context", project_id=project_id)
 
+    @server.tool(name="atme.compile_storyboard_speech", annotations=read)
+    def compile_storyboard_speech(project_id: Id, expected_revision: Revision,
+                                  timing_run_id: Annotated[str, Field(pattern=r"^[0-9a-f]{24}$")]) -> CallToolResult:
+        """Resolve stored v2 word/phrase actions against a completed timing run. Returns measured triggers or per-instruction issues."""
+        return invoke(service.compile_storyboard_speech, project_id, expected_revision, timing_run_id,
+                      tool="atme.compile_storyboard_speech", project_id=project_id)
+
     @server.tool(name="atme.write_artifact", annotations=write)
     def write_artifact(project_id: Id, kind: Kind, document: dict, expected_revision: Revision) -> CallToolResult:
         """Receive externally authored JSON. Reject invalid/stale writes without modifying the project."""

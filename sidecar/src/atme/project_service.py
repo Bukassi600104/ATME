@@ -166,7 +166,8 @@ class ProjectService:
                 "artifact_kinds": ["brief", "script", "storyboard", "layout", "resolved_timeline"],
                 "output_profiles": list(PROFILES),
                 "operations": ["create_project", "open_project", "list_projects", "duplicate_project", "archive_project",
-                               "get_schema", "get_visual_compilation_context", "write_artifact", "get_artifact", "approve_script",
+                               "get_schema", "get_visual_compilation_context", "compile_storyboard_speech",
+                               "write_artifact", "get_artifact", "approve_script",
                                "migrate_visual_contracts_v1",
                                "list_media", "get_narrative_source", "validate_project", "preview_project",
                                "prepare_timing", "get_timing_status", "create_revision_request",
@@ -622,8 +623,11 @@ class ProjectService:
                     if not legacy_migration:
                         validate_layout_registry_completeness(layout)
                 elif kind == "resolved_timeline":
-                    from atme.store.contracts_v2 import ResolvedVisualTimelineV2
-                    ResolvedVisualTimelineV2.model_validate(document)
+                    from atme.store.contracts_v2 import ResolvedVisualTimelineV2, validate_new_transform
+                    resolved = ResolvedVisualTimelineV2.model_validate(document)
+                    if not legacy_migration:
+                        for event in resolved.actions:
+                            validate_new_transform(event.action)
             except ValueError as exc:
                 errors.append({"path": "/", "message": str(exc)})
         if errors:
@@ -1229,6 +1233,34 @@ class ProjectService:
                 result["compilation_fingerprint"] = _resolved_compilation_fingerprint(resolved_draft)
             self._expected(self._row(project_id), expected_revision)
             return result
+
+    def compile_storyboard_speech(self, project_id, expected_revision, timing_run_id):
+        """Bind current storyboard instructions to an existing measurement of the same edit."""
+        from atme.board_compiler import compile_storyboard_speech
+
+        with self.store._lock:
+            basis = self.visual_compilation_context(project_id, expected_revision)["layout_basis"]
+            if basis is None:
+                raise ProjectError("stale_contract_basis", "A current v2 storyboard and narrative source are required")
+            run = self.timing.status(project_id, timing_run_id)
+            if run["status"] != "done":
+                raise ProjectError("timing_not_ready", "A completed local timing measurement is required")
+            measured = run["timing"]
+            source = self.narrative_source(project_id)
+            timeline = self.source_timeline.get(project_id)
+            media = source["timing_authority"]["media"]
+            if (timeline["project_revision"] > run["project_revision"]
+                    or measured["authority_mode"] != source["mode"]
+                    or measured["source_media"] != {key: media[key] for key in ("media_id", "revision", "sha256")}
+                    or measured["semantic_structure"]["structure_revision"] != source["semantic_structure"]["revision"]
+                    or abs(measured["final_audio"]["duration_ms"] - source["timing_authority"]["duration_ms"]) > 1):
+                raise ProjectError("stale_timing", "Measure timing for the current recording, script and edited timeline")
+            plan = self.artifact(project_id, "storyboard", basis["plan_revision"])["document"]
+            compiled = compile_storyboard_speech(plan, measured, source["timing_authority"]["duration_ms"])
+            self._expected(self._row(project_id), expected_revision)
+            return {**compiled, "project_id": project_id, "project_revision": expected_revision,
+                    "plan_revision": basis["plan_revision"], "plan_sha256": basis["plan_sha256"],
+                    "timing_run_id": timing_run_id, "audio_sha256": measured["final_audio"]["sha256"]}
 
     def set_profile(self, project_id, profile, expected_revision):
         if profile not in PROFILES:

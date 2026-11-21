@@ -303,12 +303,7 @@ class ProjectRunner:
             if doc.get("contract_version") == "2.0.0":
                 return self._preview_v2_project(project_id, row, expected_revision, doc, at_ms)
             self._require_v1_renderer(doc)
-            timeline_duration = self.service.narrative_source(project_id)["timing_authority"]["duration_ms"]
-            layout_duration = max(
-                (item["end_ms"] for item in doc.get("board_timeline", {}).get("activations", [])),
-                default=0,
-            )
-            duration = max(timeline_duration, layout_duration)
+            duration = self._v1_preview_duration(project_id, doc)
             profile = PROFILE_SETTINGS[row["profile"]]
         if duration <= 0:
             raise ProjectError("preview_unavailable", "The current layout has no previewable duration")
@@ -317,7 +312,7 @@ class ProjectRunner:
         return self._preview_document(doc, profile, project_id, expected_revision, at_ms)
 
     def preview_v2_source(self, project_id, expected_revision, at_ms):
-        """Preview a stored v2 project, explicitly rejecting legacy layouts."""
+        """Inspect source animation at an exact millisecond, or a composited camera frame."""
         if type(at_ms) is not int or at_ms < 0:
             raise ProjectError("invalid_request", "Preview time must be a nonnegative integer")
         with self.service.store._lock:
@@ -326,12 +321,12 @@ class ProjectRunner:
             layout = self.service.artifact(project_id, "layout")["document"]
             if layout.get("contract_version") != "2.0.0":
                 raise ProjectError("renderer_contract_unsupported", "A stored v2 layout is required")
-            return self._preview_v2_project(project_id, row, expected_revision, layout, at_ms)
+            return self._preview_v2_project(project_id, row, expected_revision, layout, at_ms, source_sample=True)
 
-    def _preview_v2_project(self, project_id, row, expected_revision, layout, at_ms):
+    def _preview_v2_project(self, project_id, row, expected_revision, layout, at_ms, *, source_sample=False):
         """Use the exact stored compiler result and verified project-owned raster bytes."""
         from atme.render.v2_svg import compose_png_frame
-        from atme.project_v2_render import camera_preview, resolved_record, verified_assets
+        from atme.project_v2_render import camera_preview, frame_time_ms, resolved_record, verified_assets
         from atme.timeline_media import materialize_video
 
         timing = self.service.source_timeline.get(project_id)
@@ -345,12 +340,13 @@ class ProjectRunner:
         try:
             camera = any(clip["kind"] == "video" for clip in timing["document"]["clips"])
             fps = int(timeline["output_profile"]["fps"])
-            sample_ms = (at_ms * fps // 1000) * 1000 // fps if camera else at_ms
+            frame_number = at_ms * fps // 1000
+            sample_ms = at_ms if source_sample and not camera else frame_time_ms(frame_number, fps)
             frame = compose_png_frame(layout, timeline, sample_ms, verified, paper_background=not camera)
             png = frame.png
             if camera:
                 path, _, _ = materialize_video(self.service, project_id, export_profile=True)
-                png = camera_preview(path, png, at_ms, fps)
+                png = camera_preview(path, png, frame_number, fps)
         except ValueError as exc:
             raise ProjectError("preview_unavailable", "The visual timeline cannot be previewed",
                                [{"message": str(exc)[:500]}]) from exc
@@ -367,16 +363,18 @@ class ProjectRunner:
             row = self.service._row(project_id)
             self.service._expected(row, expected_revision)
             self._require_v1_renderer(document)
-            media = self._selected_media_row(project_id)
-            if media is None:
-                raise ProjectError("narration_missing", "A recording is required for proposal preview")
-            timeline_duration = self.service.source_timeline.get(project_id)["document"]["duration_ms"]
-            media_duration = json.loads(media["metadata"]).get("duration_ms", 0)
-            duration = timeline_duration or media_duration
+            duration = self._v1_preview_duration(project_id, document)
+            if duration <= 0:
+                raise ProjectError("preview_unavailable", "The proposed layout has no previewable duration")
             if at_ms >= duration:
-                raise ProjectError("invalid_request", "Preview time must be within the narration")
+                raise ProjectError("invalid_request", "Preview time must be within the proposed project")
             profile = PROFILE_SETTINGS[row["profile"]]
         return self._preview_document(document, profile, project_id, expected_revision, at_ms)
+
+    def _v1_preview_duration(self, project_id, document):
+        timing = self.service.narrative_source(project_id)["timing_authority"]
+        boards = document.get("board_timeline", {}).get("activations", [])
+        return max(timing["duration_ms"], max((item["end_ms"] for item in boards), default=0))
 
     @staticmethod
     def _preview_document(doc, profile, project_id, expected_revision, at_ms):

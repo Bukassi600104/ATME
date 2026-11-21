@@ -306,6 +306,11 @@ def test_stored_v2_preview_matches_direct_compositor_without_v1_fallback(tmp_pat
         direct = compose_png_frame(layout, timeline, at_ms, {asset.asset_id: verified})
         assert preview["png"] == direct.png
         assert (preview["width"], preview["height"]) == (1280, 720)
+    # Frame 7 starts at 233 1/3 ms. Its animation is sampled at integer time 233.
+    frames = {at: service.preview_project(project_id, project["revision"], at)["png"]
+              for at in (200, 233, 234, 235)}
+    assert frames[200] == frames[233] != frames[234] == frames[235]
+    assert frames[234] == compose_png_frame(layout, timeline, 233, {asset.asset_id: verified}).png
     service.store.close()
 
 
@@ -389,8 +394,10 @@ def test_public_v2_export_preserves_preview_frames_and_mastered_audio(tmp_path, 
         project = service.write(pid, "resolved_timeline", timeline, project["revision"])
         revision = project["revision"]
         assert service.validate_project(pid)["ready"]
-        previews = [service.preview_project(pid, revision, at)["png"] for at in (0, 4900)]
-        assert previews[0] != previews[1]
+        # Off-frame requests at 233 and 234 ms straddle the start of encoded frame 7.
+        samples = ((0, 0), (233, 6), (234, 7), (4900, 147))
+        previews = [service.preview_project(pid, revision, at)["png"] for at, _ in samples]
+        assert previews[0] != previews[-1] and previews[1] != previews[2]
         if camera:
             corner = Image.open(io.BytesIO(previews[0])).convert("RGB").getpixel((10, 10))
             assert corner[2] > 200 and max(corner[:2]) < 20
@@ -405,9 +412,10 @@ def test_public_v2_export_preserves_preview_frames_and_mastered_audio(tmp_path, 
         manifest = json.loads((work / "manifest.json").read_text(encoding="utf-8"))
         assert hashlib.sha256(output.read_bytes()).hexdigest() == finished["manifest"]["video"]["sha256"]
         assert manifest["render"] == {"frames": 300, "contract_version": "2.0.0"}
-        for at, preview in zip((0, 4900), previews, strict=True):
-            raw = subprocess.check_output([ffmpeg, "-v", "error", "-ss", str(at / 1000), "-i", str(output),
-                                           "-map", "0:v:0", "-frames:v", "1", "-f", "image2pipe", "-c:v", "png", "-"])
+        for (_, number), preview in zip(samples, previews, strict=True):
+            raw = subprocess.check_output([ffmpeg, "-v", "error", "-i", str(output), "-map", "0:v:0",
+                                           "-vf", f"select=eq(n\\,{number})", "-frames:v", "1",
+                                           "-f", "image2pipe", "-c:v", "png", "-"])
             frame = Image.open(io.BytesIO(raw)).convert("RGB")
             expected = Image.open(io.BytesIO(preview)).convert("RGB")
             assert frame.size == (timeline["output_profile"]["width"], timeline["output_profile"]["height"])

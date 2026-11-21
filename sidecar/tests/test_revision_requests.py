@@ -1,3 +1,5 @@
+import pytest
+
 from atme.project_service import ProjectError, ProjectService
 from atme.store.db import JobStore
 from test_external_inputs import external_payload
@@ -67,3 +69,21 @@ def test_profile_switch_is_revision_checked(tmp_path):
     else:
         raise AssertionError("Stale profile update was accepted")
     store.close()
+
+
+def test_revision_selection_uses_edited_duration_after_import_and_trim(tmp_path):
+    store, projects = service(tmp_path)
+    try:
+        pid = projects.create("Edited duration", "LONG_FORM_16_9", "audio-only")["project_id"]
+        original = projects.attach_wav(pid, wav_bytes(7), 0)
+        placed = projects.edit_source_timeline(pid, "insert", {"media_id": original["media"]["media_id"], "at_ms": 0}, 1, 0)
+        rev = projects.attach_wav(pid, wav_bytes(2), placed["project"]["revision"])["project"]["revision"]
+        selection = {"kind": "audio", "id": "tail", "start_ms": 5000, "end_ms": 7000}
+        assert projects.create_revision_request(pid, rev, selection, "Change the ending")["status"] == "pending"
+        clip = placed["timeline"]["document"]["clips"][0]
+        edit = projects.edit_source_timeline(pid, "trim", {"clip_id": clip["clip_id"], "start_ms": 0, "end_ms": 4000},
+                                             rev, placed["timeline"]["timeline_revision"])
+        with pytest.raises(ProjectError, match="exceeds"):
+            projects.create_revision_request(pid, edit["project"]["revision"], selection, "Edit beyond the trim")
+    finally:
+        store.close()

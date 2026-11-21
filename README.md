@@ -6,7 +6,8 @@ then handles review, original voiceover, alignment, animation and MP4 rendering 
 The desktop and connected AI share a revisioned local project database. Use the
 production audit and live-test plan to see which workflows have been verified in a Windows build.
 
-- [Production audit, open work and live-test plan](docs/PRODUCTION_READINESS.md)
+- [Current production audit and phased completion plan](docs/ATME_COMPLETION_PLAN.md)
+- [Windows candidate verification and live-test plan](docs/PRODUCTION_READINESS.md)
 - [Project-service architecture](docs/ATME_V4_MIGRATION.md)
 - [Project-service implementation history](docs/ATME_V4_PROGRESS.md)
 - Development MCP connection: [local setup and supported tools](docs/MCP_CONNECTION.md)

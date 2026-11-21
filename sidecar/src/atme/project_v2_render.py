@@ -83,10 +83,15 @@ def _video_inputs(fps, camera, frame_number=0):
             "-filter_complex", "[1:v:0][0:v:0]overlay=shortest=1:format=yuv420[v]", "-map", "[v]"]
 
 
-def camera_preview(camera, overlay, at_ms, fps):
+def frame_time_ms(frame_number, fps):
+    """Integer timeline sample used to draw this encoded picture."""
+    return frame_number * 1000 // fps
+
+
+def camera_preview(camera, overlay, frame_number, fps):
     from atme.render.animator import find_ffmpeg
 
-    command = [find_ffmpeg(), "-v", "error", *_video_inputs(fps, camera, at_ms * fps // 1000),
+    command = [find_ffmpeg(), "-v", "error", *_video_inputs(fps, camera, frame_number),
                "-frames:v", "1", "-an", "-f", "image2pipe", "-c:v", "png", "pipe:1"]
     run = subprocess.run(command, input=overlay, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if run.returncode or not run.stdout:
@@ -143,7 +148,7 @@ def render(work, inputs, compiled, layout, audio):
                 stdout=subprocess.DEVNULL, stderr=errors) as proc:
             try:
                 for n in range(frames):
-                    frame = compose(n * 1000 // fps)
+                    frame = compose(frame_time_ms(n, fps))
                     proc.stdin.write(frame.png)
                 proc.stdin.close()
                 if proc.wait() != 0:

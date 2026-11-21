@@ -47,9 +47,8 @@ class RevisionRequests:
         with self.service.store._lock:
             row = self.service._row(project_id)
             self.service._expected(row, expected_revision)
-            media = self.service.list_media(project_id)
-            duration = media[-1]["duration_ms"] if media else None
-            if duration is not None and selection["end_ms"] > duration:
+            authority = self.service.narrative_source(project_id)["timing_authority"]
+            if (authority["timeline_revision"] or authority["media"]) and selection["end_ms"] > authority["duration_ms"]:
                 raise ProjectError("invalid_revision_request", "Selection exceeds the current project duration")
             self.service.store.conn.execute(
                 "INSERT INTO project_revision_requests VALUES(?,?,?,?,?,?,?,?,?,?)",
@@ -99,8 +98,8 @@ class RevisionRequests:
         if not errors and version == "2.0.0":
             try:
                 if artifact_kind == "storyboard":
-                    from atme.store.contracts_v2 import VisualPlanV2
-                    VisualPlanV2.model_validate(document)
+                    from atme.store.contracts_v2 import validate_plan_evidence_completeness
+                    validate_plan_evidence_completeness(document)
                 elif artifact_kind == "layout":
                     from atme.store.contracts_v2 import ExecutableLayoutV2
                     ExecutableLayoutV2.model_validate(document)

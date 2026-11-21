@@ -11,8 +11,23 @@ class TriggerResolutionError(ValueError):
             if r["status"] != "resolved"))
 
 
-def _tokens(text):
+def speech_tokens(text):
     return re.findall(r"[a-z0-9]+(?:'[a-z0-9]+)?", text.lower().replace("’", "'"))
+
+
+def phrase_matches(words, phrase):
+    """Find contiguous whole-token matches within one ordered narration scene."""
+    tokens, owners = [], []
+    for word in words:
+        parts = speech_tokens(word["word"])
+        tokens.extend(parts)
+        owners.extend([word] * len(parts))
+    wanted = speech_tokens(phrase)
+    if not wanted:
+        return []
+    width = len(wanted)
+    return [owners[i:i + width] for i in range(len(tokens) - width + 1)
+            if tokens[i] == wanted[0] and tokens[i:i + width] == wanted]
 
 
 def resolve_narration_events(doc, words, duration_ms):
@@ -32,16 +47,9 @@ def resolve_narration_events(doc, words, duration_ms):
         row = {"target_id": el["id"], "scene_id": el["scene_id"],
                "phrase": trigger["phrase"], "status": "missing"}
         report.append(row)
-        observed, owners = [], []
         scene_words = sorted((w for w in words if w.get("scene_id") == el["scene_id"]),
                              key=lambda w: w["start_ms"])
-        for word in scene_words:
-            for token in _tokens(word["word"]):
-                observed.append(token)
-                owners.append(word)
-        wanted = _tokens(trigger["phrase"])
-        matches = [i for i in range(len(observed) - len(wanted) + 1)
-                   if wanted and observed[i:i + len(wanted)] == wanted]
+        matches = phrase_matches(scene_words, trigger["phrase"])
         row["match_count"] = len(matches)
         occurrence = trigger.get("occurrence")
         if not matches or (occurrence is not None and occurrence > len(matches)):
@@ -49,8 +57,7 @@ def resolve_narration_events(doc, words, duration_ms):
         if occurrence is None and len(matches) != 1:
             row["status"] = "ambiguous"
             continue
-        first = matches[(occurrence or 1) - 1]
-        matched = owners[first:first + len(wanted)]
+        matched = matches[(occurrence or 1) - 1]
         scores = [w.get("confidence") for w in matched]
         confidence = min(scores) if all(isinstance(s, (int, float))
                                         and 0 <= s <= 1 for s in scores) else None

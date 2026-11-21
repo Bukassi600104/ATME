@@ -126,6 +126,45 @@ def test_transform_interpolation_is_pure_and_channel_specific(verb):
     assert evaluate_frame(layout, timeline, 100).object("object-evidence").transform.position.x == 0
 
 
+@pytest.mark.parametrize("verb", ["move", "scale", "rotate", "fade"])
+def test_new_writes_refuse_ignored_transform_channel_and_old_frames_replay(tmp_path, verb):
+    from atme.project_service import ProjectError
+    from test_visual_contracts_v2 import _store_v2_plan
+
+    layout, clock = supported_documents(verb)
+    action = clock["actions"][2]["action"]
+    before = evaluate_frame(layout, clock, 4450)
+    extra = {"opacity": .25} if verb != "fade" else {"destination": layout["objects"][0]["transform"]}
+    action.update(extra)
+    if verb == "fade":
+        with pytest.raises(V2FrameError, match="ignored transform destination"):
+            evaluate_frame(layout, clock, 4450)
+    else:
+        assert evaluate_frame(layout, clock, 4450) == before
+    service, state, plan = _store_v2_plan(tmp_path)
+    pid, rev = state["project_id"], state["revision"]
+    try:
+        plan["project_revision"] = rev
+        first = plan["actions"][0]
+        first.pop("annotation")
+        first.update(verb=verb, destination=action["destination"], opacity=action["opacity"])
+        selection = {"kind": "scene", "id": "beat-001", "start_ms": 0, "end_ms": 1000}
+        request = service.create_revision_request(pid, rev, selection, "Adjust the opening")
+        for submit in (lambda: service.write(pid, "storyboard", plan, rev),
+                       lambda: service.write(pid, "resolved_timeline", clock, rev),
+                       lambda: service.submit_revision_proposal(pid, request["request_id"], rev,
+                                                                "storyboard", plan, "Adjust transform")):
+            with pytest.raises(ProjectError) as caught:
+                submit()
+            assert any(verb + " cannot set" in issue["message"] and "action-" in issue["message"]
+                       for issue in caught.value.errors), caught.value.detail()
+        assert service.open(pid)["revision"] == rev
+        first.update({key: None for key in extra})
+        assert service.write(pid, "storyboard", plan, rev)["revision"] == rev + 1
+    finally:
+        service.store.close()
+
+
 def test_authored_evidence_action_requires_full_treatment_before_any_frame_is_shown():
     plan = visual_plan_v2()
     layout = executable_layout_v2(plan)
