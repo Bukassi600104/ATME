@@ -8,7 +8,7 @@ from atme.render.v2_hierarchy import HierarchySnapshot
 from atme.store.contracts_v2 import ExecutableLayoutV2, HierarchyBasis, VisualPlanV2, _evidence_treatment_for
 
 
-COMPILER_VERSION = 3
+COMPILER_VERSION = 4
 OBJECTS = ("rectangle", "rounded_rectangle", "ellipse", "text", "evidence")
 ACTIONS = ("draw", "write", "reveal", "enter", "exit", "highlight", "cross_out",
            "dim", "isolate", "insert_evidence", "return_board")
@@ -53,6 +53,8 @@ def _fit_heading(obj, cell, font, role, scale):
 
 
 def _placements(plan, style, root):
+    from atme.render.v2_svg import evidence_footer_height
+
     width, height = plan.output_profile.width, plan.output_profile.height
     landscape = width > height
     aspect = style.aspects["landscape-16:9" if landscape else "portrait-9:16"]
@@ -66,6 +68,13 @@ def _placements(plan, style, root):
     usable_w = width - x - ceil(safe.right_px * scale)
     usable_h = height - y - ceil(safe.bottom_px * scale)
     objects = {obj.object_id: obj for obj in plan.objects}
+    evidence = {}
+    actions = {action.action_id: action for action in plan.actions}
+    for beat in plan.beats:
+        if beat.evidence:
+            for key in beat.action_ids:
+                if actions[key].verb == "insert_evidence":
+                    evidence.setdefault(actions[key].target_object_id, []).append(beat.evidence)
     placed = []
     for board in plan.boards:
         count = len(board.object_ids)
@@ -95,6 +104,11 @@ def _placements(plan, style, root):
                 text, inset, bounds = _fit_heading(obj, cell, font, role, scale)
                 item["geometry"]["bounds"] = bounds
                 item.update(text=text, text_inset_px=inset, items=[], style={"text": "text.heading"})
+            elif obj.object_type == "evidence" and key in evidence:
+                heights = [w * intent.crop.height / intent.crop.width + evidence_footer_height(
+                    scale, intent.annotation is not None and intent.annotation_target_id == key) for intent in evidence[key]]
+                fitted = min(h, ceil(max(heights)))
+                item["geometry"]["bounds"] = {**cell, "height": fitted, "y": cell["y"] + (h - fitted) // 2}
             placed.append(item)
     return placed
 

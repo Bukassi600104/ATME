@@ -115,6 +115,11 @@ class ProjectRunner:
                     if max(bounds, default=0) > duration:
                         issues.append({"code": "layout_exceeds_narration",
                                        "message": "Layout timing exceeds the selected narration duration"})
+            if self.service.caption_burn_enabled(project_id):
+                try:
+                    self.service._validate_burn_track(project_id, self.service.caption_track(project_id, state["revision"]))
+                except ProjectError as exc:
+                    issues.append({"code": exc.code, "message": str(exc)})
             return {"project_id": project_id, "project_revision": state["revision"],
                     "ready": not issues, "issues": issues,
                     "authoritative_narrative_source": source,
@@ -163,6 +168,7 @@ class ProjectRunner:
         selection["audio_mux_version"] = 2
         timeline_document = timing["document"]
         resolved = None
+        burn_cues = None
         if layout["document"].get("contract_version") == "2.0.0":
             from atme import project_v2_render
             from atme.project_service import _visual_digest
@@ -173,8 +179,13 @@ class ProjectRunner:
                 resolved = project_v2_render.resolved_record(self.service, row, layout, storyboard, timing)
                 project_v2_render.check_export_inputs(storyboard, resolved)
                 assets = project_v2_render.verified_assets(self.service, row, resolved, layout["document"])
+                if self.service.caption_burn_enabled(project_id):
+                    track = self.service.caption_track(project_id, expected_revision)
+                    self.service._validate_burn_track(project_id, track)
+                    burn_cues = track["cues"]
+                    selection["caption_track_sha256"] = _visual_digest(burn_cues)
             index = project_v2_render.asset_index(assets)
-            selection.update(visual_contract="2.0.0", resolved_timeline_revision=resolved["revision"],
+            selection.update(visual_contract="2.0.0", video_segment_version=1, resolved_timeline_revision=resolved["revision"],
                              resolved_timeline_sha256=resolved["document"]["compilation_fingerprint"],
                              visual_assets_sha256=_visual_digest(index))
         source_video = None
@@ -207,6 +218,8 @@ class ProjectRunner:
                 from atme.render.v2_sound_mix import freeze_sources
 
                 project_v2_render.save_inputs(inputs, resolved, assets, index)
+                if burn_cues is not None:
+                    _write_json(inputs / "caption_track.json", burn_cues)
                 freeze_sources(self.service, project_id, resolved["document"], storyboard["document"], inputs)
             shutil.copyfile(source, inputs / "narration.wav")
             if source_video is not None:
@@ -344,6 +357,13 @@ class ProjectRunner:
             sample_ms = at_ms if source_sample and not camera else frame_time_ms(frame_number, fps)
             frame = compose_png_frame(layout, timeline, sample_ms, verified, paper_background=not camera)
             png = frame.png
+            if self.service.caption_burn_enabled(project_id):
+                from atme.project_captions import CaptionPainter
+                track = self.service.caption_track(project_id, expected_revision)
+                if track["status"] != "ready":
+                    raise ProjectError("captions_not_ready", track["message"])
+                painter = CaptionPainter(track["cues"], frame.width, frame.height)
+                png = painter.paint(png, painter.index(sample_ms))
             if camera:
                 path, _, _ = materialize_video(self.service, project_id, export_profile=True)
                 png = camera_preview(path, png, frame_number, fps)
@@ -407,7 +427,7 @@ class ProjectRunner:
         with self.service.store._lock:
             current = self.service._row(project_id)
             row = self.service.store.conn.execute(
-                "SELECT project_revision,status,manifest,error,created_at,updated_at FROM project_render_runs "
+                "SELECT project_revision,status,manifest,error,created_at,updated_at,fingerprint FROM project_render_runs "
                 "WHERE job_id=? AND run_id=?", (project_id, run_id)).fetchone()
             if row is None:
                 raise ProjectError("not_found", "Render run does not exist")
@@ -422,6 +442,13 @@ class ProjectRunner:
                       "created_at": row["created_at"], "updated_at": row["updated_at"]}
             if row["manifest"]:
                 result["manifest"] = json.loads(row["manifest"])
+            directory = self.service.store.db_path.resolve().parent / "project-runs" / str(project_id)
+            progress = (directory / row["fingerprint"] / "work/v2-segments/progress.json").resolve()
+            if progress.is_relative_to(directory) and progress.is_file():
+                try:
+                    result["progress"] = json.loads(progress.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    pass
             if row["error"]:
                 result["error"] = row["error"]
             return result

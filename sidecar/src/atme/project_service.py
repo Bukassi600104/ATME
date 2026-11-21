@@ -89,6 +89,8 @@ class ProjectService:
                 CREATE TABLE IF NOT EXISTS project_caption_edits (
                     job_id INTEGER NOT NULL REFERENCES jobs(id), timing_run_id TEXT NOT NULL,
                     project_revision INTEGER NOT NULL, cues TEXT NOT NULL, PRIMARY KEY(job_id,project_revision));
+                CREATE TABLE IF NOT EXISTS project_caption_settings (
+                    job_id INTEGER PRIMARY KEY REFERENCES jobs(id), burn_enabled INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS project_artifact_dependencies (
                     job_id INTEGER NOT NULL,
                     kind TEXT NOT NULL,
@@ -178,7 +180,8 @@ class ProjectService:
                                "write_artifact", "get_artifact", "approve_script",
                                "migrate_visual_contracts_v1",
                                "list_media", "get_narrative_source", "validate_project", "preview_project",
-                               "prepare_timing", "get_timing_status", "create_revision_request",
+                               "prepare_timing", "get_timing_status", "get_caption_track", "save_caption_track",
+                               "set_caption_burn", "create_revision_request",
                                "list_revision_requests", "apply_revision_request", "submit_revision_proposal", "decide_revision_proposal",
                                "set_output_profile", "list_assets", "read_asset",
                                "get_source_timeline", "edit_source_timeline", "remove_source",
@@ -1365,7 +1368,8 @@ class ProjectService:
 
         with self.store._lock:
             self._expected(self._row(project_id), expected_revision)
-            track = {"project_revision": expected_revision, "timing_run_id": None, "cues": []}
+            track = {"project_revision": expected_revision, "timing_run_id": None, "cues": [],
+                     "burn_enabled": self.caption_burn_enabled(project_id)}
             try:
                 run_id, measured = self.timing.current(project_id)
                 track["timing_run_id"] = run_id
@@ -1381,6 +1385,37 @@ class ProjectService:
             self._expected(self._row(project_id), expected_revision)
             return track
 
+    def caption_burn_enabled(self, project_id):
+        with self.store._lock:
+            row = self.store.conn.execute("SELECT burn_enabled FROM project_caption_settings WHERE job_id=?",
+                                          (project_id,)).fetchone()
+            return bool(row and row["burn_enabled"])
+
+    def _validate_burn_track(self, project_id, track):
+        from atme.project_captions import CaptionPainter
+
+        if track["status"] != "ready":
+            raise ProjectError("captions_not_ready", track["message"])
+        layout = self.artifact(project_id, "layout")["document"]
+        if layout.get("contract_version") != "2.0.0":
+            raise ProjectError("unsupported_captions", "Burn-in requires a v2 visual layout")
+        profile = layout["output_profile"]
+        CaptionPainter(track["cues"], profile["width"], profile["height"])
+
+    def set_caption_burn(self, project_id, expected_revision, enabled):
+        if type(enabled) is not bool:
+            raise ProjectError("invalid_request", "Choose whether to burn captions into the movie")
+        with self.store._lock, self.store.conn as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            self._expected(self._row(project_id), expected_revision)
+            if enabled != self.caption_burn_enabled(project_id):
+                if enabled:
+                    self._validate_burn_track(project_id, self.caption_track(project_id, expected_revision))
+                conn.execute("INSERT INTO project_caption_settings VALUES(?,?) ON CONFLICT(job_id) "
+                             "DO UPDATE SET burn_enabled=excluded.burn_enabled", (project_id, int(enabled)))
+                conn.execute("UPDATE project_state SET revision=revision+1 WHERE job_id=?", (project_id,))
+            return self.caption_track(project_id, self._row(project_id)["revision"])
+
     def save_captions(self, project_id, expected_revision, timing_run_id, cues):
         from atme.project_captions import validate_edits
 
@@ -1391,6 +1426,8 @@ class ProjectService:
                 raise ProjectError("stale_timing", "Reopen the caption track for the current recording")
             validate_edits(cues, track["cues"], track["duration_ms"])
             if cues != track["cues"]:
+                if track["burn_enabled"]:
+                    self._validate_burn_track(project_id, {**track, "cues": cues})
                 revision = expected_revision + 1
                 conn.execute("INSERT INTO project_caption_edits VALUES(?,?,?,?)",
                              (project_id, timing_run_id, revision, json.dumps(cues)))

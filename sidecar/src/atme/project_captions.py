@@ -1,5 +1,10 @@
 """Closed captions on the project's measured final-audio clock."""
 from html import escape
+from bisect import bisect_right
+from io import BytesIO
+from math import ceil
+
+from PIL import Image, ImageDraw, ImageFont
 
 from atme.audio.voice_upload import _token
 from atme.project_service import ProjectError
@@ -77,3 +82,65 @@ def serialize(cues, fmt):
     for i, cue in enumerate(cues, 1):
         rows.extend([str(i), f"{stamp(cue['start_ms'])} --> {stamp(cue['end_ms'])}", escape(cue["text"], quote=False), ""])
     return "\n".join(rows) + "\n"
+
+
+class CaptionPainter:
+    """Position measured cues inside the profile's caption-safe area in screen space."""
+    def __init__(self, cues, width, height):
+        from atme.render.style_bundle import load_bundle
+
+        style, _, root = load_bundle()
+        aspect = style.aspects["landscape-16:9" if width > height else "portrait-9:16"]
+        scale = width / aspect.width
+        role = style.typography.caption
+        spec = next(f for f in style.fonts if f.id == role.font_id)
+        self.font = ImageFont.truetype(BytesIO((root / spec.file).read_bytes()), ceil(role.size_px * scale))
+        self.line_height = ceil(role.size_px * scale * role.line_height)
+        self.padding = max(4, ceil(10 * scale))
+        self.width = width
+        self.bottom = height - ceil(max(style.captions.bottom_safe_offset_px, aspect.safe_area.bottom_px) * scale)
+        max_width = width - ceil((aspect.safe_area.left_px + aspect.safe_area.right_px) * scale) - 2 * self.padding
+        self.foreground = style.colors[style.captions.foreground_color_token]
+        self.background = style.colors[style.captions.background_color_token]
+        self.starts = [c["start_ms"] for c in cues]
+        self.ends = [c["end_ms"] for c in cues]
+        self.lines = []
+        for cue in cues:
+            lines = []
+            for paragraph in cue["text"].splitlines():
+                line = ""
+                for word in paragraph.split():
+                    joined = (line + " " + word).strip()
+                    if line and (self.font.getlength(joined) > max_width or len(joined) > style.captions.max_characters_per_line):
+                        lines.append(line)
+                        line = word
+                    else:
+                        line = joined
+                if line:
+                    lines.append(line)
+            if (not 1 <= len(lines) <= style.captions.max_lines or
+                    any(self.font.getlength(line) > max_width or len(line) > style.captions.max_characters_per_line for line in lines)):
+                raise ProjectError("caption_overflow", f"Shorten {cue.get('cue_id', 'the caption')} to fit this output profile")
+            self.lines.append(lines)
+
+    def index(self, at_ms):
+        index = bisect_right(self.starts, at_ms) - 1
+        return index if index >= 0 and at_ms < self.ends[index] else None
+
+    def paint(self, png, index):
+        if index is None:
+            return png
+        with Image.open(BytesIO(png)) as source:
+            picture = source.convert("RGBA")
+        draw = ImageDraw.Draw(picture)
+        lines = self.lines[index]
+        width = ceil(max(self.font.getlength(line) for line in lines)) + 2 * self.padding
+        top = self.bottom - self.line_height * len(lines) - 2 * self.padding
+        left = (self.width - width) // 2
+        draw.rounded_rectangle((left, top, left + width, self.bottom), radius=self.padding, fill=self.background)
+        for i, line in enumerate(lines):
+            draw.text((self.width // 2, top + self.padding + (i + .5) * self.line_height),
+                      line, font=self.font, fill=self.foreground, anchor="mm")
+        out = BytesIO()
+        picture.save(out, format="PNG")
+        return out.getvalue()

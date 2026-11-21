@@ -295,11 +295,19 @@ def render_stage(job_dir: Path, align_state: dict, width: int, height: int, fps:
         if control_cb:
             control_cb()
 
+    silent_video = out_dir / "video.mp4"
+    join_video_segments(segments, segments_dir, silent_video)
+    state = {"silent_video": str(silent_video), "segments": segments,
+             "render": aggregate, "wall_s": round(time.perf_counter() - started, 2)}
+    (job_dir / "render_state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
+    return state
+
+
+def join_video_segments(segments, segments_dir, silent_video):
     concat_file = segments_dir / "concat.txt"
     concat_file.write_text("\n".join(
         f"file '{Path(item['path']).resolve().as_posix().replace(chr(39), chr(39) + chr(92) + chr(39) + chr(39))}'"
         for item in segments) + "\n", encoding="utf-8")
-    silent_video = out_dir / "video.mp4"
     ffmpeg = find_ffmpeg()
     cmd = [ffmpeg, "-y", "-hide_banner", "-v", "error", "-f", "concat", "-safe", "0",
            "-i", str(concat_file), "-c", "copy", "-movflags", "+faststart", str(silent_video)]
@@ -307,10 +315,6 @@ def render_stage(job_dir: Path, align_state: dict, width: int, height: int, fps:
                           check=False)
     if proc.returncode != 0:
         raise RuntimeError(f"segment assembly failed: {proc.stderr[-400:]}")
-    state = {"silent_video": str(silent_video), "segments": segments,
-             "render": aggregate, "wall_s": round(time.perf_counter() - started, 2)}
-    (job_dir / "render_state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
-    return state
 
 
 def assemble_stage(job_dir: Path, script: dict, audio_state: dict,

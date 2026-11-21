@@ -1,4 +1,5 @@
 import pytest
+from copy import deepcopy
 
 from atme.project_service import ProjectError, ProjectService
 from atme.store.db import JobStore
@@ -9,6 +10,30 @@ from test_project_runner import wav_bytes
 def service(tmp_path):
     store = JobStore(tmp_path / "projects.db")
     return store, ProjectService(store)
+
+
+def test_scoped_script_proposal_preserves_other_scenes_and_cannot_overwrite_a_new_edit(tmp_path):
+    store, projects = service(tmp_path)
+    try:
+        script = external_payload()["script"]
+        pid = projects.create("Script revisions", "LONG_FORM_16_9", "script-first")["project_id"]
+        projects.write(pid, "script", script, 0)
+        request = projects.create_revision_request(pid, 1, {"kind":"scene", "id":"scene-1", "start_ms":0, "end_ms":1000},
+                                                   "Shorten the first scene")
+        changed = deepcopy(script)
+        changed["scenes"][1]["spoken_text"] = "Changed outside the selected scene."
+        with pytest.raises(ProjectError, match="outside"):
+            projects.submit_revision_proposal(pid, request["request_id"], 1, "script", changed, "Updated the scene")
+        changed = deepcopy(script)
+        changed["scenes"][0]["spoken_text"] = "A queue."
+        projects.submit_revision_proposal(pid, request["request_id"], 1, "script", changed, "Shortened the first scene")
+        projects.set_profile(pid, "SHORT_FORM_9_16", 1)
+        with pytest.raises(ProjectError, match="revision"):
+            projects.decide_revision_proposal(pid, request["request_id"], 2, True)
+        assert projects.artifact(pid, "script")["document"] == script
+        assert projects.revisions.get(pid, request["request_id"])["status"] == "proposed"
+    finally:
+        store.close()
 
 
 def test_bounded_external_ai_proposal_requires_user_acceptance(tmp_path):

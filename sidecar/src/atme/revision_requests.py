@@ -84,6 +84,8 @@ class RevisionRequests:
             raise ProjectError("invalid_proposal", "Proposal artifact must be script, storyboard, or layout")
         if not isinstance(summary, str) or not summary.strip() or len(summary.strip()) > 500:
             raise ProjectError("invalid_proposal", "A proposal summary of 1–500 characters is required")
+        if not isinstance(document, dict):
+            raise ProjectError("invalid_proposal", "A proposal needs an artifact document")
         try:
             serialized = json.dumps(document, ensure_ascii=False, allow_nan=False)
         except (ValueError, TypeError) as exc:
@@ -124,41 +126,67 @@ class RevisionRequests:
         if errors:
             raise ProjectError("invalid_proposal", "Proposal schema validation failed", errors[:50])
         proposal = {"artifact_kind": artifact_kind, "document": document, "summary": summary.strip()}
-        with self.service.store._lock:
+        with self.service.store._lock, self.service.store.conn as conn:
+            conn.execute("BEGIN IMMEDIATE")
             row = self.service._row(project_id)
             self.service._expected(row, expected_revision)
             request = self.get(project_id, request_id)
             if request["status"] != "pending" or request["project_revision"] != expected_revision:
                 raise ProjectError("revision_conflict", "Revision request is no longer pending for this project revision")
+            self._check_script_scope(project_id, request["selection"], artifact_kind, document)
             self.service.store.conn.execute(
                 "UPDATE project_revision_requests SET status='proposed',proposal=?,updated_at=? "
                 "WHERE job_id=? AND request_id=?", (json.dumps(proposal), time.time(), project_id, request_id))
             self.service.store.conn.commit()
         return self.get(project_id, request_id)
 
+    def _check_script_scope(self, project_id, selection, artifact_kind, document):
+        if artifact_kind != "script":
+            return
+        if selection["kind"] == "caption":
+            raise ProjectError("outside_selection", "A caption edit belongs to the measured caption track")
+        if selection["kind"] not in ("script", "scene"):
+            raise ProjectError("outside_selection", "Rewriting a script falls outside this selection")
+        try:
+            previous = self.service.artifact(project_id, "script")["document"]
+        except ProjectError as exc:
+            if exc.code == "not_found":
+                return
+            raise
+        if selection["kind"] == "script" and selection["id"] == "script":
+            authority = self.service.narrative_source(project_id)["timing_authority"]
+            if selection["start_ms"] == 0 and selection["end_ms"] >= (authority["duration_ms"] or 0):
+                return
+        allowed = selection["id"].removeprefix("scene-")
+        ids = [str(scene["scene_id"]) for scene in previous["scenes"]]
+        def retained(value):
+            return {**value, "scenes": [scene["scene_id"] if str(scene["scene_id"]) == allowed else scene
+                                       for scene in value["scenes"]]}
+        if allowed not in ids or retained(document) != retained(previous):
+            raise ProjectError("outside_selection", "The proposal changes content outside the selected scene")
+
     def decide(self, project_id, request_id, expected_revision, accepted):
         if type(accepted) is not bool:
             raise ProjectError("invalid_request", "accepted must be true or false")
-        request = self.get(project_id, request_id)
-        if request["status"] != "proposed":
-            raise ProjectError("revision_conflict", "Only a proposed revision can be decided")
-        if not accepted:
-            with self.service.store._lock:
-                row = self.service._row(project_id)
-                self.service._expected(row, expected_revision)
-                self.service.store.conn.execute(
-                    "UPDATE project_revision_requests SET status='rejected',updated_at=? WHERE job_id=? AND request_id=?",
-                    (time.time(), project_id, request_id))
-                self.service.store.conn.commit()
-            return self.get(project_id, request_id)
-        proposal = request["proposal"]
-        project = self.service.write(project_id, proposal["artifact_kind"], proposal["document"], expected_revision)
-        with self.service.store._lock:
-            self.service.store.conn.execute(
-                "UPDATE project_revision_requests SET status='applied',result_revision=?,updated_at=? "
-                "WHERE job_id=? AND request_id=?", (project["revision"], time.time(), project_id, request_id))
-            self.service.store.conn.commit()
-        return {"request": self.get(project_id, request_id), "project": project}
+        with self.service.store._lock, self.service.store.conn as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = self.service._row(project_id)
+            self.service._expected(row, expected_revision)
+            request = self.get(project_id, request_id)
+            if request["status"] != "proposed" or request["project_revision"] != expected_revision:
+                raise ProjectError("revision_conflict", "Only a proposal for this project revision can be decided")
+            revision = None
+            if accepted:
+                proposal = request["proposal"]
+                kind, document = proposal["artifact_kind"], proposal["document"]
+                self._check_script_scope(project_id, request["selection"], kind, document)
+                serialized = self.service._serialized_artifact(kind, document)
+                revision = self.service._write_transaction(conn, project_id, kind, document, serialized, row)
+            conn.execute("UPDATE project_revision_requests SET status=?,result_revision=?,updated_at=? "
+                         "WHERE job_id=? AND request_id=?", ("applied" if accepted else "rejected",
+                                                            revision, time.time(), project_id, request_id))
+            result = self.get(project_id, request_id)
+            return {"request": result, "project": self.service.open(project_id)} if accepted else result
 
     def apply_requested(self, project_id, request_id, expected_revision,
                         artifact_kind, document, summary):

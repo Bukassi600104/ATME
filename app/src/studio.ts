@@ -16,7 +16,7 @@ interface ScriptScene { scene_id: number; phase: string; spoken_text: string; vi
 interface ScriptDoc { topic?: string; title?: string; scenes: ScriptScene[] }
 interface StoryboardDoc { contract_version?: string; beats: Array<{ beat_id: string; narration?: string; narration_summary?: string; purpose?: string; visual_purpose?: string }> }
 interface CaptionCue {cue_id: string; start_ms: number; end_ms: number; text: string}
-interface CaptionTrack {status: "ready" | "needs_timing" | "needs_review"; timing_run_id: string | null; cues: CaptionCue[]; message?: string}
+interface CaptionTrack {status: "ready" | "needs_timing" | "needs_review"; timing_run_id: string | null; cues: CaptionCue[]; burn_enabled: boolean; message?: string}
 interface LayoutElement { id: string; scene_id: number; board_id: string; appear_at_ms: number; kind?: string; layer?: number; visibility_intervals?: Array<{ start_ms: number; end_ms: number }> }
 interface BoardActivation { activation_id: string; board_id: string; start_ms: number; end_ms: number }
 interface LayoutDoc { elements?: LayoutElement[]; board_timeline?: { activations: BoardActivation[] }; activations?: BoardActivation[] }
@@ -25,6 +25,7 @@ interface McpSession { session_id: string; active: boolean; client_identity: str
 interface McpActivity { active: boolean; active_session_count: number; client_identities: string[]; identity_available: boolean; last_activity_at: number | null; last_tool: string | null; last_project_id: number | null; recent_project_ids: number[]; sessions: McpSession[]; version?: number; connection_evidence?: string }
 interface StudioSync { project_version: string; mcp: McpActivity }
 interface EditHistory { can_undo: boolean; can_redo: boolean; undo_label: string | null; redo_label: string | null }
+interface RenderProgress {frames_done:number; total_frames:number; reused_segments:number}
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const state: {
@@ -1139,6 +1140,22 @@ function appendCaptionControls(root: HTMLElement, project: ProjectState, track: 
   const detail = document.createElement("p"); detail.setAttribute("role", "status");
   detail.textContent = track.message || `${track.cues.length} measured cues. Select a cue in the timeline to edit it.`;
   card.append(detail); root.append(card);
+  if (track.burn_enabled || (track.status === "ready" && state.layout?.activations && state.storyboard?.contract_version === "2.0.0")) {
+    const label = document.createElement("label");
+    const burn = document.createElement("input"); burn.type = "checkbox"; burn.checked = track.burn_enabled;
+    label.append(burn, document.createTextNode(" Burn captions into the movie")); card.append(label);
+    burn.onchange = async () => {
+      burn.disabled = true;
+      try {
+        await api(`/projects/${project.project_id}/captions/burn`, {method:"PUT",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({expected_revision:project.revision,enabled:burn.checked})});
+        if (state.project === project) {
+          await openProject(project.project_id, false, true); showStoryboard();
+        }
+      } catch (error) { burn.checked = track.burn_enabled; detail.textContent = error instanceof Error ? error.message : "Caption setting failed."; }
+      finally { burn.disabled = false; }
+    };
+  }
   if (track.status === "ready") {
     for (const fmt of ["srt", "vtt"]) {
       const save = document.createElement("button"); save.textContent = "Save " + fmt.toUpperCase();
@@ -1215,15 +1232,22 @@ async function showRenders(): Promise<void> {
   if (!state.project) { wrap.innerHTML = "<div class='workspace-card'><h3>No project open</h3></div>"; showDialog("Renders", "", wrap); return; }
   const project = state.project;
   try {
-    const response = await api<{ renders: Array<{ run_id: string; status: string; error?: string; project_revision: number; manifest?: { duration_ms?: number } }> }>(`/projects/${project.project_id}/renders`);
+    const response = await api<{ renders: Array<{ run_id: string; status: string; error?: string; project_revision: number; progress?:RenderProgress; manifest?: { duration_ms?: number } }> }>(`/projects/${project.project_id}/renders`);
     if (project !== state.project) return;
     if (!response.renders.length) wrap.innerHTML = "<div class='workspace-card'><h3>No renders yet</h3><p>Validate the project, then use Render in the project bar.</p></div>";
     for (const run of response.renders) {
       const card = document.createElement("button"); card.className = "workspace-card project-row";
       const label = document.createElement("strong"); label.textContent = run.status === "done" ? "Completed render" : `Render ${run.status}`;
       const meta = document.createElement("small"); meta.textContent = `Revision ${run.project_revision} · ${run.run_id.slice(0, 8)}`; card.append(label, meta);
+      if (run.progress && run.status !== "done") {
+        const progress = document.createElement("p"); progress.textContent = `${run.progress.frames_done} of ${run.progress.total_frames} frames saved`; card.append(progress);
+      }
       if (run.error) { const message = document.createElement("p"); message.textContent = run.error; card.append(message); }
       if (run.status === "done") card.onclick = () => { $<HTMLDialogElement>("workspace-dialog").close(); void showRenderedVideo(project.project_id, run.run_id); };
+      if (run.status === "failed" && run.project_revision === project.revision) {
+        label.textContent = "Resume render";
+        card.onclick = () => { $<HTMLDialogElement>("workspace-dialog").close(); void renderProject(); };
+      }
       wrap.append(card);
     }
   } catch (error) {
@@ -1278,7 +1302,12 @@ function downloadMovie(url: string): void {
 async function pollRender(projectId: number, runId: string): Promise<void> {
   for (let count = 0; count < 720; count++) {
     if (state.project?.project_id !== projectId) return;
-    const run = await api<{ status: string; error?: string }>(`/projects/${projectId}/renders/${runId}`);
+    const run = await api<{ status: string; error?: string; progress?:RenderProgress }>(`/projects/${projectId}/renders/${runId}`);
+    if (state.project?.project_id !== projectId) return;
+    if (run.progress && run.status === "running")
+      $("save-state").textContent = `Rendering · ${run.progress.frames_done} of ${run.progress.total_frames} frames saved`;
+    else if (run.status === "done" || run.status === "failed")
+      $("save-state").textContent = `Saved locally · revision ${state.project.revision}`;
     if (run.status === "done") { await showRenderedVideo(projectId, runId); toast("Render complete."); return; }
     if (run.status === "failed") { toast(run.error || "Render failed."); return; }
     await new Promise((resolve) => window.setTimeout(resolve, 1000));

@@ -142,6 +142,9 @@ def camera_preview(camera, overlay, frame_number, fps):
 
 
 def render(work, inputs, compiled, layout, audio):
+    import av
+    from atme.pipeline import join_video_segments
+    from atme.render.v2_segments import encode_segments
     from atme.render.animator import find_ffmpeg
     from atme.render.v2_split_paint import _SplitAssetBytes, _VerifiedSplitAssetBytes
     from atme.render.v2_sound_mix import mix_master
@@ -181,18 +184,35 @@ def render(work, inputs, compiled, layout, audio):
         from atme.project_assets import _sha256
         if _sha256(camera) != compiled["source_video_sha256"]:
             raise ValueError("The frozen camera video failed its integrity check")
-    command = [find_ffmpeg(), "-y", "-v", "error", *_video_inputs(fps, camera), "-an", "-c:v", "libx264", "-preset", "veryfast",
-               "-pix_fmt", "yuv420p", "-crf", "18", str(pending)]
-    compose = prepare_png_sequence(layout, timeline, assets, paper_background=camera is None)
-    try:
+    samples = list(picture_samples(layout, timeline, frames, fps))
+    compose = None
+    captions = None
+    if "caption_track_sha256" in compiled:
+        from atme.project_captions import CaptionPainter
+        cues = json.loads((inputs / "caption_track.json").read_text(encoding="utf-8"))
+        if _visual_digest(cues) != compiled["caption_track_sha256"]:
+            raise ValueError("The frozen caption track failed its integrity check")
+        profile = timeline["output_profile"]
+        captions = CaptionPainter(cues, profile["width"], profile["height"])
+    def encode(path, first, stop):
+        nonlocal compose
+        if compose is None:
+            compose = prepare_png_sequence(layout, timeline, assets, paper_background=camera is None)
+        command = [find_ffmpeg(), "-y", "-v", "error", *_video_inputs(fps, camera, first), "-an",
+                   "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-crf", "18", str(path)]
         with tempfile.TemporaryFile() as errors, subprocess.Popen(command, stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL, stderr=errors) as proc:
             try:
-                previous = None
-                for sample in picture_samples(layout, timeline, frames, fps):
-                    if sample != previous:
-                        picture = compose(sample).png
-                        previous = sample
+                previous_sample, previous_key = None, None
+                for n in range(first, stop):
+                    sample = samples[n]
+                    if sample != previous_sample:
+                        backdrop = compose(sample).png
+                        previous_sample = sample
+                    cue = captions.index(frame_time_ms(n, fps)) if captions else None
+                    if (sample, cue) != previous_key:
+                        picture = captions.paint(backdrop, cue) if captions else backdrop
+                        previous_key = (sample, cue)
                     proc.stdin.write(picture)
                 proc.stdin.close()
                 if proc.wait() != 0:
@@ -204,11 +224,19 @@ def render(work, inputs, compiled, layout, audio):
             except BaseException:
                 proc.kill()
                 raise
+        with av.open(str(path)) as encoded:
+            if encoded.streams.video[0].frames != stop - first:
+                raise ValueError("Encoded segment length differs from the requested picture interval")
+
+    directory = work / "v2-segments"
+    segments = encode_segments(directory, compiled["fingerprint"], frames, 10 * fps, encode)
+    try:
+        join_video_segments(segments, directory, pending)
         pending.replace(target)
     finally:
         pending.unlink(missing_ok=True)
     return ({"layout_file": str(work / "layout.json"), "cues_file": str(timeline_file),
              "visual_plan_file": str(work / "visual_plan.json")},
-            {"render": {"frames": frames, "contract_version": "2.0.0"}, "segments": [{"path": str(target)}],
+            {"render": {"frames": frames, "contract_version": "2.0.0"}, "segments": segments,
              "composition_mode": "camera_with_v2_overlays" if camera else "v2_board",
              "wall_s": round(time.monotonic() - started, 2), "silent_video": str(target)}, audio)

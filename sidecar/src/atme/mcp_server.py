@@ -172,6 +172,12 @@ def create_mcp(service: ProjectService, activity: McpActivity | None = None):
         return invoke(service.save_captions, project_id, expected_revision, timing_run_id, cues,
                       tool="atme.save_caption_track", project_id=project_id)
 
+    @server.tool(name="atme.set_caption_burn", annotations=write)
+    def set_caption_burn(project_id: Id, expected_revision: Revision, enabled: bool) -> CallToolResult:
+        """Include measured captions in the v2 preview and exported picture."""
+        return invoke(service.set_caption_burn, project_id, expected_revision, enabled,
+                      tool="atme.set_caption_burn", project_id=project_id)
+
     @server.tool(name="atme.write_artifact", annotations=write)
     def write_artifact(project_id: Id, kind: Kind, document: dict, expected_revision: Revision) -> CallToolResult:
         """Receive externally authored JSON. Reject invalid/stale writes without modifying the project."""

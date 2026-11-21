@@ -493,6 +493,10 @@ def _evidence_text(value: str, font_file: Path | bytes, font_size: float, max_wi
     return _xml_escape(value)
 
 
+def evidence_footer_height(scale, inline_annotation):
+    return (38 + (34 if inline_annotation else 0)) * scale
+
+
 def _evidence_markup(obj: VisualObject, state: FrameObject, style, root: Path,
                      scale: float, raster, treatment, resources=None) -> str:
     """Render a bounded evidence card, never a fabricated substitute image."""
@@ -509,7 +513,7 @@ def _evidence_markup(obj: VisualObject, state: FrameObject, style, root: Path,
     label_height = 34 * scale
     annotation_height = 34 * scale if inline_annotation is not None else 0
     gap = 4 * scale
-    image_height = bounds.height - label_height - annotation_height - gap
+    image_height = bounds.height - evidence_footer_height(scale, inline_annotation is not None)
     if image_height < 90 * scale:
         raise UnsupportedVisualObject(f"evidence {obj.object_id} has no readable source image area")
     crop = intent.crop

@@ -72,6 +72,7 @@ for scripts, semantic transcription, storyboard and layout authorship.
 - atme.get_timing_status
 - atme.get_caption_track
 - atme.save_caption_track
+- atme.set_caption_burn (include the measured cues in v2 preview and movie)
 - atme.validate_project
 - atme.preview_project (bounded PNG from the exact project revision)
 - atme.render_project (explicit, non-blocking queue request)

@@ -320,6 +320,11 @@ def register_projects(app, store, auth):
         value = await body(request, ("expected_revision", "timing_run_id", "cues"))
         return call(service.save_captions, project_id, value["expected_revision"], value["timing_run_id"], value["cues"])
 
+    @app.put("/projects/{project_id}/captions/burn", dependencies=[Depends(auth)])
+    async def caption_burn(project_id: int, request: Request):
+        value = await body(request, ("expected_revision", "enabled"))
+        return call(service.set_caption_burn, project_id, value["expected_revision"], value["enabled"])
+
     @app.get("/projects/{project_id}/captions/{fmt}", dependencies=[Depends(auth)])
     def subtitles(project_id: int, expected_revision: int, fmt: str):
         content = call(service.subtitle_file, project_id, expected_revision, fmt)
