@@ -14,9 +14,11 @@ interface ValidationIssue { code: string; message: string }
 interface Validation { ready: boolean; project_revision: number; issues: ValidationIssue[]; selected_revisions: Record<string, number | null> }
 interface ScriptScene { scene_id: number; phase: string; spoken_text: string; visual_directive: string; est_seconds?: number }
 interface ScriptDoc { topic?: string; title?: string; scenes: ScriptScene[] }
-interface StoryboardDoc { beats: Array<{ beat_id: string; narration?: string; narration_summary?: string; purpose?: string; visual_purpose?: string }> }
+interface StoryboardDoc { contract_version?: string; beats: Array<{ beat_id: string; narration?: string; narration_summary?: string; purpose?: string; visual_purpose?: string }> }
+interface CaptionCue {cue_id: string; start_ms: number; end_ms: number; text: string}
+interface CaptionTrack {status: "ready" | "needs_timing" | "needs_review"; timing_run_id: string | null; cues: CaptionCue[]; message?: string}
 interface LayoutElement { id: string; scene_id: number; board_id: string; appear_at_ms: number; kind?: string; layer?: number; visibility_intervals?: Array<{ start_ms: number; end_ms: number }> }
-interface BoardActivation { board_id: string; start_ms: number; end_ms: number }
+interface BoardActivation { activation_id: string; board_id: string; start_ms: number; end_ms: number }
 interface LayoutDoc { elements?: LayoutElement[]; board_timeline?: { activations: BoardActivation[] }; activations?: BoardActivation[] }
 interface RevisionRequest { request_id: string; project_revision: number; selection: { kind: string; id: string; start_ms: number; end_ms: number }; instruction: string; status: string; proposal?: { artifact_kind: string; document: object; summary: string } }
 interface McpSession { session_id: string; active: boolean; client_identity: string | null; started_at: number; last_seen_at: number; last_activity_at: number | null; last_tool: string | null; last_project_id: number | null; call_count: number }
@@ -31,12 +33,12 @@ const state: {
   playheadMs: number; durationMs: number; zoom: number; previewUrl: string | null;
   selected: { kind: string; id: string; label: string; startMs: number; endMs: number } | null;
   projectVersion: string | null; mcp: McpActivity | null;
-  editHistory: EditHistory; sourceTimeline: SourceTimeline | null; showSilences: boolean;
+  editHistory: EditHistory; sourceTimeline: SourceTimeline | null; captions: CaptionTrack | null; showSilences: boolean;
 } = { project: null, projects: [], media: [], assets: [], script: null, storyboard: null, layout: null, validation: null,
   playheadMs: 0, durationMs: 60_000, zoom: 1, previewUrl: null, selected: null,
   projectVersion: null, mcp: null,
   editHistory: { can_undo: false, can_redo: false, undo_label: null, redo_label: null },
-  sourceTimeline: null, showSilences: false };
+  sourceTimeline: null, captions: null, showSilences: false };
 let mediaTab: "sources" | "assets" = "sources";
 let inspectorTab: "scene" | "style" | "audio" | "ai" = "scene";
 let previewTimer: number | null = null;
@@ -73,9 +75,13 @@ async function sidecar(): Promise<SidecarInfo> {
 
 function apiError(value: unknown, fallback: string): string {
   if (!value || typeof value !== "object") return fallback;
-  const payload = value as { detail?: string | { message?: string }; message?: string };
+  const payload = value as { detail?: string | { message?: string; errors?: Array<{id?:string; action_id?:string; code?:string; message?:string}> }; message?: string };
   if (typeof payload.detail === "string") return payload.detail;
-  if (payload.detail && typeof payload.detail.message === "string") return payload.detail.message;
+  if (payload.detail && typeof payload.detail.message === "string") {
+    const issue = payload.detail.errors?.[0];
+    return [payload.detail.message, issue?.action_id || issue?.id, issue?.code || issue?.message]
+      .filter((part,index,parts) => part && parts.indexOf(part) === index).join(" · ");
+  }
   return payload.message || fallback;
 }
 
@@ -261,11 +267,12 @@ async function openProject(id: number, hideDrawer = true, preservePosition = fal
   clearViewerMedia();
   const project = await api<ProjectState>(`/projects/${id}`);
   if (request !== projectRequest) return;
-  const [media, assets, script, storyboard, layout, sourceTimeline] = await Promise.all([
+  const [media, assets, script, storyboard, layout, sourceTimeline, captions] = await Promise.all([
     api<{ media?: MediaItem[] } | MediaItem[]>(`/projects/${id}/media`),
     api<{ assets: AssetItem[] }>(`/projects/${id}/assets`),
     optionalArtifact<ScriptDoc>(project, "script"), optionalArtifact<StoryboardDoc>(project, "storyboard"), optionalArtifact<LayoutDoc>(project, "layout"),
     api<SourceTimeline>(`/projects/${id}/source-timeline`),
+    api<CaptionTrack>(`/projects/${id}/captions?expected_revision=${project.revision}`),
   ]);
   if (request !== projectRequest) return;
   state.project = project;
@@ -273,6 +280,7 @@ async function openProject(id: number, hideDrawer = true, preservePosition = fal
   void invoke("set_studio_open", { open: true }).catch(() => undefined);
   state.media = Array.isArray(media) ? media : media.media || [];
   state.assets = assets.assets;
+  state.captions = captions;
   state.script = script; state.storyboard = storyboard; state.layout = layout; state.sourceTimeline = sourceTimeline; state.editHistory = sourceTimeline.history; state.validation = null; state.selected = null;
   state.durationMs = Math.max(1000, sourceTimeline.document.duration_ms ||
     project.authoritative_narrative_source.timing_authority?.duration_ms || deriveLayoutDuration(layout) || 60_000);
@@ -348,6 +356,7 @@ function renderEmptyStudio(): void {
   stopPreviewPlayback();
   state.project = null; state.media = []; state.assets = []; state.script = null; state.storyboard = null; state.layout = null;
   state.sourceTimeline = null;
+  state.captions = null;
   state.editHistory = { can_undo: false, can_redo: false, undo_label: null, redo_label: null };
   $("project-name").textContent = "No project open"; $("save-state").textContent = "Local studio";
   $("add-source").setAttribute("disabled", "");
@@ -496,15 +505,9 @@ function renderTimeline(): void {
     const media=state.media.find(value=>value.media_id===item.media_id); add(item.kind === "video" ? "video" : "audio", item.timeline_start_ms, end, media?.name || (item.kind === "video" ? "Source video" : "Narration"), item.kind, item.clip_id, false, item.track_index||0);
     // Linked source audio stays inside its video clip until explicit detachment.
   }
-  for (const activation of boardActivations(state.layout)) add("illustrations", activation.start_ms, activation.end_ms, activation.board_id, "illustration", activation.board_id);
-  const scenes = state.script?.scenes || [];
-  const totalWeight = scenes.reduce((sum, scene) => sum + Math.max(1, scene.est_seconds || scene.spoken_text.split(/\s+/).length), 0);
-  let cursor = 0;
-  for (const scene of scenes) {
-    const weight = Math.max(1, scene.est_seconds || scene.spoken_text.split(/\s+/).length);
-    const end = cursor + Math.round(state.durationMs * weight / Math.max(1, totalWeight));
-    add("captions", cursor, end, scene.spoken_text, "caption", String(scene.scene_id), state.media.length === 0); cursor = end;
-  }
+  for (const activation of boardActivations(state.layout)) add("illustrations", activation.start_ms, activation.end_ms, activation.board_id, "illustration", activation.activation_id);
+  for (const cue of state.captions?.cues || [])
+    add("captions", cue.start_ms, cue.end_ms, cue.text, "caption", cue.cue_id);
   updatePlayhead(); updateEditCommands();
   void decorateSourceClips();
 }
@@ -715,29 +718,41 @@ function renderInspector(): void {
   const title = document.createElement("strong"); title.textContent = state.selected.label;
   const time = document.createElement("div"); time.className = "inspector-row"; time.innerHTML = `<span>Timing</span><strong>${formatTime(state.selected.startMs)} – ${formatTime(state.selected.endMs)}</strong>`;
   section.append(heading, title, time); root.append(section);
-  if (state.selected.kind === "caption" && state.script) appendCaptionEditor(root);
-  if (state.selected.kind === "illustration" && state.layout?.board_timeline?.activations.some(item => item.board_id === state.selected?.id)) appendTimingOverride(root);
+  if (state.selected.kind === "caption") appendCaptionEditor(root);
+  if (state.selected.kind === "illustration" && state.layout?.board_timeline?.activations.some(item => item.activation_id === state.selected?.id)) appendTimingOverride(root);
   if ((state.selected.kind === "video" || state.selected.kind.startsWith("audio")) && state.sourceTimeline) appendSourceClipEditor(root);
   updateEditCommands();
 }
 
 function appendCaptionEditor(root: HTMLElement): void {
-  const scene = state.script?.scenes.find((item) => String(item.scene_id) === state.selected?.id);
-  if (!scene) return;
+  const project = state.project, captions = state.captions;
+  const cue = captions?.cues.find(item => item.cue_id === state.selected?.id);
+  if (!cue || !project || !captions) return;
   const section = document.createElement("section"); section.className = "inspector-section";
-  const heading = document.createElement("h3"); heading.textContent = "Edit scene";
-  const text = document.createElement("textarea"); text.className = "revision-box"; text.value = scene.spoken_text;
-  text.setAttribute("aria-label", "Scene narration text");
-  const save = document.createElement("button"); save.className = "small-primary"; save.textContent = "Save edit";
-  save.onclick = () => {
-    const value = text.value.trim();
-    if (!value || value === scene.spoken_text || !state.script) return;
-    const document = structuredClone(state.script);
-    const changed = document.scenes.find((item) => item.scene_id === scene.scene_id);
-    if (changed) changed.spoken_text = value;
-    void applyEditorEdit("edit", "script", document);
+  const heading = document.createElement("h3"); heading.textContent = "Edit caption";
+  const text = document.createElement("textarea"); text.className = "revision-box"; text.value = cue.text;
+  text.setAttribute("aria-label", "Caption text");
+  const bounds = ["Start", "End"].map((label, index) => {
+    const input = document.createElement("input"); input.type = "number"; input.min = "0";
+    input.value = String(index ? cue.end_ms : cue.start_ms);
+    const field = document.createElement("label"); field.textContent = label + " (ms)"; field.append(input);
+    return {field, input};
+  });
+  const save = document.createElement("button"); save.className = "small-primary"; save.textContent = "Save caption";
+  save.onclick = async () => {
+    if (state.project !== project || save.disabled) return;
+    save.disabled = true;
+    try {
+      const cues = captions.cues.map(item => item === cue ? {...cue, text: text.value.trim(),
+        start_ms: bounds[0].input.valueAsNumber, end_ms: bounds[1].input.valueAsNumber} : item);
+      await api(`/projects/${project.project_id}/captions`, {method:"PUT", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({expected_revision:project.revision, timing_run_id:captions.timing_run_id, cues})});
+      if (state.project === project) await openProject(project.project_id, false, true);
+      toast("Caption saved.");
+    } catch (error) { toast(error instanceof Error ? error.message : "Caption edit failed."); }
+    finally { save.disabled = false; }
   };
-  section.append(heading, text, save); root.append(section);
+  section.append(heading, text, ...bounds.map(b => b.field), save); root.append(section);
 }
 
 function appendSourceClipEditor(root: HTMLElement): void {
@@ -809,7 +824,8 @@ function appendStyleInspection(root: HTMLElement): void {
   if (!state.selected) return;
   const section = document.createElement("section"); section.className = "inspector-section";
   const heading = document.createElement("h3"); heading.textContent = "Rendered style";
-  const elements = (state.layout?.elements || []).filter((item) => item.id === state.selected?.id || item.board_id === state.selected?.id);
+  const visit = boardActivations(state.layout).find(item => item.activation_id === state.selected?.id);
+  const elements = (state.layout?.elements || []).filter((item) => item.id === state.selected?.id || item.board_id === visit?.board_id);
   const description = document.createElement("p");
   description.textContent = elements.length
     ? `${elements.length} layout element${elements.length === 1 ? "" : "s"} use the saved project style and Caleb-derived draw behavior.`
@@ -913,17 +929,42 @@ function appendTimingOverride(root: HTMLElement): void {
   save.onclick = () => void saveBoardTiming(Number(start.value), Number(end.value)); section.append(start, end, save); root.append(section);
 }
 
-async function saveBoardTiming(startMs: number, endMs: number): Promise<void> {
-  if (!state.project || !state.layout || !state.selected || !Number.isInteger(startMs) || !Number.isInteger(endMs) || startMs < 0 || endMs <= startMs) { toast("Enter a valid start and end time."); return; }
-  const document = structuredClone(state.layout); const activation = document.board_timeline?.activations.find((item) => item.board_id === state.selected?.id);
-  if (!activation) return;
-  const delta = startMs - activation.start_ms; activation.start_ms = startMs; activation.end_ms = endMs;
-  for (const element of (document.elements || []).filter((item) => item.board_id === activation.board_id)) {
-    element.appear_at_ms = Math.max(startMs, Math.min(endMs - 1, element.appear_at_ms + delta));
-    element.visibility_intervals = element.visibility_intervals?.map((interval) => ({ start_ms: Math.max(startMs, interval.start_ms + delta), end_ms: Math.min(endMs, interval.end_ms + delta) }));
+function retimeBoardVisit(layout: LayoutDoc, id: string, startMs: number, endMs: number): LayoutDoc {
+  if (!Number.isInteger(startMs) || !Number.isInteger(endMs) || startMs < 0 || endMs <= startMs)
+    throw new Error("Enter a valid start and end time.");
+  const document = structuredClone(layout);
+  const visits = document.board_timeline?.activations || [];
+  const index = visits.findIndex(visit => visit.activation_id === id);
+  if (index < 0) throw new Error("This board visit is no longer available.");
+  if ((index > 0 && visits[index - 1].end_ms > startMs) ||
+      (index + 1 < visits.length && visits[index + 1].start_ms < endMs))
+    throw new Error("This timing would overlap another board visit.");
+  const visit = visits[index];
+  const first = visit.start_ms, last = visit.end_ms;
+  const mapTime = (t: number) => startMs + Math.floor((t - first) * (endMs - startMs) / (last - first));
+  for (const element of document.elements || []) {
+    if (element.board_id !== visit.board_id) continue;
+    if (first <= element.appear_at_ms && element.appear_at_ms < last)
+      element.appear_at_ms = mapTime(element.appear_at_ms);
+    let previousEnd = element.appear_at_ms;
+    for (const interval of element.visibility_intervals || []) {
+      if (first <= interval.start_ms && interval.start_ms < last) interval.start_ms = mapTime(interval.start_ms);
+      if (first < interval.end_ms && interval.end_ms <= last) interval.end_ms = mapTime(interval.end_ms);
+      if (interval.start_ms < previousEnd || interval.end_ms <= interval.start_ms)
+        throw new Error(`This timing conflicts with visibility for ${element.id}.`);
+      previousEnd = interval.end_ms;
+    }
   }
+  visit.start_ms = startMs;
+  visit.end_ms = endMs;
+  return document;
+}
+
+async function saveBoardTiming(startMs: number, endMs: number): Promise<void> {
+  if (!state.project || !state.layout || !state.selected) return;
   try {
-    await api<ProjectState>(`/projects/${state.project.project_id}/artifacts/layout`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ document, expected_revision: state.project.revision }) });
+    const document = retimeBoardVisit(state.layout, state.selected.id, startMs, endMs);
+    await api(`/projects/${state.project.project_id}/edits`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "edit", artifact_kind: "layout", document, expected_revision: state.project.revision }) });
     toast("Board timing saved as a new project revision."); await openProject(state.project.project_id);
   } catch (error) { toast(error instanceof Error ? error.message : "Timing change failed validation."); }
 }
@@ -1092,17 +1133,80 @@ async function saveScriptOverride(project: ProjectState, raw: string): Promise<v
   } catch (error) { toast(error instanceof Error ? error.message : "Script revision failed."); }
 }
 
+function appendCaptionControls(root: HTMLElement, project: ProjectState, track: CaptionTrack): void {
+  const card = document.createElement("section"); card.className = "workspace-card";
+  const title = document.createElement("strong"); title.textContent = "Closed captions"; card.append(title);
+  const detail = document.createElement("p"); detail.setAttribute("role", "status");
+  detail.textContent = track.message || `${track.cues.length} measured cues. Select a cue in the timeline to edit it.`;
+  card.append(detail); root.append(card);
+  if (track.status === "ready") {
+    for (const fmt of ["srt", "vtt"]) {
+      const save = document.createElement("button"); save.textContent = "Save " + fmt.toUpperCase();
+      save.onclick = async () => {
+        try {
+          const url = await apiBlobUrl(`/projects/${project.project_id}/captions/${fmt}?expected_revision=${project.revision}`);
+          const link = document.createElement("a"); link.href = url; link.download = `atme-${project.project_id}-r${project.revision}.${fmt}`; link.click();
+        } catch (error) { toast(error instanceof Error ? error.message : "Subtitle export failed."); }
+      };
+      card.append(save);
+    }
+  } else if (track.status === "needs_timing" && project.authoritative_narrative_source.ready_for_timing) {
+    const measure = document.createElement("button"); measure.textContent = "Measure speech timing";
+    measure.onclick = async () => {
+      if (state.project !== project || measure.disabled) return;
+      measure.disabled = true;
+      const base = `/projects/${project.project_id}/timing`;
+      try {
+        let run = await api<{run_id:string; status:string; error?:string}>(base, {method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({expected_revision:project.revision})});
+        while (run.status === "queued" || run.status === "running") {
+          detail.textContent = `Speech timing is ${run.status}. You can close this window.`;
+          await new Promise(resolve => window.setTimeout(resolve, 2000));
+          if (state.project !== project || !card.isConnected || !$<HTMLDialogElement>("workspace-dialog").open) return;
+          run = await api<typeof run>(base + "/" + run.run_id);
+        }
+        if (run.status !== "done") throw new Error(run.error || "Speech timing was interrupted.");
+        if (state.project !== project) return;
+        $<HTMLDialogElement>("workspace-dialog").close();
+        await openProject(project.project_id, false, true); showStoryboard();
+      } catch (error) { detail.textContent = error instanceof Error ? error.message : "Timing failed."; }
+      finally { measure.disabled = false; }
+    };
+    card.append(measure);
+  }
+}
+
 function showStoryboard(): void {
   const wrap = document.createElement("div"); const activations = boardActivations(state.layout);
   const beats = state.storyboard?.beats || [];
+  const project = state.project;
   if (!beats.length && !activations.length) wrap.innerHTML = "<div class='workspace-card'><h3>No storyboard yet</h3><p>Your connected AI can add the storyboard through MCP.</p></div>";
+  if (project && state.storyboard?.contract_version === "2.0.0") {
+    const compile = document.createElement("button"); compile.className = "small-primary"; compile.textContent = "Compile storyboard";
+    compile.onclick = async () => {
+      if (state.project !== project || compile.disabled) return;
+      compile.disabled = true;
+      try {
+        await api(`/projects/${project.project_id}/compile-storyboard`, {method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({expected_revision:project.revision})});
+        if (state.project === project) {
+          $<HTMLDialogElement>("workspace-dialog").close();
+          await openProject(project.project_id, false, true);
+        }
+        toast("Storyboard compiled. The saved timeline is ready to preview.");
+      } catch (error) { toast(error instanceof Error ? error.message : "Compilation failed."); }
+      finally { compile.disabled = false; }
+    };
+    wrap.append(compile);
+  }
+  if (project && state.captions) appendCaptionControls(wrap, project, state.captions);
   for (const beat of beats) {
     const card = document.createElement("article"); card.className = "workspace-card";
     const title = document.createElement("strong"); title.textContent = beat.beat_id;
     const description = document.createElement("p"); description.textContent = beat.narration_summary || beat.narration || "";
     card.append(title, description); wrap.append(card);
   }
-  for (const item of activations) { const card = document.createElement("button"); card.className = "workspace-card project-row"; const label = document.createElement("strong"); label.textContent = item.board_id; const meta = document.createElement("small"); meta.textContent = `${formatTime(item.start_ms)} – ${formatTime(item.end_ms)}`; card.append(label, meta); card.onclick = () => { state.playheadMs = item.start_ms; state.selected = { kind: "illustration", id: item.board_id, label: item.board_id, startMs: item.start_ms, endMs: item.end_ms }; $<HTMLDialogElement>("workspace-dialog").close(); updatePlayhead(); renderInspector(); void refreshPreview(); }; wrap.append(card); }
+  for (const item of activations) { const card = document.createElement("button"); card.className = "workspace-card project-row"; const label = document.createElement("strong"); label.textContent = item.board_id; const meta = document.createElement("small"); meta.textContent = `${formatTime(item.start_ms)} – ${formatTime(item.end_ms)}`; card.append(label, meta); card.onclick = () => { state.playheadMs = item.start_ms; state.selected = { kind: "illustration", id: item.activation_id, label: item.board_id, startMs: item.start_ms, endMs: item.end_ms }; $<HTMLDialogElement>("workspace-dialog").close(); updatePlayhead(); renderInspector(); void refreshPreview(); }; wrap.append(card); }
   showDialog("Storyboard", state.project?.title || "Current project", wrap);
 }
 

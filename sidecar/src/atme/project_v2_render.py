@@ -39,17 +39,25 @@ def check_export_inputs(storyboard, resolved):
 
 
 def verified_assets(service, row, record, layout_document):
+    try:
+        service._validate_resolved_timeline(row["job_id"], record["document"], row,
+                                            basis_revision=record["revision"] - 1, require_return_receipts=False)
+    except ProjectError:
+        raise
+    except ValueError as exc:
+        raise ProjectError("invalid_artifact", str(exc)) from exc
+    return verified_layout_assets(service, row["job_id"], record["document"], layout_document)
+
+
+def verified_layout_assets(service, project_id, doc, layout_document):
     from atme.project_assets import read_verified_split_asset_bytes
     from atme.store.contracts_v2 import MEDIA_OBJECT_TYPES, ExecutableLayoutV2
 
-    doc = record["document"]
     try:
-        service._validate_resolved_timeline(row["job_id"], doc, row, basis_revision=record["revision"] - 1,
-                                            require_return_receipts=False)
         layout = ExecutableLayoutV2.model_validate(layout_document)
         required = {obj.asset_id for obj in layout.objects if obj.asset_id is not None}
         assets = [asset for asset in doc["resolved_assets"] if asset["asset_id"] in required]
-        owned = {asset["asset_id"]: asset for asset in service.list_assets(row["job_id"])}
+        owned = {asset["asset_id"]: asset for asset in service.list_assets(project_id)}
         pins = [{"asset_id": asset["asset_id"], "revision": asset["revision"],
                  "resource_uri": (asset["managed_ref"] if asset["kind"] in MEDIA_OBJECT_TYPES else
                                   owned.get(asset["asset_id"], {}).get("resource_uri", "")),
@@ -86,6 +94,39 @@ def _video_inputs(fps, camera, frame_number=0):
 def frame_time_ms(frame_number, fps):
     """Integer timeline sample used to draw this encoded picture."""
     return frame_number * 1000 // fps
+
+
+def picture_samples(layout, timeline, frames, fps):
+    """Reuse the first encoded sample of a hold for time-independent board artwork."""
+    from bisect import bisect_right
+
+    static_objects = {"rectangle", "rounded_rectangle", "ellipse", "text", "evidence"}
+    bounded_actions = {"draw", "write", "reveal", "enter", "exit", "highlight", "cross_out",
+                       "dim", "isolate", "insert_evidence", "return_board"}
+    if (any(obj["object_type"] not in static_objects for obj in layout["objects"])
+            or any(event["action"]["verb"] not in bounded_actions for event in timeline["actions"])):
+        yield from (frame_time_ms(n, fps) for n in range(frames))
+        return
+    boundaries = {v[k] for v in layout["activations"] for k in ("start_ms", "end_ms")}
+    motion = []
+    for event in sorted(timeline["actions"], key=lambda row: row["start_ms"]):
+        start, end = event["start_ms"], event["end_ms"]
+        boundaries.update((start, end))
+        if motion and start <= motion[-1][1]:
+            motion[-1] = (motion[-1][0], max(motion[-1][1], end))
+        else:
+            motion.append((start, end))
+    changes = sorted(boundaries)
+    starts = [start for start, _ in motion]
+    previous_region, sample = -1, 0
+    for n in range(frames):
+        at = frame_time_ms(n, fps)
+        region = bisect_right(changes, at)
+        index = bisect_right(starts, at) - 1
+        if region != previous_region or index >= 0 and at < motion[index][1]:
+            sample = at
+        previous_region = region
+        yield sample
 
 
 def camera_preview(camera, overlay, frame_number, fps):
@@ -147,9 +188,12 @@ def render(work, inputs, compiled, layout, audio):
         with tempfile.TemporaryFile() as errors, subprocess.Popen(command, stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL, stderr=errors) as proc:
             try:
-                for n in range(frames):
-                    frame = compose(frame_time_ms(n, fps))
-                    proc.stdin.write(frame.png)
+                previous = None
+                for sample in picture_samples(layout, timeline, frames, fps):
+                    if sample != previous:
+                        picture = compose(sample).png
+                        previous = sample
+                    proc.stdin.write(picture)
                 proc.stdin.close()
                 if proc.wait() != 0:
                     raise BrokenPipeError

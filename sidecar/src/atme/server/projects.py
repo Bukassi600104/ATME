@@ -306,6 +306,27 @@ def register_projects(app, store, auth):
                      expected_revision, at_ms)
         return Response(value["png"], media_type="image/png", headers={"Cache-Control": "no-store"})
 
+    @app.post("/projects/{project_id}/compile-storyboard", dependencies=[Depends(auth)])
+    async def compile_storyboard(project_id: int, request: Request):
+        value = await body(request, ("expected_revision",))
+        return await run_in_threadpool(call, service.compile_storyboard, project_id, value["expected_revision"])
+
+    @app.get("/projects/{project_id}/captions", dependencies=[Depends(auth)])
+    def caption_track(project_id: int, expected_revision: int):
+        return call(service.caption_track, project_id, expected_revision)
+
+    @app.put("/projects/{project_id}/captions", dependencies=[Depends(auth)])
+    async def save_captions(project_id: int, request: Request):
+        value = await body(request, ("expected_revision", "timing_run_id", "cues"))
+        return call(service.save_captions, project_id, value["expected_revision"], value["timing_run_id"], value["cues"])
+
+    @app.get("/projects/{project_id}/captions/{fmt}", dependencies=[Depends(auth)])
+    def subtitles(project_id: int, expected_revision: int, fmt: str):
+        content = call(service.subtitle_file, project_id, expected_revision, fmt)
+        return Response(content, media_type="text/vtt" if fmt == "vtt" else "application/x-subrip",
+                        headers={"Content-Disposition": f'attachment; filename="atme-{project_id}-r{expected_revision}.{fmt}"',
+                                 "Cache-Control": "no-store"})
+
     @app.post("/projects/{project_id}/timing", dependencies=[Depends(auth)])
     async def prepare_timing(project_id: int, request: Request):
         value = await body(request, ("expected_revision",))

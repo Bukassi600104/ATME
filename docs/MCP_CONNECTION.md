@@ -60,6 +60,8 @@ for scripts, semantic transcription, storyboard and layout authorship.
 - atme.get_project_state
 - atme.get_project_artifact
 - atme.get_visual_compilation_context (read-only v2 production basis and draft fingerprint)
+- atme.compile_storyboard_speech (inspect exact cue matches and repair points)
+- atme.compile_storyboard (compile and save a supported semantic storyboard)
 - atme.write_artifact
 - atme.approve_script (only after explicit user approval of that exact revision)
 - atme.list_source_media
@@ -68,6 +70,8 @@ for scripts, semantic transcription, storyboard and layout authorship.
 - `atme://projects/{id}/authoritative-narrative` binary resource
 - atme.prepare_timing (non-blocking local timing request)
 - atme.get_timing_status
+- atme.get_caption_track
+- atme.save_caption_track
 - atme.validate_project
 - atme.preview_project (bounded PNG from the exact project revision)
 - atme.render_project (explicit, non-blocking queue request)
@@ -175,6 +179,11 @@ Set that field and submit the document with `atme.write_artifact`. A missing bas
 indicates a missing or stale prerequisite. ATME computes these hashes locally.
 The connected producer supplies authored actions,
 measured triggers and the action-specific evidence or continuity required by its plan.
+
+For automatic compilation, write the semantic storyboard and call `atme.compile_storyboard`
+with its current project revision. Use `atme.get_capabilities` for the supported object and action sets.
+ATME can reuse a completed timing measurement of the same recording, edited source and semantic structure.
+The optional timing run ID selects a specific measurement. Studio exposes the same operation in Storyboard.
 
 Call `atme.validate_project`, request a frame with `atme.preview_project`, then request
 the confirmed render. Both output profiles use 30 fps. Placed camera footage supplies

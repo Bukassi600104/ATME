@@ -82,6 +82,13 @@ class ProjectService:
                     script_revision INTEGER NOT NULL,
                     approved_at REAL NOT NULL,
                     PRIMARY KEY(job_id,project_revision));
+                CREATE TABLE IF NOT EXISTS storyboard_compilations (
+                    job_id INTEGER PRIMARY KEY REFERENCES jobs(id),
+                    plan_revision INTEGER NOT NULL, layout_revision INTEGER NOT NULL,
+                    timeline_revision INTEGER NOT NULL, timing_run_id TEXT, compiler_version INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS project_caption_edits (
+                    job_id INTEGER NOT NULL REFERENCES jobs(id), timing_run_id TEXT NOT NULL,
+                    project_revision INTEGER NOT NULL, cues TEXT NOT NULL, PRIMARY KEY(job_id,project_revision));
                 CREATE TABLE IF NOT EXISTS project_artifact_dependencies (
                     job_id INTEGER NOT NULL,
                     kind TEXT NOT NULL,
@@ -153,7 +160,8 @@ class ProjectService:
 
     @staticmethod
     def capabilities():
-        return {"schema_version": "1", "api_keys_required": False,
+        from atme.storyboard_compiler import capabilities
+        return {"schema_version": "1", "api_keys_required": False, "storyboard_compiler": capabilities(),
                 "visual_contracts": {
                     "authoring_versions": ["1", "2.0.0"],
                     "renderer_versions": ["1", "2.0.0"],
@@ -166,7 +174,7 @@ class ProjectService:
                 "artifact_kinds": ["brief", "script", "storyboard", "layout", "resolved_timeline"],
                 "output_profiles": list(PROFILES),
                 "operations": ["create_project", "open_project", "list_projects", "duplicate_project", "archive_project",
-                               "get_schema", "get_visual_compilation_context", "compile_storyboard_speech",
+                               "get_schema", "get_visual_compilation_context", "compile_storyboard_speech", "compile_storyboard",
                                "write_artifact", "get_artifact", "approve_script",
                                "migrate_visual_contracts_v1",
                                "list_media", "get_narrative_source", "validate_project", "preview_project",
@@ -1242,25 +1250,80 @@ class ProjectService:
             basis = self.visual_compilation_context(project_id, expected_revision)["layout_basis"]
             if basis is None:
                 raise ProjectError("stale_contract_basis", "A current v2 storyboard and narrative source are required")
-            run = self.timing.status(project_id, timing_run_id)
-            if run["status"] != "done":
-                raise ProjectError("timing_not_ready", "A completed local timing measurement is required")
-            measured = run["timing"]
-            source = self.narrative_source(project_id)
-            timeline = self.source_timeline.get(project_id)
-            media = source["timing_authority"]["media"]
-            if (timeline["project_revision"] > run["project_revision"]
-                    or measured["authority_mode"] != source["mode"]
-                    or measured["source_media"] != {key: media[key] for key in ("media_id", "revision", "sha256")}
-                    or measured["semantic_structure"]["structure_revision"] != source["semantic_structure"]["revision"]
-                    or abs(measured["final_audio"]["duration_ms"] - source["timing_authority"]["duration_ms"]) > 1):
-                raise ProjectError("stale_timing", "Measure timing for the current recording, script and edited timeline")
+            timing_run_id, measured = self.timing.current(project_id, timing_run_id)
             plan = self.artifact(project_id, "storyboard", basis["plan_revision"])["document"]
-            compiled = compile_storyboard_speech(plan, measured, source["timing_authority"]["duration_ms"])
+            compiled = compile_storyboard_speech(plan, measured, self.narrative_source(project_id)["timing_authority"]["duration_ms"])
             self._expected(self._row(project_id), expected_revision)
             return {**compiled, "project_id": project_id, "project_revision": expected_revision,
                     "plan_revision": basis["plan_revision"], "plan_sha256": basis["plan_sha256"],
                     "timing_run_id": timing_run_id, "audio_sha256": measured["final_audio"]["sha256"]}
+
+    def compile_storyboard(self, project_id, expected_revision, timing_run_id=None):
+        """Publish the generated layout and its verified timeline together or neither."""
+        from atme.project_v2_render import verified_layout_assets
+        from atme.render.v2_svg import prepare_png_sequence
+        from atme.storyboard_compiler import COMPILER_VERSION, compile_documents
+
+        with self.store._lock:
+            ctx = self.visual_compilation_context(project_id, expected_revision)
+            basis = ctx["layout_basis"]
+            if not basis:
+                raise ProjectError("stale_contract_basis", "A current v2 storyboard is required")
+            plan = self.artifact(project_id, "storyboard")["document"]
+            state = self.open(project_id)
+            pair = state["artifacts"]
+            needs_speech = any(a["trigger"]["kind"] in {"word", "phrase"} for a in plan["actions"])
+            if needs_speech and timing_run_id is None:
+                timing_run_id, _ = self.timing.current(project_id)
+            if (ctx["resolved_basis"] and self.store.conn.execute(
+                    "SELECT 1 FROM storyboard_compilations WHERE job_id=? AND plan_revision=? AND layout_revision=? "
+                    "AND timeline_revision=? AND timing_run_id IS ? AND compiler_version=?",
+                    (project_id, basis["plan_revision"], pair.get("layout"), pair.get("resolved_timeline"),
+                     timing_run_id, COMPILER_VERSION)).fetchone()):
+                self._expected(self._row(project_id), expected_revision)
+                return state
+            speech = {}
+            if needs_speech:
+                result = self.compile_storyboard_speech(project_id, expected_revision, timing_run_id)
+                if result["issues"]:
+                    raise ProjectError("storyboard_needs_repair", "Review the identified spoken cues", result["issues"])
+                speech = {r["action_id"]: r["resolved_trigger"] for r in result["resolved"]}
+            source = self.source_timeline.get(project_id)
+            owned = {a["asset_id"]: a for a in self.list_assets(project_id)}
+        try:
+            layout, clock = compile_documents(plan, basis, source, speech, owned)
+            assets = verified_layout_assets(self, project_id, clock, layout)
+            compose = prepare_png_sequence(layout, clock, assets)
+            for t in sorted({0, *(min(e["end_ms"], clock["duration_ms"] - 1) for e in clock["actions"])}):
+                compose(t)
+            documents = [(kind, doc, self._serialized_artifact(kind, doc))
+                         for kind, doc in (("layout", layout), ("resolved_timeline", clock))]
+        except ProjectError:
+            raise
+        except ValueError as exc:
+            raise ProjectError("storyboard_needs_repair", str(exc)) from exc
+        with self.store._lock:
+            conn = self.store.conn
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                row = self._row(project_id)
+                self._expected(row, expected_revision)
+                for kind, document, encoded in documents:
+                    self._write_transaction(conn, project_id, kind, document, encoded, self._row(project_id))
+                conn.execute("INSERT OR REPLACE INTO storyboard_compilations VALUES(?,?,?,?,?,?)",
+                             (project_id, basis["plan_revision"], expected_revision + 1, expected_revision + 2,
+                              timing_run_id, COMPILER_VERSION))
+                conn.commit()
+            except ProjectError:
+                conn.rollback()
+                raise
+            except ValueError as exc:
+                conn.rollback()
+                raise ProjectError("storyboard_needs_repair", str(exc)) from exc
+            except Exception:
+                conn.rollback()
+                raise
+            return self.open(project_id)
 
     def set_profile(self, project_id, profile, expected_revision):
         if profile not in PROFILES:
@@ -1296,6 +1359,52 @@ class ProjectService:
 
     def preview_project(self, project_id, expected_revision, at_ms):
         return self.runner.preview(project_id, expected_revision, at_ms)
+
+    def caption_track(self, project_id, expected_revision):
+        from atme.project_captions import measured_cues
+
+        with self.store._lock:
+            self._expected(self._row(project_id), expected_revision)
+            track = {"project_revision": expected_revision, "timing_run_id": None, "cues": []}
+            try:
+                run_id, measured = self.timing.current(project_id)
+                track["timing_run_id"] = run_id
+                row = self.store.conn.execute(
+                    "SELECT cues FROM project_caption_edits WHERE job_id=? AND timing_run_id=? "
+                    "ORDER BY project_revision DESC LIMIT 1", (project_id, run_id)).fetchone()
+                cues = json.loads(row["cues"]) if row else measured_cues(measured)
+                track.update(status="ready", cues=cues, duration_ms=measured["final_audio"]["duration_ms"])
+            except ProjectError as exc:
+                if exc.code not in {"captions_need_review", "timing_not_ready"}:
+                    raise
+                track.update(status="needs_review" if exc.code == "captions_need_review" else "needs_timing", message=str(exc))
+            self._expected(self._row(project_id), expected_revision)
+            return track
+
+    def save_captions(self, project_id, expected_revision, timing_run_id, cues):
+        from atme.project_captions import validate_edits
+
+        with self.store._lock, self.store.conn as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            track = self.caption_track(project_id, expected_revision)
+            if track["status"] != "ready" or track["timing_run_id"] != timing_run_id:
+                raise ProjectError("stale_timing", "Reopen the caption track for the current recording")
+            validate_edits(cues, track["cues"], track["duration_ms"])
+            if cues != track["cues"]:
+                revision = expected_revision + 1
+                conn.execute("INSERT INTO project_caption_edits VALUES(?,?,?,?)",
+                             (project_id, timing_run_id, revision, json.dumps(cues)))
+                conn.execute("UPDATE project_state SET revision=? WHERE job_id=?", (revision, project_id))
+                track.update(project_revision=revision, cues=cues)
+            return track
+
+    def subtitle_file(self, project_id, expected_revision, fmt):
+        from atme.project_captions import serialize
+
+        track = self.caption_track(project_id, expected_revision)
+        if track["status"] != "ready":
+            raise ProjectError("captions_not_ready", track["message"])
+        return serialize(track["cues"], fmt)
 
     def prepare_timing(self, project_id, expected_revision):
         return self.timing.request(project_id, expected_revision)

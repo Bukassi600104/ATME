@@ -167,6 +167,34 @@ class ProjectTiming:
             raise ProjectError("timing_failed", "Technical speech timing failed",
                                [{"message": str(exc)[:500]}]) from exc
 
+    def current(self, project_id, run_id=None):
+        """Find a completed measurement with the current recording, edit and script pins."""
+        with self.service.store._lock:
+            source = self.service.narrative_source(project_id)
+            media = source["timing_authority"]["media"]
+            edit_revision = self.service.source_timeline.get(project_id)["project_revision"]
+            if run_id is None:
+                rows = self.service.store.conn.execute(
+                    "SELECT run_id,project_revision,document FROM project_timing_runs "
+                    "WHERE job_id=? AND status='done' AND project_revision>=? ORDER BY updated_at DESC,run_id",
+                    (project_id, edit_revision))
+                candidates = ((r["run_id"], r["project_revision"], json.loads(r["document"])) for r in rows)
+            else:
+                run = self.status(project_id, run_id)
+                if run["status"] != "done":
+                    raise ProjectError("timing_not_ready", "A completed local timing measurement is required")
+                candidates = [(run_id, run["project_revision"], run["timing"])]
+            pin = {k: media[k] for k in ("media_id", "revision", "sha256")} if media else None
+            for key, revision, measured in candidates:
+                if (source["ready_for_timing"] and revision >= edit_revision and pin == measured["source_media"]
+                        and source["mode"] == measured["authority_mode"]
+                        and source["semantic_structure"]["revision"] == measured["semantic_structure"]["structure_revision"]
+                        and abs(source["timing_authority"]["duration_ms"] - measured["final_audio"]["duration_ms"]) <= 1):
+                    return key, measured
+            if run_id is not None:
+                raise ProjectError("stale_timing", "Measure timing for the current recording, script and edited timeline")
+            raise ProjectError("timing_not_ready", "Measure the current recording and approved narrative before using speech cues")
+
     def status(self, project_id, run_id):
         if not isinstance(run_id, str) or len(run_id) != 24 or any(c not in "0123456789abcdef" for c in run_id):
             raise ProjectError("invalid_request", "run_id must be a 24-character hexadecimal ID")

@@ -1,6 +1,15 @@
 # ATME production audit and completion plan
 
-ATME can export a movie from a saved executable timeline. The main remaining build is the storyboard compiler. A connected producer should be able to describe a diagram, name the spoken cue, supply evidence and request a return to the diagram. ATME should place and time those instructions locally, explain any instruction it cannot execute, and deliver the reviewed movie. Today a producer still supplies the rich layout and the finished action timeline.
+ATME can now generate a layout and an executable timeline for a supported semantic storyboard. A narrated queue sequence has passed through the connected client, local compiler, preview and MP4 exporter. Richer productions still require externally authored executable documents for instructions outside the compiler's supported vocabulary.
+
+## Implemented since the audit
+
+| Area | Completed and verified | Still open |
+| --- | --- | --- |
+| Storyboard and evidence | The local compiler places plain marks, text and project evidence. It resolves spoken, absolute, beat and prior-action cues, saves the layout and timeline together, and reuses an unchanged compilation. The original queue fixture visits the diagram, shows an attributed observation at 2.520 s, and returns to the diagram on the second spoken cue at 7.120 s. | Rich shape and relationship placement, nested content, authored camera movement and sound direction. Repeated visits and source evidence need coverage across more stories. |
+| Picture and export | The 11.888-second landscape fixture has a spoken soundtrack and three decoded frame comparisons. The highest channel mean absolute difference from preview was 2.533 intensity units out of 255. The extracted AAC stream matched an independent encode of the frozen narration master byte for byte. The renderer reuses raster pictures during static holds of admitted object and action types. | Original long-form and portrait productions, editorial review, and interruption recovery at production length. |
+| Captions | Studio and the connected client read a measured track. Caption text and timing edits are versioned independently of script approval and checked for overlap. The source timeline invalidates old measurements after an edit. Studio exposes SRT and WebVTT files. Both files for the queue movie contain five measured cues. | Burn-in in preview and movie, repair of partial alignments, caption styling, and independent verification on a clean install. |
+| Studio | A reviewer can compile a saved v2 storyboard directly, measure speech when needed and see an action identifier on a failed compilation. Board selection uses the visit ID. The legacy manual timing editor preserves earlier visits when moving a return. | Rich v2 layout editing, scoped proposals and end-to-end undo across the editing surfaces. |
 
 ## What is established
 
@@ -39,6 +48,6 @@ The speech result includes word indices, timing and plan identifiers, and lists 
 
 ## Next implementation
 
-Use the queue film as the first compiler case. Board A shows incoming requests, board B shows an attributed observation, then board A returns with the changed relationship highlighted on the second spoken cue. Build the smallest set of semantic instructions that can produce that complete film. Store its source revision, measured words, assets, generated artifacts and encoded comparison so a failed step can be reproduced in isolation.
+Use the completed queue case as regression evidence. Extend the compiler with a new semantic case for each uncovered object or action family. Verify each case from authored intent through rendered output and record the precise combinations supported.
 
 Create an original, rights-cleared reference production for editorial acceptance and a clean Windows build from declared dependencies. Preserve the existing engine, user projects, renderer, artwork and regression fixtures. Carry forward a completed case until an input, dependency or implementation it covers changes.

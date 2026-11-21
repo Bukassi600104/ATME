@@ -547,6 +547,7 @@ class TextObject(ObjectBase):
     })
     object_type: Literal["text", "list", "callout", "code"]
     text: str = Field(min_length=1)
+    text_inset_px: int = Field(default=0, ge=0, le=128, strict=True)
     items: list[str] = Field(default_factory=list)
     code_payload: CodePayload | None = None
     callout_binding: CalloutBinding | None = None
@@ -555,6 +556,8 @@ class TextObject(ObjectBase):
     @model_serializer(mode="wrap")
     def preserve_legacy_text_shape(self, handler):
         result = handler(self)
+        if "text_inset_px" not in self.model_fields_set:
+            result.pop("text_inset_px", None)
         if self.code_payload is None:
             result.pop("code_payload", None)
         if self.callout_binding is None:
@@ -565,6 +568,8 @@ class TextObject(ObjectBase):
 
     @model_validator(mode="after")
     def exact_authored_code(self):
+        if self.text_inset_px and self.object_type != "text":
+            raise ValueError("text inset requires a plain text object")
         if self.structured_list is not None and (
             self.object_type != "list" or self.items or not self.text.strip()
             or self.object_id == self.structured_list.container_group_id

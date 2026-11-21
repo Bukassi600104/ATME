@@ -346,11 +346,12 @@ def _text(obj: TextObject, color: str, font_family: str, font_weight: int, font_
         lines = [obj.text, *(f"• {item}" for item in obj.items)]
     if any(len(line) > max_characters for line in lines):
         raise UnsupportedVisualObject(f"text {obj.object_id} requires authored line breaks")
-    if len(lines) * font_size * line_height > bounds.height:
+    inset = obj.text_inset_px
+    if len(lines) * font_size * line_height > bounds.height - 2 * inset:
         raise UnsupportedVisualObject(f"text {obj.object_id} exceeds authored bounds")
     measuring_font = _font(font_path if isinstance(font_path, bytes) else str(font_path),
                            max(1, math.ceil(font_size)))
-    if any(measuring_font.getlength(line) > bounds.width for line in lines):
+    if any(measuring_font.getlength(line) > bounds.width - 2 * inset for line in lines):
         raise UnsupportedVisualObject(f"text {obj.object_id} exceeds authored width")
     if progressive_fraction is not None:
         if obj.object_type != "list" or obj.structured_list is not None or write_fraction is not None:
@@ -361,8 +362,8 @@ def _text(obj: TextObject, color: str, font_family: str, font_weight: int, font_
         graphemes = regex.findall(r"\X", "\n".join(lines))
         visible = math.floor(len(graphemes) * write_fraction)
         lines = "".join(graphemes[:visible]).split("\n")
-    x = _n(bounds.x)
-    y = _n(bounds.y + font_size)
+    x = _n(bounds.x + inset)
+    y = _n(bounds.y + inset + font_size)
     spans = "".join(
         f'<tspan x="{x}" dy="{_n(0 if index == 0 else font_size * line_height)}">'
         f'{_xml_escape(line)}</tspan>'

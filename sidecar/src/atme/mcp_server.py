@@ -154,6 +154,24 @@ def create_mcp(service: ProjectService, activity: McpActivity | None = None):
         return invoke(service.compile_storyboard_speech, project_id, expected_revision, timing_run_id,
                       tool="atme.compile_storyboard_speech", project_id=project_id)
 
+    @server.tool(name="atme.compile_storyboard", annotations=write)
+    def compile_storyboard(project_id: Id, expected_revision: Revision,
+                           timing_run_id: Annotated[str, Field(pattern=r"^[0-9a-f]{24}$")] | None = None) -> CallToolResult:
+        """Generate and save the layout and resolved timeline from the current v2 storyboard. Supply measured timing for word or phrase cues."""
+        return invoke(service.compile_storyboard, project_id, expected_revision, timing_run_id,
+                      tool="atme.compile_storyboard", project_id=project_id)
+
+    @server.tool(name="atme.get_caption_track", annotations=read)
+    def get_caption_track(project_id: Id, expected_revision: Revision) -> CallToolResult:
+        """Read measured, editable closed captions on the final audio timebase."""
+        return invoke(service.caption_track, project_id, expected_revision, tool="atme.get_caption_track", project_id=project_id)
+
+    @server.tool(name="atme.save_caption_track", annotations=write)
+    def save_caption_track(project_id: Id, expected_revision: Revision, timing_run_id: str, cues: list[dict]) -> CallToolResult:
+        """Version caption wording and timing separately from the approved narrative."""
+        return invoke(service.save_captions, project_id, expected_revision, timing_run_id, cues,
+                      tool="atme.save_caption_track", project_id=project_id)
+
     @server.tool(name="atme.write_artifact", annotations=write)
     def write_artifact(project_id: Id, kind: Kind, document: dict, expected_revision: Revision) -> CallToolResult:
         """Receive externally authored JSON. Reject invalid/stale writes without modifying the project."""
