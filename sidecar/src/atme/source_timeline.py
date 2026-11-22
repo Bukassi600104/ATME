@@ -168,6 +168,7 @@ class SourceTimeline:
                 project_revision = row["revision"] + 1
                 timeline_revision, serialized = self._insert_version(conn, project_id, project_revision, after, operation)
                 conn.execute("DELETE FROM project_source_timeline_events WHERE job_id=? AND undone=1", (project_id,))
+                conn.execute("DELETE FROM project_edit_events WHERE job_id=? AND undone=1", (project_id,))
                 conn.execute("INSERT INTO project_source_timeline_events(job_id,operation,before_document,after_document,"
                              "applied_timeline_revision,created_at) VALUES(?,?,?,?,?,?)",
                              (project_id, operation, json.dumps(before, separators=(",", ":")), serialized,

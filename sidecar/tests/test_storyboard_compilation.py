@@ -83,6 +83,9 @@ def test_compile_evidence_and_return_to_the_same_queue(tmp_path):
         assert [beat["board_id"] for beat in report["beats"]] == ["board-main", "measurements", "board-main"]
         assert report["beats"][1]["evidence_hold_ms"] >= 2200
         assert all(len(beat["frame_sha256"]) == 64 and beat["covered_instructions"] for beat in report["beats"])
+        copy = service.duplicate(pid)
+        assert service.compilation_report(copy["project_id"], copy["revision"]) == report
+        assert service.compile_storyboard(copy["project_id"], copy["revision"])["revision"] == copy["revision"]
         from hashlib import sha256
         sampled = report["beats"][1]
         assert sha256(service.preview_project(pid, result["revision"], sampled["preview_at_ms"])["png"]).hexdigest() == sampled["frame_sha256"]
@@ -150,6 +153,45 @@ def test_encoder_reuses_only_unchanged_board_pictures():
     assert samples == [0, 0, 200, 300, 400, 500, 600, 600, 600, 600]
     layout["objects"].append({"object_type": "video"})
     assert list(picture_samples(layout, clock, 10, 10)) == list(range(0, 1000, 100))
+
+
+def test_compilation_refuses_action_after_its_owning_beat(tmp_path):
+    service, state, plan, _, _ = stored_v2_basis(tmp_path, real_evidence=True)
+    try:
+        plan["project_revision"] = state["revision"]
+        for action, at in zip(plan["actions"], (0, 3500, 2000), strict=True):
+            action["trigger"] = {"kind": "absolute", "at_ms": at}
+        plan["beats"][1]["attention"]["dimmed_targets"] = []
+        plan["beats"][1]["camera_intent"]["framing"] = "wide"
+        pid = state["project_id"]
+        state = service.write(pid, "storyboard", plan, state["revision"])
+        with pytest.raises(ProjectError, match="owning beat") as problem:
+            service.compile_storyboard(pid, state["revision"])
+        assert plan["actions"][1]["action_id"] in str(problem.value.detail())
+        assert service.open(pid)["revision"] == state["revision"]
+    finally:
+        service.store.close()
+
+
+def test_known_prior_beat_start_resolves_and_off_board_primary_is_reported(tmp_path):
+    service, state, plan, _, _ = stored_v2_basis(tmp_path, real_evidence=True)
+    pid = state["project_id"]
+    try:
+        plan["project_revision"] = state["revision"]
+        queue_plan(plan, {"kind":"absolute", "at_ms":6100},
+                   {"kind":"beat_start", "beat_id":plan["beats"][0]["beat_id"], "offset_ms":2000})
+        state = service.write(pid, "storyboard", plan, state["revision"])
+        state = service.compile_storyboard(pid, state["revision"])
+        report = service.compilation_report(pid, state["revision"])
+        assert report["beats"][1]["start_ms"] == 2000
+        plan["project_revision"] = state["revision"]
+        plan["beats"][1]["attention"]["primary_targets"] = ["object-system"]
+        state = service.write(pid, "storyboard", plan, state["revision"])
+        with pytest.raises(ProjectError, match="primary target") as problem:
+            service.compile_storyboard(pid, state["revision"])
+        assert "beat-002" in str(problem.value.detail()) and "object-system" in str(problem.value.detail())
+    finally:
+        service.store.close()
 
 
 def test_compiler_connects_two_named_nodes_without_consuming_a_layout_cell(tmp_path):

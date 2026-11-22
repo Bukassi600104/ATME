@@ -356,6 +356,12 @@ def create_mcp(service: ProjectService, activity: McpActivity | None = None):
         return invoke(service.render_status, project_id, run_id,
                       tool="atme.get_render_status", project_id=project_id)
 
+    @server.tool(name="atme.stop_render", annotations=write)
+    def stop_render(project_id: Id,
+                    run_id: Annotated[str, Field(pattern=r"^[0-9a-f]{24}$")]) -> CallToolResult:
+        """Request a graceful stop for one render. Saved v2 segments remain available when it resumes."""
+        return invoke(service.runner.stop, project_id, run_id, tool="atme.stop_render", project_id=project_id)
+
     return server
 
 

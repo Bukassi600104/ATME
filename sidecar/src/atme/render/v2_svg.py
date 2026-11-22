@@ -1375,7 +1375,8 @@ def _compose_object_tree(objects, states, paint_ordinals, style, root, scale_x,
     return "".join(definitions), "".join(render_object(obj) for obj in children.get(None, ()))
 
 
-def prepare_png_sequence(layout_document, timeline_document, asset_bytes, *, paper_background=True, on_sample=None):
+def prepare_png_sequence(layout_document, timeline_document, asset_bytes, *, paper_background=True, on_sample=None,
+                         state_samples=()):
     """Prepare one immutable stored export. Each sample uses the normal evaluator, paint and raster path."""
     layout = ExecutableLayoutV2.model_validate(layout_document)
     timeline = ResolvedVisualTimelineV2.model_validate(timeline_document)
@@ -1391,6 +1392,9 @@ def prepare_png_sequence(layout_document, timeline_document, asset_bytes, *, pap
         for key, policy, _, end in _authored_annotation_bindings(timeline)
         if policy.leader_connector_id is not None
     }
+    if on_sample is not None:
+        for moment in state_samples:
+            on_sample(_sample_validated_frame(layout, timeline, replay, camera, moment))
 
     def compose(at_ms):
         frame = _sample_validated_frame(layout, timeline, replay, camera, at_ms)

@@ -217,6 +217,7 @@ class ProjectTiming:
                      original["project_revision"], fingerprint, "done", json.dumps(copied), None, now, now))
         conn.execute("INSERT INTO project_caption_edits SELECT ?,?,project_revision,cues FROM project_caption_edits "
                      "WHERE job_id=? AND timing_run_id=?", (destination_id, run_id, source_id, original["run_id"]))
+        return original["run_id"], run_id
 
     def status(self, project_id, run_id):
         if not isinstance(run_id, str) or len(run_id) != 24 or any(c not in "0123456789abcdef" for c in run_id):

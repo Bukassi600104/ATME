@@ -269,12 +269,13 @@ async function openProject(id: number, hideDrawer = true, preservePosition = fal
   clearViewerMedia();
   const project = await api<ProjectState>(`/projects/${id}`);
   if (request !== projectRequest) return;
-  const [media, assets, script, storyboard, layout, sourceTimeline, captions] = await Promise.all([
+  const [media, assets, script, storyboard, layout, sourceTimeline, captions, editHistory] = await Promise.all([
     api<{ media?: MediaItem[] } | MediaItem[]>(`/projects/${id}/media`),
     api<{ assets: AssetItem[] }>(`/projects/${id}/assets`),
     optionalArtifact<ScriptDoc>(project, "script"), optionalArtifact<StoryboardDoc>(project, "storyboard"), optionalArtifact<LayoutDoc>(project, "layout"),
     api<SourceTimeline>(`/projects/${id}/source-timeline`),
     api<CaptionTrack>(`/projects/${id}/captions?expected_revision=${project.revision}`),
+    api<EditHistory>(`/projects/${id}/studio-history`),
   ]);
   if (request !== projectRequest) return;
   state.project = project;
@@ -283,7 +284,7 @@ async function openProject(id: number, hideDrawer = true, preservePosition = fal
   state.media = Array.isArray(media) ? media : media.media || [];
   state.assets = assets.assets;
   state.captions = captions;
-  state.script = script; state.storyboard = storyboard; state.layout = layout; state.sourceTimeline = sourceTimeline; state.editHistory = sourceTimeline.history; state.validation = null; state.selected = null;
+  state.script = script; state.storyboard = storyboard; state.layout = layout; state.sourceTimeline = sourceTimeline; state.editHistory = editHistory; state.validation = null; state.selected = null;
   state.durationMs = Math.max(1000, sourceTimeline.document.duration_ms ||
     project.authoritative_narrative_source.timing_authority?.duration_ms || deriveLayoutDuration(layout) || 60_000);
   state.playheadMs = Math.min(previousPlayhead, Math.max(0, state.durationMs - 1));
@@ -801,7 +802,7 @@ async function historyAction(action: "undo" | "redo"): Promise<void> {
   if (!state.project) return;
   const projectId = state.project.project_id;
   try {
-    await api(`/projects/${projectId}/source-timeline/${action}`, { method: "POST", headers: { "Content-Type": "application/json" },
+    await api(`/projects/${projectId}/studio-history/${action}`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ expected_revision: state.project.revision }) });
     await openProject(projectId, false); toast(`${action === "undo" ? "Undo" : "Redo"} complete.`);
   } catch (error) { toast(error instanceof Error ? error.message : `${action} failed.`); }
@@ -901,11 +902,17 @@ async function appendRevisionState(root: HTMLElement): Promise<void> {
       const heading = document.createElement("h3"); heading.textContent = request.status === "pending" ? "Waiting for AI" : "Revision proposed";
       const text = document.createElement("p"); text.textContent = request.proposal?.summary || request.instruction; card.append(heading, text);
       if (request.status === "proposed") {
-        const preview = document.createElement("img"); preview.className = "proposal-preview"; preview.alt = "Renderer preview of the proposed revision"; card.append(preview);
-        void loadProposalPreview(request, preview);
+        const current = request.project_revision === state.project?.revision;
+        if (current) {
+          const preview = document.createElement("img"); preview.className = "proposal-preview"; preview.alt = "Renderer preview of the proposed revision"; card.append(preview);
+          void loadProposalPreview(request, preview);
+        } else {
+          heading.textContent = "Proposal for an earlier revision";
+        }
         const actions = document.createElement("div"); actions.className = "mini-actions";
         const reject = document.createElement("button"); reject.className = "secondary-button"; reject.textContent = "Reject";
         const accept = document.createElement("button"); accept.className = "small-primary"; accept.textContent = "Apply revision";
+        accept.disabled = !current;
         reject.onclick = () => void decideRevision(request, false); accept.onclick = () => void decideRevision(request, true); actions.append(reject, accept); card.append(actions);
       }
       root.append(card);
@@ -1246,7 +1253,7 @@ async function showRenders(): Promise<void> {
   if (!state.project) { wrap.innerHTML = "<div class='workspace-card'><h3>No project open</h3></div>"; showDialog("Renders", "", wrap); return; }
   const project = state.project;
   try {
-    const response = await api<{ renders: Array<{ run_id: string; status: string; error?: string; project_revision: number; progress?:RenderProgress; manifest?: { duration_ms?: number } }> }>(`/projects/${project.project_id}/renders`);
+    const response = await api<{ renders: Array<{ run_id: string; status: string; stop_requested?: boolean; error?: string; project_revision: number; progress?:RenderProgress; manifest?: { duration_ms?: number } }> }>(`/projects/${project.project_id}/renders`);
     if (project !== state.project) return;
     if (!response.renders.length) wrap.innerHTML = "<div class='workspace-card'><h3>No renders yet</h3><p>Validate the project, then use Render in the project bar.</p></div>";
     for (const run of response.renders) {
@@ -1258,7 +1265,18 @@ async function showRenders(): Promise<void> {
       }
       if (run.error) { const message = document.createElement("p"); message.textContent = run.error; card.append(message); }
       if (run.status === "done") card.onclick = () => { $<HTMLDialogElement>("workspace-dialog").close(); void showRenderedVideo(project.project_id, run.run_id); };
-      if (run.status === "failed" && run.project_revision === project.revision) {
+      if (run.status === "queued" || run.status === "running") {
+        label.textContent = run.stop_requested ? "Stopping render" : "Stop render";
+        card.disabled = !!run.stop_requested;
+        card.onclick = async () => {
+          card.disabled = true;
+          try {
+            await api(`/projects/${project.project_id}/renders/${run.run_id}/stop`, {method: "POST"});
+            if (state.project === project) await showRenders();
+          } catch (error) { card.disabled = false; toast(error instanceof Error ? error.message : "Could not stop render."); }
+        };
+      }
+      if ((run.status === "failed" || run.status === "cancelled") && run.project_revision === project.revision) {
         label.textContent = "Resume render";
         card.onclick = () => { $<HTMLDialogElement>("workspace-dialog").close(); void renderProject(); };
       }
@@ -1320,10 +1338,11 @@ async function pollRender(projectId: number, runId: string): Promise<void> {
     if (state.project?.project_id !== projectId) return;
     if (run.progress && run.status === "running")
       $("save-state").textContent = `Rendering · ${run.progress.frames_done} of ${run.progress.total_frames} frames saved`;
-    else if (run.status === "done" || run.status === "failed")
+    else if (["done", "failed", "cancelled"].includes(run.status))
       $("save-state").textContent = `Saved locally · revision ${state.project.revision}`;
     if (run.status === "done") { await showRenderedVideo(projectId, runId); toast("Render complete."); return; }
     if (run.status === "failed") { toast(run.error || "Render failed."); return; }
+    if (run.status === "cancelled") { toast("Render stopped. Resume it from Renders."); return; }
     await new Promise((resolve) => window.setTimeout(resolve, 1000));
   }
   toast("Render is still processing. Open Renders to check its status.");

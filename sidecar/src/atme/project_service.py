@@ -189,7 +189,7 @@ class ProjectService:
                                "set_output_profile", "list_assets", "read_asset",
                                "get_source_timeline", "edit_source_timeline", "remove_source",
                                "get_media_analysis", "get_video_thumbnail", "create_playback_ticket",
-                               "render_project", "get_render_status"],
+                               "render_project", "get_render_status", "stop_render"],
                 "collaboration": {"bounded_revision_requests": True,
                                   "user_request_can_apply_directly": True,
                                   "optional_proposal_review": True},
@@ -366,6 +366,7 @@ class ProjectService:
                     ("project_media_removals", "media_id,project_revision,created_at"),
                     ("project_timeline_dependencies", "kind,artifact_revision,timeline_revision"),
                     ("project_caption_settings", "burn_enabled"),
+                    ("storyboard_compilation_reports", "timeline_revision,report"),
                 )
                 for table, columns in copies:
                     conn.execute(
@@ -374,7 +375,13 @@ class ProjectService:
                         (copy_id, project_id),
                     )
                 self._rebind_duplicated_v2_artifacts(conn, project_id, copy_id)
-                self.timing.copy_current(conn, project_id, copy_id, state["revision"])
+                copied_run = self.timing.copy_current(conn, project_id, copy_id, state["revision"])
+                original_run, new_run = copied_run or (None, None)
+                conn.execute(
+                    "INSERT INTO storyboard_compilations SELECT ?,plan_revision,layout_revision,timeline_revision,"
+                    "CASE WHEN timing_run_id IS NULL THEN NULL ELSE ? END,compiler_version "
+                    "FROM storyboard_compilations WHERE job_id=? AND (timing_run_id IS NULL OR timing_run_id=?)",
+                    (copy_id, new_run, project_id, original_run))
                 conn.commit()
             except Exception as exc:
                 conn.rollback()
@@ -983,6 +990,7 @@ class ProjectService:
                 before_serialized = json.dumps(before, ensure_ascii=False, allow_nan=False)
                 revision = self._write_transaction(conn, project_id, kind, document, serialized, row)
                 conn.execute("DELETE FROM project_edit_events WHERE job_id=? AND undone=1", (project_id,))
+                conn.execute("DELETE FROM project_source_timeline_events WHERE job_id=? AND undone=1", (project_id,))
                 conn.execute("INSERT INTO project_edit_events(job_id,operation,artifact_kind,before_document,"
                              "after_document,applied_revision,created_at) VALUES(?,?,?,?,?,?,?)",
                              (project_id, operation, kind, before_serialized, serialized, revision, time.time()))
@@ -1019,6 +1027,10 @@ class ProjectService:
                     (project_id, undone)).fetchone()
                 if event is None:
                     raise ProjectError("edit_history_empty", "Nothing to redo" if redo else "Nothing to undo")
+                current = self.artifact(project_id, event["artifact_kind"])["document"]
+                expected_document = json.loads(event["before_document"] if redo else event["after_document"])
+                if current != expected_document:
+                    raise ProjectError("revision_conflict", "The artifact has changed since this edit")
                 document = json.loads(event["after_document"] if redo else event["before_document"])
                 serialized = self._serialized_artifact(event["artifact_kind"], document)
                 self._write_transaction(conn, project_id, event["artifact_kind"], document, serialized, row)
@@ -1032,6 +1044,35 @@ class ProjectService:
 
     def undo(self, project_id, expected_revision):
         return self._history_action(project_id, expected_revision, False)
+
+    def _studio_history_entry(self, project_id, redo):
+        order = "ASC" if redo else "DESC"
+        return self.store.conn.execute(
+            "SELECT 'artifact' AS scope,operation,applied_revision AS revision FROM project_edit_events "
+            "WHERE job_id=? AND undone=? UNION ALL "
+            "SELECT 'source',e.operation,v.project_revision FROM project_source_timeline_events e "
+            "JOIN project_source_timeline_versions v ON v.job_id=e.job_id "
+            "AND v.timeline_revision=e.applied_timeline_revision WHERE e.job_id=? AND e.undone=? "
+            f"ORDER BY revision {order} LIMIT 1", (project_id, redo, project_id, redo)).fetchone()
+
+    def studio_history(self, project_id):
+        with self.store._lock:
+            self._row(project_id)
+            undo = self._studio_history_entry(project_id, False)
+            redo = self._studio_history_entry(project_id, True)
+            return {"can_undo": bool(undo), "can_redo": bool(redo),
+                    "undo_label": undo["operation"] if undo else None,
+                    "redo_label": redo["operation"] if redo else None}
+
+    def studio_history_action(self, project_id, expected_revision, redo):
+        with self.store._lock:
+            self._expected(self._row(project_id), expected_revision)
+            entry = self._studio_history_entry(project_id, redo)
+            if entry is None:
+                raise ProjectError("edit_history_empty", "Nothing to redo" if redo else "Nothing to undo")
+            if entry["scope"] == "source":
+                return self.source_timeline.history_action(project_id, expected_revision, redo)
+            return self._history_action(project_id, expected_revision, redo)
 
     def redo(self, project_id, expected_revision):
         return self._history_action(project_id, expected_revision, True)

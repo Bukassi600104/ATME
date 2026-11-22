@@ -173,8 +173,8 @@ class RevisionRequests:
             row = self.service._row(project_id)
             self.service._expected(row, expected_revision)
             request = self.get(project_id, request_id)
-            if request["status"] != "proposed" or request["project_revision"] != expected_revision:
-                raise ProjectError("revision_conflict", "Only a proposal for this project revision can be decided")
+            if request["status"] != "proposed" or accepted and request["project_revision"] != expected_revision:
+                raise ProjectError("revision_conflict", "Accept a pending proposal only on its original project revision")
             revision = None
             if accepted:
                 proposal = request["proposal"]

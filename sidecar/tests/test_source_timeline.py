@@ -57,6 +57,46 @@ def test_source_cleanup_is_immutable_undoable_and_authoritative(tmp_path):
     core.store.close()
 
 
+def test_studio_history_preserves_narration_when_undoing_an_artifact_edit(tmp_path):
+    from copy import deepcopy
+    from test_external_inputs import external_payload
+    db = tmp_path / "editor.db"
+    core = ProjectService(JobStore(db))
+    try:
+        pid = core.create("Studio history", "LONG_FORM_16_9", "script-first")["project_id"]
+        script = external_payload()["script"]
+        core.write(pid, "script", script, 0)
+        upload = core.attach_wav(pid, silence_wav(), 1)
+        placed = place(core, pid, upload)
+        revised = deepcopy(script)
+        revised["scenes"][0]["spoken_text"] = "Edited scene."
+        edited = core.edit(pid, "edit", "script", revised, placed["project"]["revision"])
+        rev = edited["project"]["revision"]
+        core.store.close()
+        core = ProjectService(JobStore(db))
+        assert core.studio_history(pid)["undo_label"] == "edit"
+        core.studio_history_action(pid, rev, False)
+        assert core.artifact(pid, "script")["document"] == script
+        assert core.source_timeline_state(pid)["document"] == placed["timeline"]["document"]
+        assert core.studio_history(pid)["undo_label"] == "insert"
+        core.studio_history_action(pid, rev + 1, False)
+        core.studio_history_action(pid, rev + 2, True)
+        assert core.studio_history(pid)["redo_label"] == "edit"
+        core.edit_source_timeline(pid, "split", {"clip_id": placed["timeline"]["document"]["clips"][0]["clip_id"],
+            "at_ms": 500}, rev + 3, core.source_timeline_state(pid)["timeline_revision"])
+        assert not core.studio_history(pid)["can_redo"]
+        rev = core.open(pid)["revision"]
+        core.edit(pid, "edit", "script", revised, rev)
+        later = deepcopy(revised)
+        later["scenes"][0]["spoken_text"] = "Newer connected-client edit."
+        core.write(pid, "script", later, rev + 1)
+        with pytest.raises(ProjectError, match="since this edit"):
+            core.studio_history_action(pid, rev + 2, False)
+        assert core.artifact(pid, "script")["document"] == later
+    finally:
+        core.store.close()
+
+
 def test_supporting_import_does_not_replace_placed_recording(tmp_path):
     from atme.project_media import attach_video_file
     core = ProjectService(JobStore(tmp_path / "authority.db"))

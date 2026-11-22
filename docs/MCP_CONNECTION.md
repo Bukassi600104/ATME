@@ -77,6 +77,7 @@ for scripts, semantic transcription, storyboard and layout authorship.
 - atme.validate_project
 - atme.preview_project (bounded PNG from the exact project revision)
 - atme.render_project (explicit, non-blocking queue request)
+- atme.stop_render (gracefully stop one queued or running export and retain its completed v2 segments)
 - atme.get_render_status
 - atme.set_output_profile
 - atme.list_project_assets
@@ -146,6 +147,8 @@ a durable run ID without waiting for encoding; poll `atme.get_render_status`. Re
 completed MP4 through the authenticated local service:
 
     GET /projects/{id}/renders/{run_id}/output
+
+Studio and the connected client can stop a single active export. The worker checks between pipeline stages and during v2 frame encoding. Its status becomes `cancelled` after it releases the encoder. A new render request on the same snapshot reuses its complete verified v2 segments.
 
 The compiler copies exact immutable inputs into a fingerprinted private runtime. No tool
 accepts a source or output filesystem path. A missing or corrupt derived output is rebuilt.

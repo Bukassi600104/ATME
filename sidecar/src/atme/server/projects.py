@@ -109,6 +109,17 @@ def register_projects(app, store, auth):
     def edit_history(project_id: int):
         return call(service.edit_state, project_id)
 
+    @app.get("/projects/{project_id}/studio-history", dependencies=[Depends(auth)])
+    def studio_history(project_id: int):
+        return call(service.studio_history, project_id)
+
+    @app.post("/projects/{project_id}/studio-history/{action}", dependencies=[Depends(auth)])
+    async def studio_history_action(project_id: int, action: str, request: Request):
+        if action not in ("undo", "redo"):
+            raise HTTPException(404, "Unknown editing action")
+        value = await body(request, ("expected_revision",))
+        return call(service.studio_history_action, project_id, value["expected_revision"], action == "redo")
+
     @app.post("/projects/{project_id}/edits", dependencies=[Depends(auth)])
     async def edit(project_id: int, request: Request):
         value = await body(request, ("operation", "artifact_kind", "document", "expected_revision"))
@@ -363,6 +374,10 @@ def register_projects(app, store, auth):
     @app.get("/projects/{project_id}/renders/{run_id}", dependencies=[Depends(auth)])
     def render_status(project_id: int, run_id: str):
         return call(service.render_status, project_id, run_id)
+
+    @app.post("/projects/{project_id}/renders/{run_id}/stop", dependencies=[Depends(auth)])
+    def stop_render(project_id: int, run_id: str):
+        return call(service.runner.stop, project_id, run_id)
 
     @app.post("/projects/{project_id}/renders/{run_id}/playback-ticket", dependencies=[Depends(auth)])
     def render_playback_ticket(project_id: int, run_id: str):

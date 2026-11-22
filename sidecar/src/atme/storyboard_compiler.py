@@ -10,7 +10,7 @@ from atme.render.v2_hierarchy import HierarchySnapshot
 from atme.store.contracts_v2 import ExecutableLayoutV2, HierarchyBasis, VisualPlanV2, _evidence_treatment_for
 
 
-COMPILER_VERSION = 6
+COMPILER_VERSION = 7
 OBJECTS = ("rectangle", "rounded_rectangle", "ellipse", "text", "evidence", "arrow", "network")
 ACTIONS = ("draw", "write", "reveal", "enter", "exit", "highlight", "cross_out",
            "dim", "isolate", "insert_evidence", "return_board", "connect", "disconnect")
@@ -46,6 +46,7 @@ def verify_compilation(plan, layout, clock, assets):
     fps = clock["output_profile"]["fps"]
     checks = []
     samples = {0, *(min(e["end_ms"], duration - 1) for e in actions.values())}
+    encoded_checks = {}
     beats = clock["beat_anchors"]
     for index, beat in enumerate(plan["beats"]):
         start = beats[index]["start_ms"]
@@ -66,7 +67,15 @@ def verify_compilation(plan, layout, clock, assets):
                  "end_ms": stop, "sample_ms": at, "frame_number": frame_number,
                  "preview_at_ms": (frame_number * 1000 + fps - 1) // fps, "action_ids": beat["action_ids"],
                  "covered_instructions": instructions}
+        # Include action transitions so a primary can legitimately exit before the settled frame.
+        encoded = {at, ((start * fps + 999) // 1000) * 1000 // fps}
         for event in events:
+            for boundary in (event["start_ms"], event["end_ms"]):
+                first = (boundary * fps + 999) // 1000
+                for number in (first - 1, first, first + 1):
+                    moment = number * 1000 // fps
+                    if start <= moment < stop:
+                        encoded.add(moment)
             key = event["action"]["action_id"]
             if key in holds:
                 visit = next(v for v in layout["activations"] if v["start_ms"] <= event["start_ms"] < v["end_ms"])
@@ -75,6 +84,8 @@ def verify_compilation(plan, layout, clock, assets):
                     _reject(key, "Evidence leaves its board before the requested reading hold finishes")
                 check["evidence_hold_ms"] = holds[key]
                 check["available_board_hold_ms"] = available
+        for moment in encoded:
+            encoded_checks[moment] = check
         samples.add(at)
         checks.append(check)
     attention = {beat["beat_id"]: beat for beat in plan["beats"]}
@@ -83,6 +94,18 @@ def verify_compilation(plan, layout, clock, assets):
         sampled_beats.setdefault(check["sample_ms"], []).append(check)
 
     def inspect(frame):
+        owner = encoded_checks.get(frame.at_ms)
+        if owner:
+            primary = attention[owner["beat_id"]]["attention"]["primary_targets"]
+            visible = []
+            for key in primary:
+                obj = frame.object(key)
+                if (obj.board_id == frame.active_board_id and obj.visible and
+                        obj.opacity > 0 and obj.reveal_fraction > 0):
+                    visible.append(key)
+            owner.setdefault("primary_targets_seen", set()).update(visible)
+            if frame.at_ms == owner["sample_ms"]:
+                owner["visible_primary_targets"] = visible
         for check in sampled_beats.get(frame.at_ms, []):
             beat = attention[check["beat_id"]]
             if frame.active_board_id != beat["board_id"]:
@@ -94,17 +117,22 @@ def verify_compilation(plan, layout, clock, assets):
             for key in beat["continuity"]["remove"]:
                 if frame.object(key).visible:
                     _reject(beat["beat_id"], f"Object {key} remains visible after its requested removal")
-            check["visible_primary_targets"] = [key for key in beat["attention"]["primary_targets"]
-                                                  if frame.object(key).visible and frame.object(key).opacity > 0]
 
     frames = {}
-    compose = prepare_png_sequence(layout, clock, assets, on_sample=inspect)
+    compose = prepare_png_sequence(layout, clock, assets, on_sample=inspect,
+                                   state_samples=sorted(encoded_checks.keys() - samples))
     for at in sorted(samples):
         png = compose(at).png
         with Image.open(BytesIO(png)) as image:
             extrema = image.convert("RGB").getextrema()
         frames[at] = (hashlib.sha256(png).hexdigest(), any(lo != hi for lo, hi in extrema))
     for check in checks:
+        wanted = attention[check["beat_id"]]["attention"]["primary_targets"]
+        seen = check["primary_targets_seen"]
+        for key in wanted:
+            if key not in seen:
+                _reject(check["beat_id"], f"Requested primary target {key} has no visible frame on this board during its beat")
+        check["primary_targets_seen"] = [key for key in wanted if key in seen]
         checksum, visible_ink = frames[check["sample_ms"]]
         check.update(frame_sha256=checksum, visible_picture_detail=visible_ink)
         if not visible_ink and check.get("evidence_hold_ms"):
@@ -238,8 +266,10 @@ def _schedule(plan, speech, duration, motion):
             trigger = actions[key].trigger
             if trigger.kind == "prior_action" and trigger.action_id in ends:
                 candidates.append(ends[trigger.action_id] + trigger.offset_ms)
+            elif trigger.kind == "beat_start" and trigger.beat_id in starts:
+                candidates.append(starts[trigger.beat_id] + trigger.offset_ms)
         if not candidates and beats:
-            _reject(beat.beat_id, "Give this beat a measured, absolute or previous-action start")
+            _reject(beat.beat_id, "Give this beat a measured, absolute, earlier beat or previous-action start")
         start = min(candidates) if beats else 0
         if not 0 <= start < duration or beats and start < beats[-1]["start_ms"]:
             _reject(beat.beat_id, "Beat starts must follow narration order and fit the recording")
@@ -295,6 +325,10 @@ def _schedule(plan, speech, duration, motion):
             ends[key] = end
             events.append({"action": action.model_dump(mode="json", exclude_unset=True), "start_ms": at,
                            "end_ms": end, "resolved_trigger": resolved})
+    for beat, next_beat in zip(plan.beats, beats[1:]):
+        for key in beat.action_ids:
+            if ends[key] > next_beat["start_ms"]:
+                _reject(key, f"Action extends beyond its owning beat {beat.beat_id}")
     used = {v["activation_id"] for v in visits if v["activation_id"] is not None}
     for index, visit in enumerate(visits):
         if visit["activation_id"] is None:

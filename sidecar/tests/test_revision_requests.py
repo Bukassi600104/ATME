@@ -32,6 +32,8 @@ def test_scoped_script_proposal_preserves_other_scenes_and_cannot_overwrite_a_ne
             projects.decide_revision_proposal(pid, request["request_id"], 2, True)
         assert projects.artifact(pid, "script")["document"] == script
         assert projects.revisions.get(pid, request["request_id"])["status"] == "proposed"
+        assert projects.decide_revision_proposal(pid, request["request_id"], 2, False)["status"] == "rejected"
+        assert projects.open(pid)["revision"] == 2
     finally:
         store.close()
 

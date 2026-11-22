@@ -258,6 +258,9 @@ class ProjectRunner:
                       lambda: self._execute_render(compiled, project_id, expected_revision, run_id), background)
 
     def _execute_render(self, compiled, project_id, expected_revision, run_id):
+        from atme.project_workers import check_render_stop, render_stop_marker
+        check_stop = partial(check_render_stop, render_stop_marker(self.service.store.db_path, project_id, run_id))
+        check_stop()
         snapshot = Path(compiled["runtime_dir"])
         inputs = snapshot / "inputs"
         directory = snapshot / "work"
@@ -273,15 +276,18 @@ class ProjectRunner:
             script = json.loads((directory / "script.json").read_text(encoding="utf-8"))
             layout = json.loads((directory / "layout.json").read_text(encoding="utf-8"))
             audio = pipeline.polish_stage(directory, voice_mode="upload", remove_silence=False)
+            check_stop()
             if compiled.get("visual_contract") == "2.0.0":
                 from atme.project_v2_render import render
 
-                aligned, rendered, audio = render(directory, inputs, compiled, layout, audio)
+                aligned, rendered, audio = render(directory, inputs, compiled, layout, audio, check_stop=check_stop)
             else:
                 aligned = pipeline.align_stage(directory, script, audio, voice_mode="upload",
                                                layout_dict=layout,
                                                semantic_authority=compiled["semantic_role"])
+                check_stop()
                 rendered = pipeline.render_stage(directory, aligned, **profile)
+            check_stop()
             source_video = inputs / "source-video.mp4"
             talking_head_mux = None
             if source_video.is_file() and compiled.get("visual_contract") != "2.0.0":
@@ -294,6 +300,8 @@ class ProjectRunner:
                                "video": {"sha256": manifest["artifacts"]["video"]["sha256"],
                                          "bytes": manifest["artifacts"]["video"]["bytes"]}}
             return public_manifest
+        except ProjectError:
+            raise
         except Exception as exc:
             raise ProjectError("render_failed", "Rendering failed", [{"message": str(exc)[:500]}]) from exc
 
@@ -451,7 +459,24 @@ class ProjectRunner:
                     pass
             if row["error"]:
                 result["error"] = row["error"]
+            if row["status"] in ("queued", "running"):
+                from atme.project_workers import render_stop_marker
+                result["stop_requested"] = render_stop_marker(self.service.store.db_path, project_id, run_id).is_file()
             return result
+
+    def stop(self, project_id, run_id):
+        from atme.project_workers import render_stop_marker
+        state = self.status(project_id, run_id)
+        if state["status"] not in ("queued", "running"):
+            return state
+        store = self.service.store
+        with store._lock, store.conn as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT status FROM project_render_runs WHERE job_id=? AND run_id=?",
+                               (project_id, run_id)).fetchone()
+            if row["status"] in ("queued", "running"):
+                render_stop_marker(store.db_path, project_id, run_id).touch()
+        return self.status(project_id, run_id)
 
     def output_path(self, project_id, run_id):
         status = self.status(project_id, run_id)

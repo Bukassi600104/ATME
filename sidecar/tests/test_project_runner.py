@@ -248,6 +248,39 @@ def test_audio_only_project_compiles_from_recording_authority_without_approval(t
     core.store.close()
 
 
+def test_stop_from_second_client_is_durable_and_resumable(tmp_path, monkeypatch):
+    from atme import pipeline
+    core, project = ready_project(tmp_path)
+    pid, revision = project["project_id"], project["revision"]
+    other = ProjectService(JobStore(core.store.db_path))
+    started, release = Event(), Event()
+    def polish(*args, **kwargs):
+        started.set()
+        assert release.wait(timeout=20)
+        return {}
+    monkeypatch.setattr(pipeline, "polish_stage", polish)
+    try:
+        queued = core.render_project(pid, revision, True)
+        run = queued["run_id"]
+        assert started.wait(timeout=20)
+        assert other.runner.stop(pid, run)["stop_requested"]
+        assert other.runner.stop(pid, run)["stop_requested"]
+        release.set()
+        core.runner._workers[run].join(timeout=20)
+        assert other.render_status(pid, run)["status"] == "cancelled"
+        assert core.open(pid)["revision"] == revision
+        monkeypatch.setattr(core.runner, "_execute_render", lambda *args: {"resumed": True})
+        result = core.runner.render(pid, revision, True)
+        assert result["status"] == "done" and result["run_id"] == run
+        assert other.runner.stop(pid, run)["status"] == "done"
+    finally:
+        release.set()
+        for worker in core.runner._workers.values():
+            worker.join(timeout=20)
+        other.store.close()
+        core.store.close()
+
+
 def test_render_is_manual_durable_and_uses_existing_pipeline(tmp_path, monkeypatch):
     core, state = ready_project(tmp_path)
     pid = state["project_id"]

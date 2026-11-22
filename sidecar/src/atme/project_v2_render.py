@@ -141,7 +141,7 @@ def camera_preview(camera, overlay, frame_number, fps):
     return run.stdout
 
 
-def render(work, inputs, compiled, layout, audio):
+def render(work, inputs, compiled, layout, audio, *, check_stop=None):
     import av
     from atme.pipeline import join_video_segments
     from atme.render.v2_segments import encode_segments
@@ -205,6 +205,8 @@ def render(work, inputs, compiled, layout, audio):
             try:
                 previous_sample, previous_key = None, None
                 for n in range(first, stop):
+                    if check_stop and (n - first) % fps == 0:
+                        check_stop()
                     sample = samples[n]
                     if sample != previous_sample:
                         backdrop = compose(sample).png
@@ -230,6 +232,8 @@ def render(work, inputs, compiled, layout, audio):
 
     directory = work / "v2-segments"
     segments = encode_segments(directory, compiled["fingerprint"], frames, 10 * fps, encode)
+    if check_stop:
+        check_stop()
     try:
         join_video_segments(segments, directory, pending)
         pending.replace(target)

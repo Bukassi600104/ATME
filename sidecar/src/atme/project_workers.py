@@ -22,6 +22,15 @@ def _worker_path(database, kind, project_id, run_id):
     return database.parent / (database.name + ".workers") / kind / str(project_id) / run_id
 
 
+def render_stop_marker(database, project_id, run_id):
+    return _worker_path(database, "render", project_id, run_id).with_suffix(".stop")
+
+
+def check_render_stop(marker):
+    if marker.is_file():
+        raise ProjectError("render_cancelled", "Render stopped. Completed segments are available to resume.")
+
+
 def _lease(database, kind, project_id, run_id):
     path = _worker_path(database, kind, project_id, run_id)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -62,10 +71,12 @@ def mark_interrupted(store, kind, project_id, run_id):
                 return False
             restored = _restore_result(connection, table, document, receipt, (project_id, run_id))
             if not restored:
+                stopped = kind == "render" and render_stop_marker(store.db_path, project_id, run_id).is_file()
                 connection.execute(
-                    f"UPDATE {table} SET status='failed',error=?,updated_at=? "
+                    f"UPDATE {table} SET status=?,error=?,updated_at=? "
                     "WHERE job_id=? AND run_id=? AND status IN ('queued','running')",
-                    ("The worker stopped before completion. Request the operation again to resume.",
+                    ("cancelled" if stopped else "failed",
+                     None if stopped else "The worker stopped before completion. Request the operation again to resume.",
                      time.time(), project_id, run_id))
         if restored:
             receipt.unlink(missing_ok=True)
@@ -117,6 +128,8 @@ def submit(owner, kind, project_id, revision, snapshot, callback, background):
                 lease.close()
                 return owner.status(*keys)
             receipt.unlink(missing_ok=True)
+            if kind == "render":
+                render_stop_marker(store.db_path, project_id, run_id).unlink(missing_ok=True)
             status = "queued" if background else "running"
             now = time.time()
             store.conn.execute(
@@ -144,6 +157,9 @@ def submit(owner, kind, project_id, revision, snapshot, callback, background):
             pending.write_text(payload, encoding="utf-8")
             os.replace(pending, receipt)
         except Exception as exc:
+            if kind == "render" and isinstance(exc, ProjectError) and exc.code == "render_cancelled":
+                persist("cancelled")
+                return
             logging.getLogger(__name__).exception("%s worker failed on project %s", kind, project_id)
             cause = exc.__cause__ if exc.__cause__ is not None else exc
             persist("failed", error=str(cause)[:2000])
