@@ -91,6 +91,9 @@ class ProjectService:
                     project_revision INTEGER NOT NULL, cues TEXT NOT NULL, PRIMARY KEY(job_id,project_revision));
                 CREATE TABLE IF NOT EXISTS project_caption_settings (
                     job_id INTEGER PRIMARY KEY REFERENCES jobs(id), burn_enabled INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS storyboard_compilation_reports (
+                    job_id INTEGER NOT NULL REFERENCES jobs(id), timeline_revision INTEGER NOT NULL,
+                    report TEXT NOT NULL, PRIMARY KEY(job_id,timeline_revision));
                 CREATE TABLE IF NOT EXISTS project_artifact_dependencies (
                     job_id INTEGER NOT NULL,
                     kind TEXT NOT NULL,
@@ -176,7 +179,7 @@ class ProjectService:
                 "artifact_kinds": ["brief", "script", "storyboard", "layout", "resolved_timeline"],
                 "output_profiles": list(PROFILES),
                 "operations": ["create_project", "open_project", "list_projects", "duplicate_project", "archive_project",
-                               "get_schema", "get_visual_compilation_context", "compile_storyboard_speech", "compile_storyboard",
+                               "get_schema", "get_visual_compilation_context", "compile_storyboard_speech", "compile_storyboard", "get_compilation_report",
                                "write_artifact", "get_artifact", "approve_script",
                                "migrate_visual_contracts_v1",
                                "list_media", "get_narrative_source", "validate_project", "preview_project",
@@ -362,6 +365,7 @@ class ProjectService:
                     ("project_source_timeline_state", "current_timeline_revision"),
                     ("project_media_removals", "media_id,project_revision,created_at"),
                     ("project_timeline_dependencies", "kind,artifact_revision,timeline_revision"),
+                    ("project_caption_settings", "burn_enabled"),
                 )
                 for table, columns in copies:
                     conn.execute(
@@ -370,6 +374,7 @@ class ProjectService:
                         (copy_id, project_id),
                     )
                 self._rebind_duplicated_v2_artifacts(conn, project_id, copy_id)
+                self.timing.copy_current(conn, project_id, copy_id, state["revision"])
                 conn.commit()
             except Exception as exc:
                 conn.rollback()
@@ -1264,8 +1269,7 @@ class ProjectService:
     def compile_storyboard(self, project_id, expected_revision, timing_run_id=None):
         """Publish the generated layout and its verified timeline together or neither."""
         from atme.project_v2_render import verified_layout_assets
-        from atme.render.v2_svg import prepare_png_sequence
-        from atme.storyboard_compiler import COMPILER_VERSION, compile_documents
+        from atme.storyboard_compiler import COMPILER_VERSION, compile_documents, verify_compilation
 
         with self.store._lock:
             ctx = self.visual_compilation_context(project_id, expected_revision)
@@ -1278,6 +1282,8 @@ class ProjectService:
             needs_speech = any(a["trigger"]["kind"] in {"word", "phrase"} for a in plan["actions"])
             if needs_speech and timing_run_id is None:
                 timing_run_id, _ = self.timing.current(project_id)
+            if not needs_speech:
+                timing_run_id = None
             if (ctx["resolved_basis"] and self.store.conn.execute(
                     "SELECT 1 FROM storyboard_compilations WHERE job_id=? AND plan_revision=? AND layout_revision=? "
                     "AND timeline_revision=? AND timing_run_id IS ? AND compiler_version=?",
@@ -1296,9 +1302,7 @@ class ProjectService:
         try:
             layout, clock = compile_documents(plan, basis, source, speech, owned)
             assets = verified_layout_assets(self, project_id, clock, layout)
-            compose = prepare_png_sequence(layout, clock, assets)
-            for t in sorted({0, *(min(e["end_ms"], clock["duration_ms"] - 1) for e in clock["actions"])}):
-                compose(t)
+            report = verify_compilation(plan, layout, clock, assets)
             documents = [(kind, doc, self._serialized_artifact(kind, doc))
                          for kind, doc in (("layout", layout), ("resolved_timeline", clock))]
         except ProjectError:
@@ -1316,6 +1320,8 @@ class ProjectService:
                 conn.execute("INSERT OR REPLACE INTO storyboard_compilations VALUES(?,?,?,?,?,?)",
                              (project_id, basis["plan_revision"], expected_revision + 1, expected_revision + 2,
                               timing_run_id, COMPILER_VERSION))
+                conn.execute("INSERT INTO storyboard_compilation_reports VALUES(?,?,?)",
+                             (project_id, expected_revision + 2, json.dumps(report)))
                 conn.commit()
             except ProjectError:
                 conn.rollback()
@@ -1327,6 +1333,25 @@ class ProjectService:
                 conn.rollback()
                 raise
             return self.open(project_id)
+
+    def compilation_report(self, project_id, expected_revision):
+        with self.store._lock:
+            self._expected(self._row(project_id), expected_revision)
+            active = self.visual_compilation_context(project_id, expected_revision)
+            if active["resolved_basis"]:
+                layout = self.artifact(project_id, "layout")
+                try:
+                    clock = self.artifact(project_id, "resolved_timeline")
+                except ProjectError as exc:
+                    if exc.code != "not_found":
+                        raise
+                else:
+                    if clock["document"]["layout_revision"] == layout["revision"] and not clock.get("stale"):
+                        row = self.store.conn.execute("SELECT report FROM storyboard_compilation_reports "
+                            "WHERE job_id=? AND timeline_revision=?", (project_id, clock["revision"])).fetchone()
+                        if row:
+                            return {**json.loads(row["report"]), "timeline_revision": clock["revision"]}
+            return {"status":"unavailable", "beats":[]}
 
     def set_profile(self, project_id, profile, expected_revision):
         if profile not in PROFILES:
@@ -1371,7 +1396,14 @@ class ProjectService:
             track = {"project_revision": expected_revision, "timing_run_id": None, "cues": [],
                      "burn_enabled": self.caption_burn_enabled(project_id)}
             try:
-                run_id, measured = self.timing.current(project_id)
+                prior = self.store.conn.execute("SELECT timing_run_id FROM project_caption_edits WHERE job_id=? "
+                                                "ORDER BY project_revision DESC LIMIT 1", (project_id,)).fetchone()
+                try:
+                    run_id, measured = self.timing.current(project_id, prior["timing_run_id"] if prior else None)
+                except ProjectError as exc:
+                    if not prior or exc.code not in ("stale_timing", "not_found", "timing_not_ready"):
+                        raise
+                    run_id, measured = self.timing.current(project_id)
                 track["timing_run_id"] = run_id
                 row = self.store.conn.execute(
                     "SELECT cues FROM project_caption_edits WHERE job_id=? AND timing_run_id=? "

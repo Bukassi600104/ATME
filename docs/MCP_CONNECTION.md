@@ -62,6 +62,7 @@ for scripts, semantic transcription, storyboard and layout authorship.
 - atme.get_visual_compilation_context (read-only v2 production basis and draft fingerprint)
 - atme.compile_storyboard_speech (inspect exact cue matches and repair points)
 - atme.compile_storyboard (compile and save a supported semantic storyboard)
+- atme.get_compilation_report (read beat coverage, evidence holds and sampled frame hashes)
 - atme.write_artifact
 - atme.approve_script (only after explicit user approval of that exact revision)
 - atme.list_source_media

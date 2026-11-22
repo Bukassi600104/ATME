@@ -16,6 +16,7 @@ interface ScriptScene { scene_id: number; phase: string; spoken_text: string; vi
 interface ScriptDoc { topic?: string; title?: string; scenes: ScriptScene[] }
 interface StoryboardDoc { contract_version?: string; beats: Array<{ beat_id: string; narration?: string; narration_summary?: string; purpose?: string; visual_purpose?: string }> }
 interface CaptionCue {cue_id: string; start_ms: number; end_ms: number; text: string}
+interface CompiledBeat {beat_id:string; sample_ms:number; covered_instructions:string[]; evidence_hold_ms?:number}
 interface CaptionTrack {status: "ready" | "needs_timing" | "needs_review"; timing_run_id: string | null; cues: CaptionCue[]; burn_enabled: boolean; message?: string}
 interface LayoutElement { id: string; scene_id: number; board_id: string; appear_at_ms: number; kind?: string; layer?: number; visibility_intervals?: Array<{ start_ms: number; end_ms: number }> }
 interface BoardActivation { activation_id: string; board_id: string; start_ms: number; end_ms: number }
@@ -1197,6 +1198,7 @@ function showStoryboard(): void {
   const wrap = document.createElement("div"); const activations = boardActivations(state.layout);
   const beats = state.storyboard?.beats || [];
   const project = state.project;
+  const beatCards = new Map<string, HTMLElement>();
   if (!beats.length && !activations.length) wrap.innerHTML = "<div class='workspace-card'><h3>No storyboard yet</h3><p>Your connected AI can add the storyboard through MCP.</p></div>";
   if (project && state.storyboard?.contract_version === "2.0.0") {
     const compile = document.createElement("button"); compile.className = "small-primary"; compile.textContent = "Compile storyboard";
@@ -1221,10 +1223,22 @@ function showStoryboard(): void {
     const card = document.createElement("article"); card.className = "workspace-card";
     const title = document.createElement("strong"); title.textContent = beat.beat_id;
     const description = document.createElement("p"); description.textContent = beat.narration_summary || beat.narration || "";
-    card.append(title, description); wrap.append(card);
+    card.append(title, description); wrap.append(card); beatCards.set(beat.beat_id, card);
   }
   for (const item of activations) { const card = document.createElement("button"); card.className = "workspace-card project-row"; const label = document.createElement("strong"); label.textContent = item.board_id; const meta = document.createElement("small"); meta.textContent = `${formatTime(item.start_ms)} – ${formatTime(item.end_ms)}`; card.append(label, meta); card.onclick = () => { state.playheadMs = item.start_ms; state.selected = { kind: "illustration", id: item.activation_id, label: item.board_id, startMs: item.start_ms, endMs: item.end_ms }; $<HTMLDialogElement>("workspace-dialog").close(); updatePlayhead(); renderInspector(); void refreshPreview(); }; wrap.append(card); }
   showDialog("Storyboard", state.project?.title || "Current project", wrap);
+  if (project?.artifacts.resolved_timeline && state.storyboard?.contract_version === "2.0.0") {
+    void api<{status:string; beats:CompiledBeat[]}>(`/projects/${project.project_id}/compilation-report?expected_revision=${project.revision}`)
+      .then(report => {
+        if (state.project !== project || !wrap.isConnected || report.status !== "verified") return;
+        for (const beat of report.beats) {
+          const detail = document.createElement("small");
+          const parts = [`Frame checked at ${formatTime(beat.sample_ms)}`, `${beat.covered_instructions.length} covered instructions`];
+          if (beat.evidence_hold_ms) parts.push(`${(beat.evidence_hold_ms / 1000).toFixed(1)} s evidence hold`);
+          detail.textContent = parts.join(" · "); beatCards.get(beat.beat_id)?.append(detail);
+        }
+      }).catch(error => { if (state.project === project && wrap.isConnected) toast(error.message); });
+  }
 }
 
 async function showRenders(): Promise<void> {

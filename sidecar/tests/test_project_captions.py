@@ -36,10 +36,16 @@ def test_captions_reuse_current_measurement_and_keep_edits_separate(tmp_path, mo
         saved = service.save_captions(pid, revision, run_id, edited)
         assert saved["project_revision"] == revision + 1
         assert service.caption_track(pid, revision + 1)["cues"] == edited
+        clone = service.duplicate(pid)
+        clone_track = service.caption_track(clone["project_id"], clone["revision"])
+        assert clone_track["cues"] == edited and clone_track["timing_run_id"] != run_id
         assert "00:00:01.125 --> " in service.subtitle_file(pid, revision + 1, "vtt")
         assert "00:00:01,125 --> " in service.subtitle_file(pid, revision + 1, "srt")
         assert service.open(pid)["approved_script_revision"] == 1
         assert service.save_captions(pid, revision + 1, run_id, edited)["project_revision"] == revision + 1
+        remeasured = service.timing.prepare(pid, revision + 1)
+        assert remeasured["run_id"] != run_id
+        assert service.caption_track(pid, revision + 1)["cues"] == edited
         with pytest.raises(ProjectError, match="overlap"):
             service.save_captions(pid, revision + 1, run_id, [first, {**second, "start_ms": 101}])
         current = service.source_timeline.get(pid)

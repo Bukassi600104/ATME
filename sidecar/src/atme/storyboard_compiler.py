@@ -1,28 +1,118 @@
 """Deterministic placement and scheduling for stored semantic storyboards."""
+import hashlib
+from io import BytesIO
 from math import ceil
 
-from PIL import ImageFont
+from PIL import Image, ImageFont
 from atme.project_service import ProjectError, _resolved_compilation_fingerprint, _visual_digest
 from atme.render.style_bundle import load_bundle
 from atme.render.v2_hierarchy import HierarchySnapshot
 from atme.store.contracts_v2 import ExecutableLayoutV2, HierarchyBasis, VisualPlanV2, _evidence_treatment_for
 
 
-COMPILER_VERSION = 4
-OBJECTS = ("rectangle", "rounded_rectangle", "ellipse", "text", "evidence")
+COMPILER_VERSION = 6
+OBJECTS = ("rectangle", "rounded_rectangle", "ellipse", "text", "evidence", "arrow", "network")
 ACTIONS = ("draw", "write", "reveal", "enter", "exit", "highlight", "cross_out",
-           "dim", "isolate", "insert_evidence", "return_board")
+           "dim", "isolate", "insert_evidence", "return_board", "connect", "disconnect")
 
 
 def capabilities():
     return {"object_types": list(OBJECTS), "actions": list(ACTIONS),
             "triggers": ["absolute", "word", "phrase", "beat_start", "prior_action"],
+            "connector_anchors": ["left", "right", "top", "bottom", "center", "in", "out"],
+            "connector_roles": ["semantic_connector"], "connector_routing": ["straight", "elbow", "curve"],
+            "action_requirements": {"write": "text", "draw": "mark_or_arrow",
+                "endpoint_edits": "disconnect_before_changing_a_connected_endpoint",
+                "connect": "disconnected_named_relationship", "disconnect": "connected_named_relationship",
+                "insert_evidence": "owned_png_with_source_and_read_hold", "return_board": "prior_visit_and_state_receipt",
+                "highlight": "untouched_visible_mark_or_text", "cross_out": "untouched_visible_mark_or_text",
+                "dim": "untouched_visible_context"},
             "restrictions": ["plain_leaf_objects", "exact_measured_speech", "verified_project_evidence",
                              "renderer_target_and_state_rules_apply"]}
 
 
 def _reject(owner, message):
     raise ProjectError("storyboard_needs_repair", message, [{"id": owner, "message": message}])
+
+
+def verify_compilation(plan, layout, clock, assets):
+    """Record a decoded picture and measured execution facts for each saved beat."""
+    from atme.render.v2_svg import prepare_png_sequence
+
+    actions = {e["action"]["action_id"]: e for e in clock["actions"]}
+    coverage = {entry["coverage_id"]: entry for entry in clock["coverage"]}
+    holds = {item["action_id"]: item["intent"]["readable_hold_intent_ms"] for item in clock["evidence_treatments"]}
+    duration = clock["duration_ms"]
+    fps = clock["output_profile"]["fps"]
+    checks = []
+    samples = {0, *(min(e["end_ms"], duration - 1) for e in actions.values())}
+    beats = clock["beat_anchors"]
+    for index, beat in enumerate(plan["beats"]):
+        start = beats[index]["start_ms"]
+        stop = beats[index + 1]["start_ms"] if index + 1 < len(beats) else duration
+        events = [actions[key] for key in beat["action_ids"]]
+        settled = max((e["end_ms"] for e in events), default=start)
+        frame_number = min((stop * fps + 999) // 1000 - 1, (settled * fps + 999) // 1000)
+        at = frame_number * 1000 // fps
+        if at < start:
+            _reject(beat["beat_id"], "This beat has no encoded picture before the next beat")
+        instructions = []
+        for key in beat["coverage_ids"]:
+            entry = coverage[key]
+            if entry["status"] != "executed" or not entry["action_ids"] or any(k not in actions for k in entry["action_ids"]):
+                _reject(entry["instruction_id"], "This instruction needs an executable action before export")
+            instructions.append(entry["instruction_id"])
+        check = {"beat_id": beat["beat_id"], "board_id": beat["board_id"], "start_ms": start,
+                 "end_ms": stop, "sample_ms": at, "frame_number": frame_number,
+                 "preview_at_ms": (frame_number * 1000 + fps - 1) // fps, "action_ids": beat["action_ids"],
+                 "covered_instructions": instructions}
+        for event in events:
+            key = event["action"]["action_id"]
+            if key in holds:
+                visit = next(v for v in layout["activations"] if v["start_ms"] <= event["start_ms"] < v["end_ms"])
+                available = visit["end_ms"] - event["end_ms"]
+                if available < holds[key]:
+                    _reject(key, "Evidence leaves its board before the requested reading hold finishes")
+                check["evidence_hold_ms"] = holds[key]
+                check["available_board_hold_ms"] = available
+        samples.add(at)
+        checks.append(check)
+    attention = {beat["beat_id"]: beat for beat in plan["beats"]}
+    sampled_beats = {}
+    for check in checks:
+        sampled_beats.setdefault(check["sample_ms"], []).append(check)
+
+    def inspect(frame):
+        for check in sampled_beats.get(frame.at_ms, []):
+            beat = attention[check["beat_id"]]
+            if frame.active_board_id != beat["board_id"]:
+                _reject(beat["beat_id"], "The requested board is absent at the sampled beat")
+            for key in beat["attention"]["dimmed_targets"]:
+                obj = frame.object(key)
+                if not obj.visible or not 0 < obj.opacity < 1:
+                    _reject(beat["beat_id"], f"Add a supported dim action for the requested context {key}")
+            for key in beat["continuity"]["remove"]:
+                if frame.object(key).visible:
+                    _reject(beat["beat_id"], f"Object {key} remains visible after its requested removal")
+            check["visible_primary_targets"] = [key for key in beat["attention"]["primary_targets"]
+                                                  if frame.object(key).visible and frame.object(key).opacity > 0]
+
+    frames = {}
+    compose = prepare_png_sequence(layout, clock, assets, on_sample=inspect)
+    for at in sorted(samples):
+        png = compose(at).png
+        with Image.open(BytesIO(png)) as image:
+            extrema = image.convert("RGB").getextrema()
+        frames[at] = (hashlib.sha256(png).hexdigest(), any(lo != hi for lo, hi in extrema))
+    for check in checks:
+        checksum, visible_ink = frames[check["sample_ms"]]
+        check.update(frame_sha256=checksum, visible_picture_detail=visible_ink)
+        if not visible_ink and check.get("evidence_hold_ms"):
+            _reject(check["beat_id"], "The sampled evidence frame has no visible picture detail")
+    return {"status": "verified", "compiler_version": COMPILER_VERSION, "plan_revision": clock["plan_revision"],
+            "layout_revision": clock["layout_revision"], "profile": clock["output_profile"]["profile_id"],
+            "sampled_frames": len(frames), "picture_source": "compiled_artwork_on_paper",
+            "beats": checks, "editorial_review": "unrated"}
 
 
 def _fit_heading(obj, cell, font, role, scale):
@@ -77,30 +167,53 @@ def _placements(plan, style, root):
                     evidence.setdefault(actions[key].target_object_id, []).append(beat.evidence)
     placed = []
     for board in plan.boards:
-        count = len(board.object_ids)
-        if not count:
+        if not board.object_ids:
             continue
-        if count > min(board.density_limit, aspect.density.max_context_objects):
+        if len(board.object_ids) > min(board.density_limit, aspect.density.max_context_objects):
             _reject(board.board_id, "Reduce visible objects or split this board into two visits")
+        connectors = [key for key in board.object_ids if objects[key].object_type in {"arrow", "network"}]
+        nodes = [key for key in board.object_ids if key not in connectors]
+        count = len(nodes)
+        if not count:
+            _reject(board.board_id, "A relationship board requires placed endpoints")
+        anchor_points = {"left": (0, .5), "right": (1, .5), "top": (.5, 0), "bottom": (.5, 1),
+                         "center": (.5, .5), "in": (0, .5) if landscape else (.5, 0),
+                         "out": (1, .5) if landscape else (.5, 1)}
+        anchors = {key: {} for key in nodes}
+        for edge in connectors:
+            binding = objects[edge].connector_binding
+            if not binding or binding.role != "semantic_connector":
+                _reject(edge, "Supply a semantic connector with two named endpoints")
+            for node, name in [(binding.source_object_id, binding.source_anchor_id),
+                               (binding.destination_object_id, binding.destination_anchor_id)]:
+                if node not in anchors or name not in anchor_points:
+                    _reject(edge, f"Unsupported connector endpoint {node} at anchor {name}")
+                ax, ay = anchor_points[name]
+                anchors[node][name] = {"anchor_id": name, "point": {"x": ax, "y": ay}}
         columns = min(count, 2) if landscape else 1
         rows = ceil(count / columns)
         w, h = (usable_w - gap * (columns - 1)) // columns, (usable_h - gap * (rows - 1)) // rows
-        for index, key in enumerate(board.object_ids):
+        for index, key in enumerate([*nodes, *connectors]):
             obj = objects[key]
-            if obj.object_type not in OBJECTS or obj.initial_state not in {"hidden", "visible"}:
+            states = {"hidden", "visible", "connected", "disconnected"} if key in connectors else {"hidden", "visible"}
+            if obj.object_type not in OBJECTS or obj.initial_state not in states:
                 _reject(key, f"Automatic placement does not support {obj.object_type} in state {obj.initial_state}")
             if obj.object_type != "evidence" and obj.asset_id:
                 _reject(key, "This asset needs a supported asset placement")
-            cell = {"x": x + index % columns * (w + gap), "y": y + index // columns * (h + gap),
-                    "width": w, "height": h}
+            cell = ({"x": x, "y": y, "width": usable_w, "height": usable_h} if key in connectors else
+                    {"x": x + index % columns * (w + gap), "y": y + index // columns * (h + gap),
+                     "width": w, "height": h})
             item = obj.model_dump(mode="json", exclude_none=True)
-            item.update(z_index=index, visible=obj.initial_state == "visible", opacity=1,
-                        transform={"position": {"x": 0, "y": 0}}, anchors=[],
+            item.update(z_index=index, visible=obj.initial_state in {"visible", "connected"}, opacity=1,
+                        transform={"position": {"x": 0, "y": 0}}, anchors=list(anchors.get(key, {}).values()),
                         geometry={"bounds": cell, "points": [], "corner_radius":
                                   round(style.strokes.corner_radius_px * scale) if obj.object_type in
                                   {"rounded_rectangle", "evidence"} else None},
                         style={"stroke": "ink.primary", "fill": "surface.raised"})
-            if obj.object_type == "text":
+            if key in connectors:
+                item.update(item.pop("connector_binding"))
+                item["style"] = {"stroke": "ink.accent"}
+            elif obj.object_type == "text":
                 text, inset, bounds = _fit_heading(obj, cell, font, role, scale)
                 item["geometry"]["bounds"] = bounds
                 item.update(text=text, text_inset_px=inset, items=[], style={"text": "text.heading"})
@@ -208,6 +321,12 @@ def compile_documents(plan_document, basis, source, speech, owned):
     for beat in plan.beats:
         if beat.camera_intent.mode not in {"cut", "hold"} or beat.sound_intent.role not in {"none", "purposeful_silence"}:
             _reject(beat.beat_id, "This camera move or soundtrack requires an executable treatment")
+        if beat.continuity.replacements:
+            _reject(beat.beat_id, "The requested replacements need explicit executable object transitions")
+        board = next(board for board in plan.boards if board.board_id == beat.board_id)
+        if (beat.camera_intent.framing in {"close", "detail", "medium"}
+                and set(board.object_ids) != set(beat.camera_intent.target_ids)):
+            _reject(beat.beat_id, "Use a dedicated board for this camera framing or supply an executable camera move")
         if beat.evidence:
             action = next(actions[key] for key in beat.action_ids if actions[key].verb == "insert_evidence")
             asset = assets[beat.evidence.evidence_asset_id]
@@ -245,6 +364,13 @@ def compile_documents(plan_document, basis, source, speech, owned):
                                                   "destination_activation_id": action["destination_activation_id"],
                                                   "hierarchy_basis": retained.model_dump(mode="json"),
                                                   "hierarchy_basis_sha256": retained.checksum()}
+    scheduled = {event["action"]["action_id"] for event in events}
+    for entry in plan.coverage:
+        if entry.status != "executed" or not set(entry.action_ids).issubset(scheduled):
+            _reject(entry.instruction_id, "The declared instruction has incomplete scheduled coverage")
+    for fallback in plan.fallbacks:
+        if fallback.production_blocking and fallback.status in {"selected", "rejected"}:
+            _reject(fallback.fallback_id, "Resolve the selected production-blocking fallback before compilation")
     clock = {**basis, "project_revision": basis["project_revision"] + 1, "contract_version": "2.0.0",
              "timeline_id": f"timeline-{plan.plan_id}", "layout_id": layout["layout_id"],
              "layout_revision": basis["project_revision"] + 1, "layout_sha256": _visual_digest(layout),

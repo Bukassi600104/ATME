@@ -161,6 +161,11 @@ def create_mcp(service: ProjectService, activity: McpActivity | None = None):
         return invoke(service.compile_storyboard, project_id, expected_revision, timing_run_id,
                       tool="atme.compile_storyboard", project_id=project_id)
 
+    @server.tool(name="atme.get_compilation_report", annotations=read)
+    def get_compilation_report(project_id: Id, expected_revision: Revision) -> CallToolResult:
+        """Read saved beat coverage, evidence holds and frame checksums of the current compilation."""
+        return invoke(service.compilation_report, project_id, expected_revision, tool="atme.get_compilation_report", project_id=project_id)
+
     @server.tool(name="atme.get_caption_track", annotations=read)
     def get_caption_track(project_id: Id, expected_revision: Revision) -> CallToolResult:
         """Read measured, editable closed captions on the final audio timebase."""

@@ -195,6 +195,29 @@ class ProjectTiming:
                 raise ProjectError("stale_timing", "Measure timing for the current recording, script and edited timeline")
             raise ProjectError("timing_not_ready", "Measure the current recording and approved narrative before using speech cues")
 
+    def copy_current(self, conn, source_id, destination_id, revision):
+        """Preserve a copy's measured timing and editorial captions on its own project ID."""
+        if not conn.execute("SELECT 1 FROM project_timing_runs WHERE job_id=? AND status='done' LIMIT 1",
+                            (source_id,)).fetchone():
+            return
+        track = self.service.caption_track(source_id, revision)
+        if track["timing_run_id"] is None:
+            return
+        original = self.status(source_id, track["timing_run_id"])
+        measured = original["timing"]
+        basis = {"project_id": destination_id, "derived_from_project": source_id,
+                 "measured_source_fingerprint": measured["source_fingerprint"]}
+        fingerprint = hashlib.sha256(json.dumps(basis, sort_keys=True).encode()).hexdigest()
+        run_id = fingerprint[:24]
+        copied = {**measured, "project_id": destination_id, "source_fingerprint": fingerprint,
+                  "timing_derivation": {"project_id": source_id, "run_id": original["run_id"],
+                                        "source_fingerprint": measured["source_fingerprint"]}}
+        now = time.time()
+        conn.execute("INSERT INTO project_timing_runs VALUES(?,?,?,?,?,?,?,?,?)", (destination_id, run_id,
+                     original["project_revision"], fingerprint, "done", json.dumps(copied), None, now, now))
+        conn.execute("INSERT INTO project_caption_edits SELECT ?,?,project_revision,cues FROM project_caption_edits "
+                     "WHERE job_id=? AND timing_run_id=?", (destination_id, run_id, source_id, original["run_id"]))
+
     def status(self, project_id, run_id):
         if not isinstance(run_id, str) or len(run_id) != 24 or any(c not in "0123456789abcdef" for c in run_id):
             raise ProjectError("invalid_request", "run_id must be a 24-character hexadecimal ID")

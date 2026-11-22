@@ -311,6 +311,10 @@ def register_projects(app, store, auth):
         value = await body(request, ("expected_revision",))
         return await run_in_threadpool(call, service.compile_storyboard, project_id, value["expected_revision"])
 
+    @app.get("/projects/{project_id}/compilation-report", dependencies=[Depends(auth)])
+    def compilation_report(project_id: int, expected_revision: int):
+        return call(service.compilation_report, project_id, expected_revision)
+
     @app.get("/projects/{project_id}/captions", dependencies=[Depends(auth)])
     def caption_track(project_id: int, expected_revision: int):
         return call(service.caption_track, project_id, expected_revision)

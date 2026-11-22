@@ -100,9 +100,9 @@ def picture_samples(layout, timeline, frames, fps):
     """Reuse the first encoded sample of a hold for time-independent board artwork."""
     from bisect import bisect_right
 
-    static_objects = {"rectangle", "rounded_rectangle", "ellipse", "text", "evidence"}
+    static_objects = {"rectangle", "rounded_rectangle", "ellipse", "text", "evidence", "arrow", "network"}
     bounded_actions = {"draw", "write", "reveal", "enter", "exit", "highlight", "cross_out",
-                       "dim", "isolate", "insert_evidence", "return_board"}
+                       "dim", "isolate", "insert_evidence", "return_board", "connect", "disconnect"}
     if (any(obj["object_type"] not in static_objects for obj in layout["objects"])
             or any(event["action"]["verb"] not in bounded_actions for event in timeline["actions"])):
         yield from (frame_time_ms(n, fps) for n in range(frames))

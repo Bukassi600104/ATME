@@ -78,6 +78,14 @@ def test_compile_evidence_and_return_to_the_same_queue(tmp_path):
         assert label["geometry"]["bounds"]["width"] < 260 and label["geometry"]["bounds"]["height"] < 110
         assert label.get("text_inset_px", 0) >= 16
         assert clock["actions"][2]["return_hierarchy_receipt"]["destination_activation_id"] == "activation-return"
+        report = service.compilation_report(pid, result["revision"])
+        assert report["status"] == "verified" and report["timeline_revision"] == result["artifacts"]["resolved_timeline"]
+        assert [beat["board_id"] for beat in report["beats"]] == ["board-main", "measurements", "board-main"]
+        assert report["beats"][1]["evidence_hold_ms"] >= 2200
+        assert all(len(beat["frame_sha256"]) == 64 and beat["covered_instructions"] for beat in report["beats"])
+        from hashlib import sha256
+        sampled = report["beats"][1]
+        assert sha256(service.preview_project(pid, result["revision"], sampled["preview_at_ms"])["png"]).hexdigest() == sampled["frame_sha256"]
         from atme.render.v2_state import evaluate_frame
         assert evaluate_frame(layout, clock, 7500).object("object-label").state == "highlighted"
         assert evaluate_frame(layout, clock, 1050).object("object-label").state == "visible"
@@ -95,6 +103,8 @@ def test_compile_semantic_plan_into_paired_project_artifacts(tmp_path):
         plan["project_revision"] = state["revision"]
         for action, at in zip(plan["actions"], (0, 700, 2000), strict=True):
             action["trigger"] = {"kind": "absolute", "at_ms": at}
+        plan["beats"][1]["attention"]["dimmed_targets"] = []
+        plan["beats"][1]["camera_intent"]["framing"] = "wide"
         state = service.write(pid, "storyboard", plan, state["revision"])
         rev = state["revision"]
         result = service.compile_storyboard(pid, rev)
@@ -107,6 +117,7 @@ def test_compile_semantic_plan_into_paired_project_artifacts(tmp_path):
         assert len({service.preview_project(pid, result["revision"], t)["png"] for t in (0, 1600, 6000)}) == 3
         assert service.validate_project(pid)["ready"]
         assert service.compile_storyboard(pid, result["revision"])["revision"] == result["revision"]
+        assert service.compile_storyboard(pid, result["revision"], "0" * 24)["revision"] == result["revision"]
         caps = service.capabilities()["storyboard_compiler"]
         assert "return_board" in caps["actions"] and "evidence" in caps["object_types"]
         original = deepcopy(layout["document"])
@@ -118,6 +129,13 @@ def test_compile_semantic_plan_into_paired_project_artifacts(tmp_path):
         assert "action-3" in str(caught.value.detail())
         assert service.open(pid)["revision"] == state["revision"]
         assert service.artifact(pid, "layout")["document"] == original
+        plan["project_revision"] = state["revision"]
+        plan["actions"][-1]["trigger"]["at_ms"] = 2000
+        plan["beats"][1]["attention"]["dimmed_targets"] = ["object-label"]
+        state = service.write(pid, "storyboard", plan, state["revision"])
+        with pytest.raises(ProjectError, match="dim") as missed:
+            service.compile_storyboard(pid, state["revision"])
+        assert "beat-002" in str(missed.value.detail())
     finally:
         service.store.close()
 
@@ -132,3 +150,41 @@ def test_encoder_reuses_only_unchanged_board_pictures():
     assert samples == [0, 0, 200, 300, 400, 500, 600, 600, 600, 600]
     layout["objects"].append({"object_type": "video"})
     assert list(picture_samples(layout, clock, 10, 10)) == list(range(0, 1000, 100))
+
+
+def test_compiler_connects_two_named_nodes_without_consuming_a_layout_cell(tmp_path):
+    service, state, plan, _, _ = stored_v2_basis(tmp_path, real_evidence=True)
+    pid = state["project_id"]
+    try:
+        plan["project_revision"] = state["revision"]
+        for action, at in zip(plan["actions"], (0, 700, 4200), strict=True):
+            action["trigger"] = {"kind":"absolute","at_ms":at}
+        plan["beats"][1]["attention"]["dimmed_targets"] = []
+        plan["beats"][1]["camera_intent"]["framing"] = "wide"
+        opening = plan["beats"][0]
+        node = plan["objects"][0]
+        binding = {"source_object_id":node["object_id"],"source_anchor_id":"out",
+                   "destination_object_id":"object-label","destination_anchor_id":"in",
+                   "role":"semantic_connector","routing":"straight","allow_self_loop":False}
+        link = {**node, "object_id":"flow-link", "object_type":"arrow", "connector_binding":binding,
+                "initial_state":"disconnected"}
+        plan["objects"].append(link)
+        plan["boards"][0]["object_ids"].append("flow-link")
+        opening["object_ids"].append("flow-link")
+        action = {k:v for k,v in plan["actions"][0].items() if k not in ("target_ids","annotation")}
+        action.update(action_id="connect-flow", verb="connect", expected_state="disconnected", post_state="connected", connector_id="flow-link",
+                      trigger={"kind":"absolute","at_ms":1900},
+                      **{key:binding[key] for key in ("source_object_id","source_anchor_id","destination_object_id","destination_anchor_id")})
+        plan["actions"].insert(2, action)
+        opening["action_ids"].append("connect-flow")
+        plan["coverage"][0]["action_ids"].append("connect-flow")
+        plan["fallbacks"][0]["affected_ids"].append("connect-flow")
+        state = service.write(pid,"storyboard",plan,state["revision"])
+        state = service.compile_storyboard(pid,state["revision"])
+        layout = service.artifact(pid,"layout")["document"]
+        source, dest = [next(o for o in layout["objects"] if o["object_id"] == key) for key in ("object-system","object-label")]
+        assert source["anchors"] == [{"anchor_id":"out","point":{"x":1,"y":.5}}]
+        assert dest["anchors"] == [{"anchor_id":"in","point":{"x":0,"y":.5}}]
+        assert service.preview_project(pid,state["revision"],1800)["png"] != service.preview_project(pid,state["revision"],2800)["png"]
+    finally:
+        service.store.close()
