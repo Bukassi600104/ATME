@@ -23,6 +23,8 @@ Studio Undo and Redo now follow the original project edit order across source-ti
 
 A 606-second recording-led recovery workload exposed a mastering defect after long digital silence. The noise estimator returned nonfinite samples. Subsequent processing produced a near-full-scale constant signal where there should have been silence and later speech. Mastering now keeps the original PCM sample wherever the estimator fails. A new mastering version in the render fingerprint keeps earlier exports available and prevents a corrected render from returning an old movie.
 
+The corrected workload completed all 18,180 frames at 1280×720 after a stop at frame 300 and a resume on the same run. The first verified segment was reused. Three decoded pictures, including the return at 592.1 seconds, agreed with preview within 2.541 intensity units out of 255. Decoded AAC contained silence at 100 and 500 seconds and speech at 1, 301 and 591 seconds. Export and recovery took 438.52 seconds on the shared development workstation. Peak memory was unmeasured. This sparse workload establishes duration, recovery and audio continuity. Production-density performance and editorial approval of a complete film remain open.
+
 ## What is established
 
 | Area | Evidence and limits |
@@ -63,3 +65,17 @@ The speech result includes word indices, timing and plan identifiers, and lists 
 Use the completed queue case as regression evidence. Extend the compiler with a new semantic case for each uncovered object or action family. Verify each case from authored intent through rendered output and record the precise combinations supported.
 
 Create an original, rights-cleared reference production for editorial acceptance and a clean Windows build from declared dependencies. Preserve the existing engine, user projects, renderer, artwork and regression fixtures. Carry forward a completed case until an input, dependency or implementation it covers changes.
+
+## Windows live-test candidate
+
+The unsigned Windows x64 candidate uses [source checkpoint f482a1b](https://github.com/Bukassi600104/ATME/commit/f482a1b316c08ccc9617f4756b6c2ff8dc49fc06). Its installer is 172,974,436 bytes with SHA-256 `c5fec7cf7cac6b5cfa8b330a687c2ff2e9b2053ba05110db802c64f0c5475fe8`. Extraction verified all 686 sidecar and runtime files, the installed Studio executable, its NSIS marker, the JavaScript bundle and the installer helper. The desktop source is identical to the reviewed build at `9775667`. An intermediate bundle encountered a shared output-file lock. The verified installer was assembled in its own output directory.
+
+The frozen engine measured real speech offline, exported H.264 and AAC in both profiles, and reopened the projects after restart. A presenter-footage export delivered 179 video frames and all independently encoded mastered AAC packets. The engineering backup contains the original measurements, short films, editable test projects and the ten-minute recovery movie. Separate restores of the landscape and portrait projects both reopened with five measured caption cues and rendered previews.
+
+A connected client also used the executable extracted from this installer. It duplicated the narrated relationship project with its captions and compilation report, recompiled the three beats, stopped the render and resumed the same run. All 357 frames completed. The portrait MP4 matched the prior reference movie byte for byte. Three decoded pictures agreed with their previews within 2.323 intensity units.
+
+## Release decisions still needed
+
+The owner selected an existing signing service and a designated Windows test machine. Their references are pending. Once identified, use the service for the executable payloads and installer, record signature verification and exercise installation, upgrade, project reopening and uninstall on that machine. Keep the engineering candidate and its source identities available throughout.
+
+Select the rights-cleared production that will set the editorial acceptance target. Its approved narrative, source evidence and intended aspect ratios determine which visual families and sound treatments the compiler must handle next. The measured queue fixtures will continue to cover regressions in speaking cues, evidence, board returns, captions, connections and recovery.
