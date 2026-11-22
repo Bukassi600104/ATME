@@ -166,6 +166,7 @@ class ProjectRunner:
                      "semantic_role": state["authoritative_narrative_source"]["semantic_structure"]["role"]}
         timing = self.service.source_timeline.get(project_id)
         selection["audio_mux_version"] = 2
+        selection["audio_mastering_version"] = 2
         timeline_document = timing["document"]
         resolved = None
         burn_cues = None

@@ -21,6 +21,8 @@ The branch review found four editing and compilation faults and two project-main
 
 Studio Undo and Redo now follow the original project edit order across source-timeline commands and manual artifact edits, including after reopening. A new command discards abandoned redo entries in both histories. A reviewer can dismiss a proposal after another edit has made it stale. Approved scripts, caption edits and proposed v2 artifact pairs still need their own complete history integration.
 
+A 606-second recording-led recovery workload exposed a mastering defect after long digital silence. The noise estimator returned nonfinite samples. Subsequent processing produced a near-full-scale constant signal where there should have been silence and later speech. Mastering now keeps the original PCM sample wherever the estimator fails. A new mastering version in the render fingerprint keeps earlier exports available and prevents a corrected render from returning an old movie.
+
 ## What is established
 
 | Area | Evidence and limits |

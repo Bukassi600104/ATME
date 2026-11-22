@@ -15,6 +15,17 @@ from atme.audio.voice_upload import (
     reconcile_words,
 )
 
+def test_denoise_preserves_input_where_spectral_gate_cannot_estimate_signal(monkeypatch):
+    from atme.audio.polish import denoise
+    import noisereduce
+
+    recording = np.array([0.25, 0.0, 0.0, -0.125, 0.4], dtype=np.float32)
+    reduced = np.array([0.2, np.nan, np.inf, -np.inf, 0.3], dtype=np.float32)
+    monkeypatch.setattr(noisereduce, "reduce_noise", lambda **kwargs: reduced)
+    result = denoise(recording, 24000)
+    np.testing.assert_array_equal(result, np.array([0.2, 0, 0, -0.125, 0.3], dtype=np.float32))
+
+
 SCENES = [
     {"scene_id": 1, "spoken_text": "Serving models creates a fight between latency and cost."},
     {"scene_id": 2, "spoken_text": "Memory movement becomes the real bottleneck."},

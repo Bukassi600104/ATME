@@ -106,8 +106,15 @@ def denoise(samples: np.ndarray, sample_rate: int) -> np.ndarray:
     except ImportError:
         log.warning("noisereduce not installed; skipping denoise")
         return samples
-    reduced = nr.reduce_noise(y=samples, sr=sample_rate, stationary=False, prop_decrease=0.85)
-    return np.asarray(reduced, dtype=np.float32)
+    # On digital silence the nonstationary spectral gate can divide zero by zero.
+    # Keep original PCM wherever the noise estimate is undefined, before running stateful filters.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        reduced = nr.reduce_noise(y=samples, sr=sample_rate, stationary=False, prop_decrease=0.85)
+    reduced = np.asarray(reduced, dtype=np.float32)
+    finite = np.isfinite(reduced)
+    if not finite.all():
+        return np.where(finite, reduced, np.asarray(samples, dtype=np.float32))
+    return reduced
 
 
 def dynamics_and_loudness(samples: np.ndarray, sample_rate: int, target_lufs: float = -16.0) -> np.ndarray:
